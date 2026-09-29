@@ -1,0 +1,96 @@
+{
+  "teams": [
+    {
+      "name": "Red Dragons",
+      "group": "A",
+      "color": "#d0483f",
+      "logo_url": "/assets/teams/red-dragons.png",
+      "players": [
+        { "dcl_id": "DCL-001", "name": "Prahlad", "number": 1, "position": "GK", "is_manager": false },
+        { "dcl_id": "DCL-002", "name": "Changte", "number": 2, "position": "DEF", "is_manager": false },
+        { "dcl_id": "DCL-003", "name": "Sagar", "number": 3, "position": "DEF", "is_manager": false },
+        { "dcl_id": "DCL-004", "name": "Suman Chakraborty", "number": 4, "position": "MID", "is_manager": false },
+        { "dcl_id": "DCL-005", "name": "Soutrik", "number": 5, "position": "MID", "is_manager": false },
+        { "dcl_id": "DCL-006", "name": "Manoj", "number": 6, "position": "FWD", "is_manager": false },
+        { "dcl_id": "DCL-007", "name": "Subhra", "number": 7, "position": "FWD", "is_manager": true }
+      ]
+    },
+    {
+      "name": "Golden Hawks",
+      "group": "A",
+      "color": "#d9a71b",
+      "logo_url": "/assets/teams/golden-hawks.png",
+      "players": [
+        { "dcl_id": "DCL-008", "name": "Sumit", "number": 1, "position": "GK", "is_manager": false },
+        { "dcl_id": "DCL-009", "name": "Nikunj", "number": 2, "position": "DEF", "is_manager": false },
+        { "dcl_id": "DCL-010", "name": "Jisu", "number": 3, "position": "DEF", "is_manager": false },
+        { "dcl_id": "DCL-011", "name": "Mukul", "number": 4, "position": "MID", "is_manager": false },
+        { "dcl_id": "DCL-012", "name": "Gautam", "number": 5, "position": "MID", "is_manager": false },
+        { "dcl_id": "DCL-013", "name": "Souvik", "number": 6, "position": "FWD", "is_manager": false },
+        { "dcl_id": "DCL-014", "name": "Upendra", "number": 7, "position": "FWD", "is_manager": false },
+        { "dcl_id": "DCL-015", "name": "Rajesh", "number": 8, "position": "MID", "is_manager": true }
+      ]
+    },
+    {
+      "name": "White Lions",
+      "group": "A",
+      "color": "#c9cdd0",
+      "logo_url": "/assets/teams/white-lions.png",
+      "players": [
+        { "dcl_id": "DCL-038", "name": "Soumava", "number": 1, "position": "GK", "is_manager": false },
+        { "dcl_id": "DCL-039", "name": "Joy", "number": 2, "position": "DEF", "is_manager": false },
+        { "dcl_id": "DCL-040", "name": "Pankaj", "number": 3, "position": "DEF", "is_manager": false },
+        { "dcl_id": "DCL-041", "name": "Hruda", "number": 4, "position": "MID", "is_manager": false },
+        { "dcl_id": "DCL-042", "name": "Trideb", "number": 5, "position": "MID", "is_manager": false },
+        { "dcl_id": "DCL-043", "name": "Sandip", "number": 6, "position": "FWD", "is_manager": false },
+        { "dcl_id": "DCL-044", "name": "Mayukh", "number": 7, "position": "FWD", "is_manager": true }
+      ]
+    },
+    {
+      "name": "Black Panthers",
+      "group": "B",
+      "color": "#565b66",
+      "logo_url": "/assets/teams/black-panthers.png",
+      "players": [
+        { "dcl_id": "DCL-016", "name": "Ritwik", "number": 1, "position": "GK", "is_manager": false },
+        { "dcl_id": "DCL-017", "name": "Shamindra", "number": 2, "position": "DEF", "is_manager": false },
+        { "dcl_id": "DCL-018", "name": "Ishaan", "number": 3, "position": "DEF", "is_manager": false },
+        { "dcl_id": "DCL-019", "name": "Arush", "number": 4, "position": "MID", "is_manager": false },
+        { "dcl_id": "DCL-020", "name": "Nilotpal", "number": 5, "position": "MID", "is_manager": false },
+        { "dcl_id": "DCL-021", "name": "Haseeb", "number": 6, "position": "FWD", "is_manager": false },
+        { "dcl_id": "DCL-022", "name": "Sumon Sarkar", "number": 7, "position": "FWD", "is_manager": true }
+      ]
+    },
+    {
+      "name": "Blue Whales",
+      "group": "B",
+      "color": "#3d8fd6",
+      "logo_url": "/assets/teams/blue-whales.png",
+      "players": [
+        { "dcl_id": "DCL-023", "name": "Sagnik", "number": 1, "position": "GK", "is_manager": false },
+        { "dcl_id": "DCL-024", "name": "Rounak", "number": 2, "position": "DEF", "is_manager": false },
+        { "dcl_id": "DCL-025", "name": "Salim", "number": 3, "position": "DEF", "is_manager": false },
+        { "dcl_id": "DCL-026", "name": "Suman Kundu", "number": 4, "position": "MID", "is_manager": false },
+        { "dcl_id": "DCL-027", "name": "Maharana", "number": 5, "position": "MID", "is_manager": false },
+        { "dcl_id": "DCL-028", "name": "Chotu", "number": 6, "position": "FWD", "is_manager": false },
+        { "dcl_id": "DCL-029", "name": "Tamojit", "number": 7, "position": "FWD", "is_manager": false },
+        { "dcl_id": "DCL-030", "name": "Arindam", "number": 8, "position": "MID", "is_manager": true }
+      ]
+    },
+    {
+      "name": "Green Alligators",
+      "group": "B",
+      "color": "#3f9958",
+      "logo_url": "/assets/teams/green-alligators.png",
+      "players": [
+        { "dcl_id": "DCL-031", "name": "Anirban", "number": 1, "position": "GK", "is_manager": false },
+        { "dcl_id": "DCL-032", "name": "Shakti", "number": 2, "position": "DEF", "is_manager": false },
+        { "dcl_id": "DCL-033", "name": "Rup", "number": 3, "position": "DEF", "is_manager": false },
+        { "dcl_id": "DCL-034", "name": "Sayan", "number": 4, "position": "MID", "is_manager": false },
+        { "dcl_id": "DCL-035", "name": "Ujjal", "number": 5, "position": "MID", "is_manager": false },
+        { "dcl_id": "DCL-036", "name": "Sourav", "number": 6, "position": "FWD", "is_manager": false },
+        { "dcl_id": "DCL-037", "name": "Shantanu", "number": 7, "position": "FWD", "is_manager": true }
+      ]
+    }
+  ]
+}

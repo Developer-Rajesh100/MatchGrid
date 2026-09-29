@@ -1,0 +1,41 @@
+# Prepared ahead of Phase 10 (production deployment / Dockerfiles) so that
+# whatever build context gets used there, secrets and local-only artifacts
+# are excluded by default — see implementation.txt Phase 9.5 and
+# reference/plan.txt §8/§10 (never let a dev secret reach a build artifact).
+
+# Secrets — never bake these into an image; real values are injected via
+# environment variables at deploy time instead.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Version control / editor
+.git
+.gitignore
+.dockerignore
+.vscode
+.idea
+
+# Backend
+backend/venv
+backend/**/__pycache__
+backend/**/*.pyc
+backend/.pytest_cache
+backend/tests
+
+# Frontend
+frontend/node_modules
+frontend/dist
+
+# Project docs/reference — not needed inside a runtime image
+docs
+reference
+README.md
+
+# TLS certs (Phase 10) — mounted as a volume at runtime (see
+# docker-compose.yml), never copied into an image; excluded from the build
+# context entirely as a second layer of the same guarantee.
+proxy/certs/*.pem

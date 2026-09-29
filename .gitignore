@@ -1,0 +1,40 @@
+# Environment files (contain credentials/secrets — never commit real values)
+.env
+backend/.env
+frontend/.env
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# Python
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+backend/.pytest_cache/
+backend/**/.pytest_cache/
+backend/.ruff_cache/
+backend/.coverage
+backend/htmlcov/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
+# TLS certificates (self-signed dev certs or real ones — never commit either;
+# real certs are secrets, and even a dev cert/key pair doesn't belong in git)
+proxy/certs/*.pem
+
+# Development-only planning/audit documentation — not part of the shipped
+# application, already excluded from the Docker build context (.dockerignore)
+# for the same reason. Requested explicitly during the final project audit;
+# if you'd rather keep this history under version control, just remove these
+# two lines — nothing else in the project depends on them being ignored.
+reference/
+docs/
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/

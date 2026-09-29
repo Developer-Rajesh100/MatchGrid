@@ -1,0 +1,70 @@
+from typing import Optional
+
+from beanie import PydanticObjectId
+from fastapi import APIRouter, Depends, Query
+
+from app.core.deps import get_current_admin
+from app.core.errors import NotFoundError
+from app.models import Admin, Player, Team
+from app.schemas.player import PlayerCreate, PlayerDetailOut, PlayerOut, PlayerUpdate
+from app.services.players import create_player, delete_player, get_player_detail, update_player
+from app.services.serializers import player_to_out
+from app.services.tournament_scope import get_active_tournament_id
+
+router = APIRouter(prefix="/players", tags=["players"])
+
+
+async def _player_or_404(player_id: str) -> Player:
+    player = await Player.get(PydanticObjectId(player_id))
+    if player is None:
+        raise NotFoundError("Player not found")
+    return player
+
+
+@router.get("", response_model=list[PlayerOut])
+async def list_players(team_id: Optional[str] = Query(default=None)) -> list[PlayerOut]:
+    tournament_id = await get_active_tournament_id()
+    teams = {t.id: t for t in await Team.find(Team.tournament_id == tournament_id).to_list()}
+
+    if team_id:
+        tid = PydanticObjectId(team_id)
+        # A team_id outside the current tournament has no players to show,
+        # same as any other team_id with an empty roster.
+        query = Player.find(Player.team_id == tid) if tid in teams else None
+    else:
+        query = Player.find({"team_id": {"$in": list(teams.keys())}})
+
+    players = await query.sort("number").to_list() if query is not None else []
+    return [player_to_out(p, teams.get(p.team_id)) for p in players]
+
+
+@router.get("/{player_id}", response_model=PlayerDetailOut)
+async def get_player(player_id: str) -> PlayerDetailOut:
+    player = await _player_or_404(player_id)
+    return await get_player_detail(player)
+
+
+@router.post("", response_model=PlayerOut, status_code=201)
+async def add_player(payload: PlayerCreate, _admin: Admin = Depends(get_current_admin)) -> PlayerOut:
+    """Add a player to a team. DCL ID is auto-assigned; jersey number must be unique on the team."""
+    player = await create_player(payload)
+    team = await Team.get(player.team_id)
+    return player_to_out(player, team)
+
+
+@router.patch("/{player_id}", response_model=PlayerOut)
+async def edit_player(
+    player_id: str, payload: PlayerUpdate, _admin: Admin = Depends(get_current_admin)
+) -> PlayerOut:
+    """Update player fields. Setting is_manager=true unsets any other manager on the same team."""
+    player = await _player_or_404(player_id)
+    player = await update_player(player, payload)
+    team = await Team.get(player.team_id)
+    return player_to_out(player, team)
+
+
+@router.delete("/{player_id}", status_code=204)
+async def remove_player(player_id: str, _admin: Admin = Depends(get_current_admin)) -> None:
+    """Remove a player. Blocked if the player already has recorded match events or lineup entries."""
+    player = await _player_or_404(player_id)
+    await delete_player(player)
