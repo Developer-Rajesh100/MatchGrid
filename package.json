@@ -4,12 +4,17 @@
   "private": true,
   "description": "DCL Season 5 — Digital Scoreboard",
   "scripts": {
-    "dev": "npm --prefix frontend run dev",
+    "dev": "concurrently --kill-others -n \"backend,frontend\" -c \"cyan,magenta\" \"npm run backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm run backend",
     "build": "npm --prefix frontend run build",
     "preview": "npm --prefix frontend run preview",
     "backend": "cd backend && ./venv/bin/uvicorn app.main:app --reload --port 8001",
     "test:frontend": "npm --prefix frontend run test",
     "test:backend": "cd backend && ./venv/bin/pytest",
     "test": "npm run test:backend && npm run test:frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.5"
   }
 }

@@ -77,7 +77,7 @@ export function StandingsPage() {
               </h4>
               <p style={{ fontSize: '13px', color: 'var(--chalk-dim)', lineHeight: '1.6' }}>
                 Teams are ranked by: <strong>Points (3 for a Win, 1 for a Draw)</strong> &rarr; <strong>Goal Difference (GD)</strong> &rarr; <strong>Goals For (GF)</strong>.
-                The top 2 teams from each group qualify for the semi-finals: <strong>Group A Winner vs Group B Runner-up (A1 vs B2)</strong> and <strong>Group B Winner vs Group A Runner-up (B1 vs A2)</strong>.
+                The top 2 teams from each group qualify for the semi-finals: <strong>Semi-final 1: Group A Runner-up vs Group B Winner (A2 vs B1)</strong> and <strong>Semi-final 2: Group B Runner-up vs Group A Winner (B2 vs A1)</strong>.
               </p>
             </div>
           </div>

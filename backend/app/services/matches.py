@@ -310,8 +310,10 @@ async def generate_semis(tournament_id: PydanticObjectId) -> list[Match]:
     if len(standings_a) < 2 or len(standings_b) < 2:
         raise ConflictError("Each group needs at least 2 teams with standings computed")
 
-    semis[0].team1_id, semis[0].team2_id = standings_a[0].team_id, standings_b[1].team_id
-    semis[1].team1_id, semis[1].team2_id = standings_b[0].team_id, standings_a[1].team_id
+    # Per the official DCL Season 5 schedule: SF1 = Group A (2nd) vs Group B (1st),
+    # SF2 = Group B (2nd) vs Group A (1st).
+    semis[0].team1_id, semis[0].team2_id = standings_a[1].team_id, standings_b[0].team_id
+    semis[1].team1_id, semis[1].team2_id = standings_b[1].team_id, standings_a[0].team_id
     await semis[0].save()
     await semis[1].save()
     await refresh_tournament_stage(tournament_id)

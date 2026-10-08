@@ -9,6 +9,5 @@ export const playersApi = {
   },
   getPlayer: (playerId) => apiClient(`/api/players/${playerId}`),
   createPlayer: (data) => apiClient('/api/players', { method: 'POST', body: data }),
-  updatePlayer: (playerId, data) => apiClient(`/api/players/${playerId}`, { method: 'PATCH', body: data }),
   deletePlayer: (playerId) => apiClient(`/api/players/${playerId}`, { method: 'DELETE' }),
 };

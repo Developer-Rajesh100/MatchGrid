@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.match_event import MatchEventOut
 
@@ -43,11 +43,18 @@ class HalfTimePayload(BaseModel):
 
 
 class MatchUpdate(BaseModel):
-    date: Optional[str] = None
-    time: Optional[str] = None
-    venue: Optional[str] = None
+    date: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")  # YYYY-MM-DD
+    time: Optional[str] = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")  # HH:MM, 24h
+    venue: Optional[str] = Field(default=None, max_length=200)
     duration_minutes: Optional[int] = Field(default=None, ge=1, le=240)
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=1000)
+
+    @field_validator("date")
+    @classmethod
+    def _real_calendar_date(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            date.fromisoformat(v)  # rejects e.g. 2026-13-45
+        return v
 
 
 class WinnerRequest(BaseModel):

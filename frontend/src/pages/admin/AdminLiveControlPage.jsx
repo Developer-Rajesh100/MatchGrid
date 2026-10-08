@@ -32,6 +32,12 @@ export function AdminLiveControlPage() {
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
+  // The error banner renders at the top of the page; bring it into view when an
+  // action fails while the operator is scrolled down at the event/lineup forms.
+  useEffect(() => {
+    if (error) window.scrollTo?.({ top: 0, behavior: 'smooth' });
+  }, [error]);
+
   // New Event Form State
   const [eventType, setEventType] = useState('goal');
   const [eventTeamId, setEventTeamId] = useState('');
@@ -774,12 +780,13 @@ export function AdminLiveControlPage() {
             {/* Minute (not needed for POTM) */}
             {eventType !== 'potm' && (
               <div className="field">
-                <label htmlFor="event-minute">Match Minute (1 - 90)</label>
+                <label htmlFor="event-minute">Match Minute (1 - 120, required)</label>
                 <input
                   id="event-minute"
                   type="number"
                   min="1"
                   max="120"
+                  required
                   className="input"
                   placeholder="e.g. 34"
                   value={eventMinute}

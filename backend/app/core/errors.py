@@ -6,6 +6,7 @@ deal with one error format, whether the failure came from Pydantic request
 validation, an app-level rule, or an unexpected 500.
 """
 
+from bson.errors import InvalidId
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -45,3 +46,8 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers
         )
+
+    @app.exception_handler(InvalidId)
+    async def handle_invalid_id(request: Request, exc: InvalidId) -> JSONResponse:
+        # A malformed ObjectId in a path/query/body is a client error, not a server fault.
+        return JSONResponse(status_code=422, content={"detail": "Invalid id format"})

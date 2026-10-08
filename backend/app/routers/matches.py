@@ -259,7 +259,7 @@ async def generate_fixtures(
 
 @router.post("/generate-semis", response_model=list[MatchOut])
 async def do_generate_semis(_admin: Admin = Depends(get_current_admin)) -> list[MatchOut]:
-    """Seed the 2 semi-finals from final group standings: A1 vs B2, B1 vs A2.
+    """Seed the 2 semi-finals from final group standings: SF1 = A2 vs B1, SF2 = B2 vs A1.
     Requires both groups fully complete and no semis generated yet."""
     tournament = await Tournament.find_one()
     matches = await generate_semis(tournament.id)

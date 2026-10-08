@@ -174,9 +174,9 @@ async def test_generate_semis_seeds_correctly_from_group_standings(tournament, g
 
     assert len(semis) == 2
     semi1, semi2 = sorted(semis, key=lambda m: m.match_number)
-    # Semi-final 1: Group A winner vs Group B runner-up; Semi-final 2: Group B winner vs Group A runner-up.
-    assert semi1.team1_id == teams["Red Dragons"].id
-    assert semi2.team1_id == teams["Blue Whales"].id
+    # Semi-final 1: Group A (2nd) vs Group B (1st); Semi-final 2: Group B (2nd) vs Group A (1st).
+    assert semi1.team2_id == teams["Blue Whales"].id
+    assert semi2.team2_id == teams["Red Dragons"].id
 
 
 async def test_generate_semis_rejects_regenerating_once_already_seeded(tournament, groups, teams, players):

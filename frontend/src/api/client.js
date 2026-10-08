@@ -33,7 +33,13 @@ export async function apiClient(endpoint, options = {}) {
     try {
       const errorJson = await response.json();
       errorDetail = errorJson.detail || errorDetail;
-      if (typeof errorDetail === 'object') {
+      if (Array.isArray(errorDetail)) {
+        // FastAPI validation errors: [{loc: [...], msg: '...'}, ...]
+        errorDetail = errorDetail
+          .map((e) => (e?.loc ? `${e.loc.slice(1).join('.') || e.loc[0]}: ${e.msg}` : e?.msg))
+          .filter(Boolean)
+          .join('; ');
+      } else if (typeof errorDetail === 'object') {
         errorDetail = JSON.stringify(errorDetail);
       }
     } catch {

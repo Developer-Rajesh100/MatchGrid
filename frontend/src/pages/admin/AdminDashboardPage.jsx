@@ -745,7 +745,7 @@ export function AdminDashboardPage() {
               <div style={{ padding: '14px', borderRadius: '8px', background: 'var(--panel-alt)', border: '1px solid var(--line)' }}>
                 <div style={{ fontWeight: 600, marginBottom: '4px' }}>1. Generate Semi-finals</div>
                 <p style={{ fontSize: '12.5px', color: 'var(--chalk-dim)', marginBottom: '10px' }}>
-                  Seeds Match 7 (A1 vs B2) and Match 8 (B1 vs A2) from computed group standings.
+                  Seeds Match 7 (A2 vs B1) and Match 8 (B2 vs A1) from computed group standings.
                 </p>
                 <button className="btn btn-primary btn-sm" onClick={handleGenerateSemis} disabled={actionLoading}>
                   Seed Semi-finals

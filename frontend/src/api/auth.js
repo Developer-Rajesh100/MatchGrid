@@ -18,8 +18,6 @@ export const authApi = {
     localStorage.removeItem('dcl_admin_username');
     window.dispatchEvent(new Event('dcl-auth-changed'));
   },
-  getMe: () => apiClient('/api/auth/me'),
-  getToken: () => localStorage.getItem('dcl_admin_token'),
   getUsername: () => localStorage.getItem('dcl_admin_username') || 'Admin',
   isAuthenticated: () => !!localStorage.getItem('dcl_admin_token'),
 };
