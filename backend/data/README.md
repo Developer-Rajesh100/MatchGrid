@@ -28,7 +28,6 @@ Or point it at a different file:
           "dcl_id": "DCL-001",
           "name": "Prahlad",
           "number": 1,
-          "position": "GK",
           "is_manager": false,
           "photo_url": "/assets/players/DCL-001.jpg"
         }
@@ -47,14 +46,13 @@ Or point it at a different file:
 | `teams[].players[].dcl_id` | no | Your tournament's player ID (e.g. `"DCL-001"`). If given, it's what re-running the import matches this player against (so you can safely re-run after fixing a typo). If omitted, one is auto-assigned and matching falls back to (team, jersey number) instead. |
 | `teams[].players[].name` | yes | |
 | `teams[].players[].number` | yes | Jersey number, unique within the team. |
-| `teams[].players[].position` | yes | One of `"GK"`, `"DEF"`, `"MID"`, `"FWD"`. |
 | `teams[].players[].is_manager` | no | Defaults to `false`. At most one `true` per team — the importer will error if a team's file has more than one. |
 | `teams[].players[].photo_url` | no | Path to the player's photo, served from `frontend/public/assets/players/`. Defaults to `/assets/players/<dcl_id>.jpg` if omitted (or is skipped if there's no `dcl_id` to key off) — put the actual image file at that path yourself. |
 
 ## Behavior
 
 - **Idempotent**: re-running the import against an updated file upserts in place — it matches existing teams by name and existing players by `dcl_id` (or by team+number, if no `dcl_id`), updates their fields, and never creates duplicates.
-- **Validates everything before writing anything**: every row is checked (required fields, duplicate names/numbers/DCL IDs within the file, valid `position`/`group` values, at most one manager per team) and all problems are reported together; if anything is invalid, nothing is written to the database.
+- **Validates everything before writing anything**: every row is checked (required fields, duplicate names/numbers/DCL IDs within the file, valid `group` values, at most one manager per team) and all problems are reported together; if anything is invalid, nothing is written to the database.
 - **Never touches matches, events, lineups, or standings** — those belong to Part 2/3's match-management system, not this import. Re-running the import after matches have already been played is safe (it only touches `teams`, `groups`/`group_teams`, and `players`).
 - **Group assignment** happens after teams are upserted, based on each team's `group` field.
 - Image files themselves are **not** part of this JSON — place the actual `.jpg`/`.png` files under `frontend/public/assets/players/` and `frontend/public/assets/teams/` yourself; the JSON only records the *paths* the frontend will request them at (see `docs/DATABASE_DESIGN.md` §14).

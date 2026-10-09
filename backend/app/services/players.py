@@ -35,7 +35,6 @@ async def create_player(payload: PlayerCreate) -> Player:
                 dcl_id=dcl_id,
                 name=payload.name,
                 number=payload.number,
-                position=payload.position,
                 is_manager=False,
                 photo_url=payload.photo_url,
             )

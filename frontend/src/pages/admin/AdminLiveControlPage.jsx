@@ -749,7 +749,7 @@ export function AdminLiveControlPage() {
                 <option value="">Select Player...</option>
                 {activeTeamPlayers.map((p) => (
                   <option key={p.id} value={p.id}>
-                    #{p.number} {p.name} ({p.position})
+                    #{p.number} {p.name}
                   </option>
                 ))}
               </select>
@@ -900,7 +900,7 @@ export function AdminLiveControlPage() {
                     checked={selectedLineup.includes(p.id)}
                     onChange={() => handleToggleLineupPlayer(p.id)}
                   />
-                  <span>#{p.number} {p.name} ({p.position})</span>
+                  <span>#{p.number} {p.name}</span>
                 </label>
               ))}
             </div>
@@ -931,7 +931,7 @@ export function AdminLiveControlPage() {
                     checked={selectedLineup.includes(p.id)}
                     onChange={() => handleToggleLineupPlayer(p.id)}
                   />
-                  <span>#{p.number} {p.name} ({p.position})</span>
+                  <span>#{p.number} {p.name}</span>
                 </label>
               ))}
             </div>

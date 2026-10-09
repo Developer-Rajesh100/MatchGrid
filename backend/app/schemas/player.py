@@ -1,8 +1,6 @@
-from typing import Literal, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
-
-Position = Literal["GK", "DEF", "MID", "FWD"]
 
 
 class PlayerOut(BaseModel):
@@ -13,7 +11,6 @@ class PlayerOut(BaseModel):
     dcl_id: str
     name: str
     number: int
-    position: Position
     is_manager: bool
     photo_url: Optional[str] = None
 
@@ -22,7 +19,6 @@ class PlayerCreate(BaseModel):
     team_id: str
     name: str = Field(min_length=1)
     number: int = Field(ge=0, le=999)
-    position: Position
     is_manager: bool = False
     photo_url: Optional[str] = None
 
@@ -30,7 +26,6 @@ class PlayerCreate(BaseModel):
 class PlayerUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1)
     number: Optional[int] = Field(default=None, ge=0, le=999)
-    position: Optional[Position] = None
     is_manager: Optional[bool] = None
     photo_url: Optional[str] = None
 

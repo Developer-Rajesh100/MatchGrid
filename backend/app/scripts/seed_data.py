@@ -23,75 +23,75 @@ TEAMS = [
     {
         "name": "Red Dragons", "group": "A", "color": "#d0483f",
         "players": [
-            ("DCL-001", "Prahlad", 1, "GK", False),
-            ("DCL-002", "Changte", 2, "DEF", False),
-            ("DCL-003", "Sagar", 3, "DEF", False),
-            ("DCL-004", "Suman Chakraborty", 4, "MID", False),
-            ("DCL-005", "Soutrik", 5, "MID", False),
-            ("DCL-006", "Manoj", 6, "FWD", False),
-            ("DCL-007", "Subhra", 7, "FWD", True),
+            ("DCL-001", "Prahlad", 1, False),
+            ("DCL-002", "Changte", 2, False),
+            ("DCL-003", "Sagar", 3, False),
+            ("DCL-004", "Suman Chakraborty", 4, False),
+            ("DCL-005", "Soutrik", 5, False),
+            ("DCL-006", "Manoj", 6, False),
+            ("DCL-007", "Subhra", 7, True),
         ],
     },
     {
         "name": "Golden Hawks", "group": "A", "color": "#d9a71b",
         "players": [
-            ("DCL-008", "Sumit", 1, "GK", False),
-            ("DCL-009", "Nikunj", 2, "DEF", False),
-            ("DCL-010", "Jisu", 3, "DEF", False),
-            ("DCL-011", "Mukul", 4, "MID", False),
-            ("DCL-012", "Gautam", 5, "MID", False),
-            ("DCL-013", "Souvik", 6, "FWD", False),
-            ("DCL-014", "Upendra", 7, "FWD", False),
-            ("DCL-015", "Rajesh", 8, "MID", True),
+            ("DCL-008", "Sumit", 1, False),
+            ("DCL-009", "Nikunj", 2, False),
+            ("DCL-010", "Jisu", 3, False),
+            ("DCL-011", "Mukul", 4, False),
+            ("DCL-012", "Gautam", 5, False),
+            ("DCL-013", "Souvik", 6, False),
+            ("DCL-014", "Upendra", 7, False),
+            ("DCL-015", "Rajesh", 8, True),
         ],
     },
     {
         "name": "White Lions", "group": "A", "color": "#c9cdd0",
         "players": [
-            ("DCL-038", "Soumava", 1, "GK", False),
-            ("DCL-039", "Joy", 2, "DEF", False),
-            ("DCL-040", "Pankaj", 3, "DEF", False),
-            ("DCL-041", "Hruda", 4, "MID", False),
-            ("DCL-042", "Trideb", 5, "MID", False),
-            ("DCL-043", "Sandip", 6, "FWD", False),
-            ("DCL-044", "Mayukh", 7, "FWD", True),
+            ("DCL-038", "Soumava", 1, False),
+            ("DCL-039", "Joy", 2, False),
+            ("DCL-040", "Pankaj", 3, False),
+            ("DCL-041", "Hruda", 4, False),
+            ("DCL-042", "Trideb", 5, False),
+            ("DCL-043", "Sandip", 6, False),
+            ("DCL-044", "Mayukh", 7, True),
         ],
     },
     {
         "name": "Black Panthers", "group": "B", "color": "#565b66",
         "players": [
-            ("DCL-016", "Ritwik", 1, "GK", False),
-            ("DCL-017", "Shamindra", 2, "DEF", False),
-            ("DCL-018", "Ishaan", 3, "DEF", False),
-            ("DCL-019", "Arush", 4, "MID", False),
-            ("DCL-020", "Nilotpal", 5, "MID", False),
-            ("DCL-021", "Haseeb", 6, "FWD", False),
-            ("DCL-022", "Sumon Sarkar", 7, "FWD", True),
+            ("DCL-016", "Ritwik", 1, False),
+            ("DCL-017", "Shamindra", 2, False),
+            ("DCL-018", "Ishaan", 3, False),
+            ("DCL-019", "Arush", 4, False),
+            ("DCL-020", "Nilotpal", 5, False),
+            ("DCL-021", "Haseeb", 6, False),
+            ("DCL-022", "Sumon Sarkar", 7, True),
         ],
     },
     {
         "name": "Blue Whales", "group": "B", "color": "#3d8fd6",
         "players": [
-            ("DCL-023", "Sagnik", 1, "GK", False),
-            ("DCL-024", "Rounak", 2, "DEF", False),
-            ("DCL-025", "Salim", 3, "DEF", False),
-            ("DCL-026", "Suman Kundu", 4, "MID", False),
-            ("DCL-027", "Maharana", 5, "MID", False),
-            ("DCL-028", "Chotu", 6, "FWD", False),
-            ("DCL-029", "Tamojit", 7, "FWD", False),
-            ("DCL-030", "Arindam", 8, "MID", True),
+            ("DCL-023", "Sagnik", 1, False),
+            ("DCL-024", "Rounak", 2, False),
+            ("DCL-025", "Salim", 3, False),
+            ("DCL-026", "Suman Kundu", 4, False),
+            ("DCL-027", "Maharana", 5, False),
+            ("DCL-028", "Chotu", 6, False),
+            ("DCL-029", "Tamojit", 7, False),
+            ("DCL-030", "Arindam", 8, True),
         ],
     },
     {
         "name": "Green Alligators", "group": "B", "color": "#3f9958",
         "players": [
-            ("DCL-031", "Anirban", 1, "GK", False),
-            ("DCL-032", "Shakti", 2, "DEF", False),
-            ("DCL-033", "Rup", 3, "DEF", False),
-            ("DCL-034", "Sayan", 4, "MID", False),
-            ("DCL-035", "Ujjal", 5, "MID", False),
-            ("DCL-036", "Sourav", 6, "FWD", False),
-            ("DCL-037", "Shantanu", 7, "FWD", True),
+            ("DCL-031", "Anirban", 1, False),
+            ("DCL-032", "Shakti", 2, False),
+            ("DCL-033", "Rup", 3, False),
+            ("DCL-034", "Sayan", 4, False),
+            ("DCL-035", "Ujjal", 5, False),
+            ("DCL-036", "Sourav", 6, False),
+            ("DCL-037", "Shantanu", 7, True),
         ],
     },
 ]
@@ -124,13 +124,12 @@ async def seed() -> None:
         ).insert()
         teams_by_group[team_data["group"]].append(team)
 
-        for dcl_id, name, number, position, is_manager in team_data["players"]:
+        for dcl_id, name, number, is_manager in team_data["players"]:
             await Player(
                 team_id=team.id,
                 dcl_id=dcl_id,
                 name=name,
                 number=number,
-                position=position,
                 is_manager=is_manager,
                 photo_url=f"/assets/players/{dcl_id}.jpg",
             ).insert()
@@ -170,10 +169,10 @@ async def seed() -> None:
             match_id=demo_match.id, team_id=player.team_id, player_id=player.id
         ).insert()
 
-    scorer1 = next(p for p in team1_players if p.position == "FWD")
-    assist1 = next(p for p in team1_players if p.position == "MID")
-    scorer2 = next(p for p in team2_players if p.position == "FWD")
-    booked = next(p for p in team2_players if p.position == "DEF")
+    outfield1 = [p for p in team1_players if not p.is_manager]
+    outfield2 = [p for p in team2_players if not p.is_manager]
+    scorer1, assist1 = outfield1[-1], outfield1[-2]
+    scorer2, booked = outfield2[-1], outfield2[1]
 
     await MatchEvent(
         match_id=demo_match.id, type="goal", team_id=demo_match.team1_id,

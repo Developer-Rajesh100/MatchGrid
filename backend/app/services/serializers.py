@@ -46,7 +46,6 @@ def player_to_out(player: Player, team: Optional[Team] = None) -> PlayerOut:
         dcl_id=player.dcl_id,
         name=player.name,
         number=player.number,
-        position=player.position,
         is_manager=player.is_manager,
         photo_url=player.photo_url,
     )

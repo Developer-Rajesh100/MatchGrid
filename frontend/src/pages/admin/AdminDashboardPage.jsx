@@ -57,7 +57,6 @@ export function AdminDashboardPage() {
   const [newPlayer, setNewPlayer] = useState({
     name: '',
     number: '',
-    position: 'MID',
     is_manager: false,
     dcl_id: '',
   });
@@ -343,12 +342,11 @@ export function AdminDashboardPage() {
         team_id: selectedTeamId,
         name: newPlayer.name.trim(),
         number: parseInt(newPlayer.number, 10),
-        position: newPlayer.position,
         is_manager: newPlayer.is_manager,
         dcl_id: newPlayer.dcl_id.trim() || undefined,
       });
       showSuccess(`Player "${newPlayer.name}" added to squad!`);
-      setNewPlayer({ name: '', number: '', position: 'MID', is_manager: false, dcl_id: '' });
+      setNewPlayer({ name: '', number: '', is_manager: false, dcl_id: '' });
       const updated = await playersApi.getPlayers({ team_id: selectedTeamId });
       setTeamPlayers(updated || []);
     } catch (err) {
@@ -652,19 +650,6 @@ export function AdminDashboardPage() {
                       required
                     />
                   </div>
-                  <div className="field">
-                    <label>Position *</label>
-                    <select
-                      className="select"
-                      value={newPlayer.position}
-                      onChange={(e) => setNewPlayer({ ...newPlayer, position: e.target.value })}
-                    >
-                      <option value="GK">Goalkeeper (GK)</option>
-                      <option value="DEF">Defender (DEF)</option>
-                      <option value="MID">Midfielder (MID)</option>
-                      <option value="FWD">Forward (FWD)</option>
-                    </select>
-                  </div>
                 </div>
 
                 <div className="field">
@@ -726,7 +711,7 @@ export function AdminDashboardPage() {
                         {p.name} {p.is_manager && <span style={{ fontSize: '10px', color: 'var(--amber)' }}>(Manager)</span>}
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--chalk-dim)' }}>
-                        {p.position} {p.dcl_id ? `· ${p.dcl_id}` : ''}
+                        {p.dcl_id || ''}
                       </div>
                     </div>
                   </div>

@@ -16,13 +16,13 @@ vi.mock('../../api/matches');
 vi.mock('../../api/players');
 
 const TEAM1_PLAYERS = [
-  { id: 'p1', number: 1, name: 'Keeper One', position: 'GK' },
-  { id: 'p2', number: 9, name: 'Striker One', position: 'FWD' },
-  { id: 'p3', number: 8, name: 'Mid One', position: 'MID' },
+  { id: 'p1', number: 1, name: 'Keeper One' },
+  { id: 'p2', number: 9, name: 'Striker One' },
+  { id: 'p3', number: 8, name: 'Mid One' },
 ];
 const TEAM2_PLAYERS = [
-  { id: 'p4', number: 1, name: 'Keeper Two', position: 'GK' },
-  { id: 'p5', number: 7, name: 'Striker Two', position: 'FWD' },
+  { id: 'p4', number: 1, name: 'Keeper Two' },
+  { id: 'p5', number: 7, name: 'Striker Two' },
 ];
 
 function baseMatch(overrides = {}) {

@@ -24,7 +24,6 @@ from app.models import Group, Player, Team, Tournament
 from app.services.groups import assign_team_group
 
 DEFAULT_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "tournament_data.json"
-VALID_POSITIONS = {"GK", "DEF", "MID", "FWD"}
 VALID_GROUPS = {"A", "B"}
 
 
@@ -82,12 +81,6 @@ def validate(data: dict) -> list[str]:
                 errors.append(f"{pprefix}.number {number} is duplicated within team '{name}'")
             else:
                 seen_numbers.add(number)
-
-            position = player.get("position")
-            if position not in VALID_POSITIONS:
-                errors.append(
-                    f"{pprefix}.position must be one of {sorted(VALID_POSITIONS)}, got {position!r}"
-                )
 
             dcl_id = player.get("dcl_id")
             if dcl_id is not None:
@@ -181,7 +174,6 @@ async def import_data(data: dict, dry_run: bool, update_existing: bool = True) -
             if existing_player:
                 existing_player.name = player_data["name"]
                 existing_player.number = player_data["number"]
-                existing_player.position = player_data["position"]
                 if photo_url:
                     existing_player.photo_url = photo_url
                 if player_data.get("is_manager") is True:
@@ -207,7 +199,6 @@ async def import_data(data: dict, dry_run: bool, update_existing: bool = True) -
                     dcl_id=dcl_id,
                     name=player_data["name"],
                     number=player_data["number"],
-                    position=player_data["position"],
                     is_manager=bool(player_data.get("is_manager")),
                     photo_url=photo_url,
                 )

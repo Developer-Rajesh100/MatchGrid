@@ -16,7 +16,7 @@ from app.services.players import create_player, delete_player, update_player
 
 async def test_create_player_assigns_an_auto_incrementing_dcl_id(tournament, teams, players):
     existing_count = await Player.find_all().count()
-    payload = PlayerCreate(team_id=str(teams["Red Dragons"].id), name="New Signing", number=99, position="FWD")
+    payload = PlayerCreate(team_id=str(teams["Red Dragons"].id), name="New Signing", number=99)
     player = await create_player(payload)
     assert player.dcl_id == f"DCL-{existing_count + 1:03d}"
     assert player.team_id == teams["Red Dragons"].id
@@ -25,7 +25,7 @@ async def test_create_player_assigns_an_auto_incrementing_dcl_id(tournament, tea
 async def test_create_player_rejects_a_duplicate_jersey_number_on_the_same_team(tournament, teams, players):
     existing = players["Red Dragons"][0]
     payload = PlayerCreate(
-        team_id=str(teams["Red Dragons"].id), name="Duplicate Number", number=existing.number, position="MID"
+        team_id=str(teams["Red Dragons"].id), name="Duplicate Number", number=existing.number
     )
     with pytest.raises(ConflictError):
         await create_player(payload)
@@ -36,10 +36,10 @@ async def test_create_player_allows_the_same_jersey_number_on_a_different_team(t
     # isolates "same number, different team" from an incidental same-team clash.
     number = 77
     await create_player(
-        PlayerCreate(team_id=str(teams["Red Dragons"].id), name="Red 77", number=number, position="MID")
+        PlayerCreate(team_id=str(teams["Red Dragons"].id), name="Red 77", number=number)
     )
     player = await create_player(
-        PlayerCreate(team_id=str(teams["Golden Hawks"].id), name="Hawks 77", number=number, position="MID")
+        PlayerCreate(team_id=str(teams["Golden Hawks"].id), name="Hawks 77", number=number)
     )
     assert player.number == number
     assert player.team_id == teams["Golden Hawks"].id
@@ -53,7 +53,7 @@ async def test_create_player_as_manager_unsets_the_teams_existing_manager(tourna
     await original_manager.save()
 
     payload = PlayerCreate(
-        team_id=str(teams["Red Dragons"].id), name="New Manager", number=50, position="MID", is_manager=True
+        team_id=str(teams["Red Dragons"].id), name="New Manager", number=50, is_manager=True
     )
     new_manager = await create_player(payload)
 
@@ -64,9 +64,8 @@ async def test_create_player_as_manager_unsets_the_teams_existing_manager(tourna
 
 async def test_update_player_can_change_basic_fields(tournament, teams, players):
     player = players["Red Dragons"][1]
-    updated = await update_player(player, PlayerUpdate(name="Renamed Player", position="FWD"))
+    updated = await update_player(player, PlayerUpdate(name="Renamed Player"))
     assert updated.name == "Renamed Player"
-    assert updated.position == "FWD"
 
 
 async def test_update_player_number_conflict_raises_a_clean_error(tournament, teams, players):
@@ -133,3 +132,32 @@ async def test_delete_player_is_blocked_when_they_have_a_lineup_entry(tournament
     with pytest.raises(ConflictError):
         await delete_player(player)
     assert await Player.get(player.id) is not None
+
+
+async def test_legacy_player_documents_with_position_still_load_and_are_not_exposed(
+    async_client, tournament, teams
+):
+    """Production already holds players stored with a `position` — they must keep
+    loading, and the API must no longer expose the field."""
+    from app.core.database import get_client
+    from app.core.config import get_settings
+
+    team = teams["Red Dragons"]
+    coll = get_client()[get_settings().mongo_db_name]["players"]
+    await coll.insert_one(
+        {"team_id": team.id, "dcl_id": "LEGACY-1", "name": "Old Doc", "number": 55,
+         "position": "GK", "is_manager": False}
+    )
+    listed = (await async_client.get(f"/api/players?team_id={team.id}")).json()
+    legacy = next(p for p in listed if p["dcl_id"] == "LEGACY-1")
+    assert "position" not in legacy
+    assert legacy["name"] == "Old Doc"
+
+
+def test_importer_accepts_files_with_or_without_position():
+    from app.scripts.import_tournament_data import validate
+
+    base = {"name": "T", "group": "A", "color": "#fff", "players": [{"name": "P", "number": 1}]}
+    assert [e for e in validate({"teams": [base]}) if not e.startswith("NOTE")] == []
+    with_pos = {**base, "players": [{"name": "P", "number": 1, "position": "GK"}]}
+    assert [e for e in validate({"teams": [with_pos]}) if not e.startswith("NOTE")] == []

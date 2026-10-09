@@ -55,7 +55,7 @@ async def test_foreign_player_does_not_appear_in_player_listing(async_client, to
     await foreign_team.insert()
     from app.models import Player
 
-    foreign_player = Player(team_id=foreign_team.id, dcl_id="GHOST-001", name="Ghost Player", number=99, position="FWD")
+    foreign_player = Player(team_id=foreign_team.id, dcl_id="GHOST-001", name="Ghost Player", number=99)
     await foreign_player.insert()
 
     resp = await async_client.get("/api/players")

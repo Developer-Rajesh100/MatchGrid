@@ -12,7 +12,6 @@ export function PlayersPage() {
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeam, setSelectedTeam] = useState(searchParams.get('team') || 'all');
-  const [selectedPos, setSelectedPos] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
@@ -30,7 +29,6 @@ export function PlayersPage() {
 
   const filteredPlayers = players.filter((p) => {
     if (selectedTeam !== 'all' && p.team_id !== selectedTeam) return false;
-    if (selectedPos !== 'all' && p.position !== selectedPos) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchName = p.name?.toLowerCase().includes(q);
@@ -90,21 +88,6 @@ export function PlayersPage() {
             ))}
           </select>
         </div>
-
-        {/* Position Filter */}
-        <div style={{ flex: '0 1 140px' }}>
-          <select
-            className="select"
-            value={selectedPos}
-            onChange={(e) => setSelectedPos(e.target.value)}
-          >
-            <option value="all">All Positions</option>
-            <option value="GK">Goalkeeper (GK)</option>
-            <option value="DEF">Defender (DEF)</option>
-            <option value="MID">Midfielder (MID)</option>
-            <option value="FWD">Forward (FWD)</option>
-          </select>
-        </div>
       </div>
 
       {loading ? (
@@ -144,9 +127,6 @@ export function PlayersPage() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-                  <span style={{ fontSize: '10px', background: 'var(--panel-alt)', border: '1px solid var(--line)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600, color: 'var(--chalk-dim)' }}>
-                    {player.position}
-                  </span>
                   {player.is_manager && (
                     <span style={{ fontSize: '10px', background: 'var(--amber)', color: 'var(--base)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
                       MANAGER

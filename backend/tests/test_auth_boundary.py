@@ -16,7 +16,7 @@ MUTATING_ENDPOINTS = [
     ("PATCH", f"/api/teams/{DUMMY_ID}", {"name": "X"}),
     ("DELETE", f"/api/teams/{DUMMY_ID}", None),
     ("POST", "/api/groups/random-draw", None),
-    ("POST", "/api/players", {"team_id": DUMMY_ID, "name": "X", "number": 1, "position": "GK"}),
+    ("POST", "/api/players", {"team_id": DUMMY_ID, "name": "X", "number": 1}),
     ("PATCH", f"/api/players/{DUMMY_ID}", {"name": "X"}),
     ("DELETE", f"/api/players/{DUMMY_ID}", None),
     ("PATCH", f"/api/matches/{DUMMY_ID}", {"venue": "X"}),

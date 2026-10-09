@@ -10,7 +10,6 @@
           "dcl_id": "DCL-001",
           "name": "Prahlad",
           "number": 1,
-          "position": "GK",
           "is_manager": false,
           "photo_url": "/assets/players/DCL-001.jpg"
         },
@@ -18,7 +17,6 @@
           "dcl_id": "DCL-007",
           "name": "Subhra",
           "number": 7,
-          "position": "FWD",
           "is_manager": true,
           "photo_url": "/assets/players/DCL-007.jpg"
         }
@@ -32,14 +30,12 @@
         {
           "dcl_id": "DCL-008",
           "name": "Sumit",
-          "number": 1,
-          "position": "GK"
+          "number": 1
         },
         {
           "dcl_id": "DCL-015",
           "name": "Rajesh",
           "number": 8,
-          "position": "MID",
           "is_manager": true
         }
       ]

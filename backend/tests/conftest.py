@@ -83,8 +83,8 @@ async def _make_team(tournament: Tournament, group: Group, name: str, color: str
     return team
 
 
-async def _make_player(team: Team, dcl_id: str, name: str, number: int, position: str) -> Player:
-    player = Player(team_id=team.id, dcl_id=dcl_id, name=name, number=number, position=position)
+async def _make_player(team: Team, dcl_id: str, name: str, number: int) -> Player:
+    player = Player(team_id=team.id, dcl_id=dcl_id, name=name, number=number)
     await player.insert()
     return player
 
@@ -109,10 +109,8 @@ async def players(teams) -> dict[str, list[Player]]:
     n = 1
     for team_name, team in teams.items():
         squad = []
-        for i, (pos, pname) in enumerate(
-            [("GK", "Keeper"), ("DEF", "Defender"), ("MID", "Midfielder"), ("FWD", "Striker")]
-        ):
-            squad.append(await _make_player(team, f"DCL-{n:03d}", f"{team_name} {pname}", i + 1, pos))
+        for i, pname in enumerate(["Keeper", "Defender", "Midfielder", "Striker"]):
+            squad.append(await _make_player(team, f"DCL-{n:03d}", f"{team_name} {pname}", i + 1))
             n += 1
         out[team_name] = squad
     return out

@@ -568,9 +568,6 @@ export function MatchDetailPage() {
                         #{p.number}
                       </span>
                       <span>{p.name}</span>
-                      <span style={{ fontSize: '10px', color: 'var(--chalk-muted)', marginLeft: 'auto' }}>
-                        {p.position}
-                      </span>
                     </div>
                   ))}
                   {team1Lineup.length === 0 && <span style={{ fontSize: '12px', color: 'var(--chalk-muted)' }}>None recorded</span>}
@@ -589,9 +586,6 @@ export function MatchDetailPage() {
                         #{p.number}
                       </span>
                       <span>{p.name}</span>
-                      <span style={{ fontSize: '10px', color: 'var(--chalk-muted)', marginLeft: 'auto' }}>
-                        {p.position}
-                      </span>
                     </div>
                   ))}
                   {team2Lineup.length === 0 && <span style={{ fontSize: '12px', color: 'var(--chalk-muted)' }}>None recorded</span>}

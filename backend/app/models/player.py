@@ -1,11 +1,9 @@
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Optional
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
-
-Position = Literal["GK", "DEF", "MID", "FWD"]
 
 
 class Player(Document):
@@ -13,7 +11,6 @@ class Player(Document):
     dcl_id: str  # e.g. "DCL-001"
     name: str
     number: int
-    position: Position
     is_manager: bool = False
     photo_url: Optional[str] = None  # e.g. "/assets/players/DCL-001.jpg"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
