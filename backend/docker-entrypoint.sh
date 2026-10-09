@@ -12,8 +12,7 @@ if [ "$#" -gt 0 ]; then
     exec "$@"
 fi
 
-# --proxy-headers/--forwarded-allow-ips: the container is only reachable through the
-# platform's reverse proxy (DigitalOcean / nginx), so trust its X-Forwarded-For. Without
-# this every visitor shares the proxy's IP and the per-IP login throttle would let anyone
-# lock the admin out by failing a few logins.
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --proxy-headers --forwarded-allow-ips "*"
+# The per-IP login throttle reads the real client IP from X-Forwarded-For itself (see
+# TRUSTED_PROXY_HOPS in app/core/config.py); uvicorn must NOT be told to trust that header
+# from everyone, or a client could spoof it to dodge the throttle.
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"

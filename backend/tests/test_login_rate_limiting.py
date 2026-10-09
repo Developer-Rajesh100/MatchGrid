@@ -81,3 +81,29 @@ def test_limiter_unit_behavior_directly():
     limiter.record_success(key)
     assert limiter.seconds_until_allowed(key) is None
     limiter.reset()
+
+
+async def test_spoofed_leftmost_forwarded_for_cannot_dodge_the_throttle(async_client, admin):
+    """A client rotating a fake leftmost X-Forwarded-For must still be throttled, because the
+    trusted entry is the one our proxy appended (the rightmost)."""
+    bad = {"username": "testadmin", "password": "wrong-password"}
+    statuses = []
+    for i in range(10):
+        r = await async_client.post(
+            "/api/auth/login", json=bad, headers={"X-Forwarded-For": f"10.0.0.{i}, 203.0.113.9"}
+        )
+        statuses.append(r.status_code)
+    assert 429 in statuses
+
+
+async def test_different_real_clients_behind_the_proxy_are_throttled_separately(async_client, admin):
+    bad = {"username": "testadmin", "password": "wrong-password"}
+    for _ in range(10):
+        await async_client.post("/api/auth/login", json=bad, headers={"X-Forwarded-For": "198.51.100.1"})
+    blocked = await async_client.post("/api/auth/login", json=bad, headers={"X-Forwarded-For": "198.51.100.1"})
+    assert blocked.status_code == 429
+    good = await async_client.post(
+        "/api/auth/login", json={"username": "testadmin", "password": "testpass123"},
+        headers={"X-Forwarded-For": "198.51.100.2"},
+    )
+    assert good.status_code == 200

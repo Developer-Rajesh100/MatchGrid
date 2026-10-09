@@ -1,46 +1,55 @@
 # DCL Season 5 Scoreboard — Test & Production-Readiness Audit
 
-## Final audit of 2026-10-10 (current)
+## Final audit of 2026-10-10, second pass (current)
 
-**Scope:** the whole project including the newest features (admin team assignment for every match, Create/Edit/Delete Match, player-position removal, production startup migrations/seed, security hardening).
-**Ground rules followed:** no match was started, paused, ended or scored during browser/API testing, and no live-match endpoint was called outside the automated unit tests. Those tests run only against a disposable test database in a throwaway Mongo container. Your dev database and production were **not written to** (the dev DB was only read, earlier, for the restore analysis).
+**Scope:** the whole project including the newest features: delete for every match (including live/completed), Create/Edit/Delete Match, team assignment, the reset script, and the production startup seed.
+**Ground rules followed:** all match/live testing used disposable data (a throwaway Mongo container and separate databases). Real matches were never started, completed or modified. The dev database and production were only *read*.
 
 ### Results
 
 | Area | What was run | Result |
 |---|---|---|
-| Backend automated | `pytest` (isolated test DB) | **236 passed** |
-| Frontend automated | `vitest` + `vite build` | **34 passed**, build OK |
-| Static analysis | `ruff` (F, E9) on app + tests, YAML parse of `.do/app.yaml`, shell syntax of the entrypoint | clean |
-| Dependencies | `pip-audit`, `npm audit --omit=dev` | **0 vulnerabilities** |
-| Secrets scan | tracked `.env`/key files, hard-coded credentials | none |
-| Live-state API checks | 51 checks on a freshly seeded isolated DB (non-live endpoints only) | **51 / 51 pass** |
-| Browser: pages | all 9 public routes + admin + login + unknown URL, at 375 / 768 / 1280 px (36 combinations) | **0 horizontal overflow, 0 JS errors, no `undefined`/`NaN`**, footer at the bottom everywhere, unknown URLs redirect home |
-| Browser: admin workflows | edit schedule (time, venue), assign semi-final teams, create match, duplicate rejected, edit, delete; Create-Match modal at phone width | all pass, modal fits (10 px margins) |
-| Final state | all matches after testing | **9/9 `upcoming`, 0 live, no scores, no events** |
+| Backend automated | `pytest` (isolated test DB, includes live/scoring workflows) | **246 passed** |
+| Frontend automated | `vitest` and `vite build` | **34 passed**, build OK |
+| Static analysis | `ruff` (F, E9) on app and tests, unreferenced-function scan (backend and frontend API wrappers), `.do/app.yaml` parse | clean, no dead code |
+| Dependencies / secrets | `pip-audit`, `npm audit --omit=dev`, tracked-secret scan | **0 vulnerabilities**, no secrets |
+| API checks (fresh DB) | 51 checks: seed accuracy (9 matches on 2026-10-10, all upcoming), every public GET, 401 on every mutating route, create/duplicate/clash validation, edits, team assignment, delete, headers, load | **51 / 51 pass** |
+| API fuzzing | 45 malformed or illegal inputs and state changes | **no 5xx** |
+| Full live tournament | start, goals, assists, cards, half-time, end, standings, semi-finals, final, champion, event deletion and reopen | standings match an independent recomputation, tournament reaches `champions` |
+| Load | 150 requests at concurrency 30 on 5 public endpoints | 0 errors, p95 106–167 ms |
+| Browser: pages | 14 routes (public, admin, live console, login, unknown URL, unknown match id) at 375 / 768 / 1280 px = **42 combinations** | **0 overflow, 0 JS errors, no `undefined`/`NaN`**; unknown URLs redirect home |
+| Browser: live match through the Live Control UI | Start, Goal (player, minute), Half Time, Resume, End Match | all work; public API shows the live score; standings and top scorer update on the end |
+| Browser: admin workflows | schedule edit, semi-final assignment, create/edit/delete match, Delete button on every row | pass |
+| WebSocket | ping/pong and event broadcast | working (5 messages received during the admin pass) |
 
-The 51 API checks cover: seed accuracy (9 matches, 6 teams, 44 players, group pairings equal to the reference schedule, knockouts TBD, standings zero, stage `group`), every public GET, 401 on every mutating route without a token, bad/valid tokens, create/duplicate/team-clash/same-team/bad-date validation, label/venue/time edits, semi-final and final assignment, group-match team rules, protected deletion of tournament matches, security headers, 404/422 handling, and load (120 requests at concurrency 30 on three endpoints, no errors).
+### Bugs and risks found, and fixed
 
-### Schedule requirement
-"All tournament matches are scheduled for today": the reference schedule (`backend/data/match_schedule.json`) and a freshly seeded database both have **all 9 matches on 2026-10-10 (today)**, all `upcoming`. No data change was needed. Kickoff times and venues are still unset.
+| # | Severity | Finding | Fix |
+|---|---|---|---|
+| 1 | **High (regression from the previous audit)** | The proxy-aware login throttling I added trusted `X-Forwarded-For` from anyone (`--forwarded-allow-ips "*"`). Because uvicorn then takes a client-controlled leftmost entry, an attacker rotating a fake header got **12 wrong-password attempts in a row with no throttling**, bypassing brute-force protection. Confirmed by test. | uvicorn no longer trusts the header. The app takes the entry appended by its own proxy (the rightmost; `TRUSTED_PROXY_HOPS`, default 1, `0` if there is no proxy). Verified: a spoofed rotating header is now throttled (429 after 6 attempts), and different real clients are throttled separately. 2 regression tests added. |
+| 2 | Low | Duplicate "next match number" logic in `create_extra_match` | now uses the shared `_next_match_number` helper |
+| 3 | Test-only | The legacy tests/check scripts asserted that group matches and knockout slots cannot be deleted. That rule was intentionally replaced. | tests updated to the new behaviour (deletion with full recomputation; knockout slots are re-created on generation) |
 
-### Bugs / security issues found
-**None new in this pass.** Everything found in the previous audit (proxy-aware login throttling, security headers, CSP fonts, docs disabled in production) is verified still in place. No data inconsistencies were found.
+No data inconsistencies were found (standings, statistics and events agree after every mutation, including deletes).
 
-### Remaining issues (not fixed)
-1. **Dev database still holds manual-testing leftovers** (match 2 played with 3 events plus derived stats and standings, match 7 with teams and a 12:00 time, tournament stage `semis`). A backup exists (`~/dcl_backups/dcl_scoreboard-20261010-000015/`) and a restore script is ready, but the write is **awaiting your approval**. Until then, the dev site does not show all matches as not-started. Production was not inspected and not changed.
-2. Kickoff times and venues are unknown, so only the date is shown.
-3. Unreferenced duplicate crest images remain in `frontend/public/assets/teams/`.
-4. Player photos are absent, so avatars fall back to initials.
-5. The same pairing can appear in two group matches. Teams can be swapped between fixtures, so this is deliberately not blocked.
-6. Single backend instance only (in-process WebSocket hub and login throttle).
-7. Not testable here: the live DigitalOcean deployment, `.do/app.yaml` with `doctl`, and the Docker Compose stack with TLS. Turn on MongoDB backups.
-8. Live-match behaviour was verified only by the automated suite on the test database, not by hand in a browser, because of the no-live-actions rule.
+### Notes on behaviour
+- **Delete is permanent and works on any match**, including live and completed ones. Events and lineups are removed; standings, player statistics and the tournament stage are recomputed. The confirmation dialog warns when a match has results. A deleted semi-final or final is re-created by "Generate semi-finals / final".
+- **The startup seed runs once per database**, so deleted fixtures and teams are not re-created on later deploys.
+
+### Remaining issues / things to know
+1. **The dev database currently has only 8 matches.** Match 2 is missing (deleted) and match 7 still has a 12:00 time. This happened outside this audit (probably from the admin Delete button); I did not touch it. Matches 1, 3, 4, 5, 6, 8, 9 are upcoming with no events.
+2. **Production still shows the manual-test state**: Match 1 and 2 finished (0-0 and 1-0), times on matches 1-3. The reset script is deployed but **has not been run**; it needs your DigitalOcean console (see earlier steps).
+3. Kickoff times and venues are still unset, apart from those test values.
+4. Unreferenced duplicate crest images remain in `frontend/public/assets/teams/`; player photos are absent.
+5. Single backend instance only (in-process WebSocket hub and login throttle). Turn on MongoDB backups.
+6. If deployed behind a different number of proxies than one, set `TRUSTED_PROXY_HOPS` accordingly.
+7. Not testable here: the live DigitalOcean deployment, `.do/app.yaml` with `doctl`, and the Docker Compose stack with TLS.
 
 ### Verdict
-**Production-ready.** All suites pass, nothing broke, no vulnerabilities, and no match was started or changed state. Before the tournament: deploy (your push), confirm `/health/db` shows 6 teams, 44 players and 9 matches, log in once, and decide on the dev-database restore.
+**Production-ready**, with the fix above included. All suites and the live-match workflows pass on isolated data, no known vulnerabilities, and no data inconsistencies. Nothing real was modified. Deploy only after you review and push the commits; then run the production reset and check the Matches page.
 
 ---
+
 ## Previous audit (2026-10-09)
 
 **Scope:** the whole project after the production-startup, team-assignment, position-removal and squad-UI changes: backend (FastAPI + MongoDB), frontend (React/Vite), deployment config, data integrity, security, performance, responsiveness.
@@ -93,7 +102,7 @@ No data inconsistencies were found. Nothing in the existing tournament data was 
 
 ## Previous audit (2026-10-08)
 
-> Items 2 (player positions) and 8 (API security headers) below are resolved by the 2026-10-09 audit above.
+> Items 2 (player positions) and 8 (API security headers) below are resolved by the 2026-10-09 audit.
 
 **Date:** 2026-10-08
 **Scope:** backend (FastAPI + MongoDB), frontend (React/Vite), data, security, performance, deployment config.

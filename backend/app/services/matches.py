@@ -379,10 +379,9 @@ async def create_extra_match(
     await assert_no_conflict(tournament_id, team1_id, team2_id, date, time)
 
     for _ in range(5):  # retry if two admins create at the same instant (unique match_number)
-        last = await Match.find(Match.tournament_id == tournament_id).sort("-match_number").first_or_none()
         match = Match(
             tournament_id=tournament_id,
-            match_number=(last.match_number if last else 0) + 1,
+            match_number=await _next_match_number(tournament_id),
             stage="extra",
             label=label or "Friendly",
             date=date,

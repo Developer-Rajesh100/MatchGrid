@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Request
 
+from app.core.config import get_settings
 from app.core.deps import get_current_admin
 from app.core.errors import TooManyRequestsError, UnauthorizedError
 from app.core.rate_limit import login_rate_limiter
@@ -12,6 +13,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _client_key(request: Request) -> str:
+    """The client IP used for login throttling.
+
+    X-Forwarded-For is client-controlled except for what our own proxies append, so the
+    trustworthy entry is the one `trusted_proxy_hops` places from the right (never the
+    leftmost, which an attacker can set to any value to dodge the throttle)."""
+    hops = get_settings().trusted_proxy_hops
+    forwarded = [part.strip() for part in request.headers.get("x-forwarded-for", "").split(",") if part.strip()]
+    if hops > 0 and len(forwarded) >= hops:
+        return forwarded[-hops]
     return request.client.host if request.client else "unknown"
 
 

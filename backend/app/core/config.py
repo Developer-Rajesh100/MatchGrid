@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     admin_bootstrap_username: str = "admin"
     admin_bootstrap_password: str = "change-me-in-.env"
 
+    # Number of reverse proxies in front of the app that append to X-Forwarded-For
+    # (DigitalOcean App Platform / the bundled nginx = 1). The client IP used for login
+    # throttling is the address that the Nth-nearest proxy appended — the only part of the
+    # header a client cannot forge. Use 0 when the app is reached directly (no proxy).
+    trusted_proxy_hops: int = 1
+
     # CORS
     cors_origins: str = "http://localhost:5173"
 
