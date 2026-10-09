@@ -7,6 +7,7 @@ from app.core.deps import get_current_admin
 from app.core.websocket import broadcast
 from app.models import Admin, Group, Match, MatchEvent, MatchLineup, Player, Team, Tournament
 from app.schemas.match import (
+    AssignTeamsRequest,
     GenerateGroupFixturesRequest,
     HalfTimePayload,
     MatchDetailOut,
@@ -19,6 +20,7 @@ from app.schemas.match_lineup import LineupEntryOut, LineupSetRequest
 from app.services.lineups import set_lineup
 from app.services.match_events import add_event, remove_event
 from app.services.matches import (
+    assign_semi_teams,
     cancel_match,
     compute_score,
     compute_scores_and_winners,
@@ -157,6 +159,18 @@ async def update_match(
         setattr(match, field, value)
     await match.save()
     await broadcast({"type": "match_updated", "match_id": str(match.id)})
+    return await _to_out(match)
+
+
+@router.put("/{match_id}/teams", response_model=MatchOut)
+async def assign_teams(
+    match_id: str, payload: AssignTeamsRequest, _admin: Admin = Depends(get_current_admin)
+) -> MatchOut:
+    """Manually assign the two teams of an upcoming semi-final (admin only)."""
+    match = await get_match_or_404(PydanticObjectId(match_id))
+    await assign_semi_teams(
+        match, PydanticObjectId(payload.team1_id), PydanticObjectId(payload.team2_id)
+    )
     return await _to_out(match)
 
 

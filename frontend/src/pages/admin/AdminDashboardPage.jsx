@@ -49,6 +49,8 @@ export function AdminDashboardPage() {
     venue: '',
     duration_minutes: '',
     notes: '',
+    team1_id: '',
+    team2_id: '',
   });
 
   // New Player Form State
@@ -199,6 +201,8 @@ export function AdminDashboardPage() {
           ? String(match.duration_minutes)
           : '',
       notes: match.notes || '',
+      team1_id: match.team1_id || '',
+      team2_id: match.team2_id || '',
     });
   };
 
@@ -209,8 +213,26 @@ export function AdminDashboardPage() {
   const handleSaveSchedule = async (e) => {
     e.preventDefault();
     if (!editingMatch) return;
+    const canPickTeams = editingMatch.stage === 'semi' && editingMatch.status === 'upcoming';
+    const { team1_id, team2_id } = scheduleForm;
+    const teamsChanged =
+      canPickTeams &&
+      (team1_id !== (editingMatch.team1_id || '') || team2_id !== (editingMatch.team2_id || ''));
+    if (teamsChanged) {
+      if (!team1_id || !team2_id) {
+        setError('Select both teams for the semi-final (or leave both unchanged).');
+        return;
+      }
+      if (team1_id === team2_id) {
+        setError('A team cannot play against itself — pick two different teams.');
+        return;
+      }
+    }
     try {
       setActionLoading(true);
+      if (teamsChanged) {
+        await matchesApi.assignTeams(editingMatch.id, team1_id, team2_id);
+      }
       const payload = {
         date: scheduleForm.date || null,
         time: scheduleForm.time || null,
@@ -873,7 +895,7 @@ export function AdminDashboardPage() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>
-                <Calendar size={18} color="var(--amber)" /> Edit Match Schedule
+                <Calendar size={18} color="var(--amber)" /> {editingMatch.stage === 'semi' ? 'Edit Semi-Final' : 'Edit Match Schedule'}
               </h3>
               <button
                 type="button"
@@ -895,6 +917,41 @@ export function AdminDashboardPage() {
                     Stage: {editingMatch.stage ? editingMatch.stage.toUpperCase() : ''} {editingMatch.label ? `(${editingMatch.label})` : ''} · Status: {editingMatch.status}
                   </div>
                 </div>
+
+                {editingMatch.stage === 'semi' && editingMatch.status === 'upcoming' && (
+                  <div className="grid-2" style={{ gap: '12px' }}>
+                    {[['team1_id', 'Team 1', 'team2_id'], ['team2_id', 'Team 2', 'team1_id']].map(
+                      ([key, label, otherKey]) => {
+                        // Teams already playing in the other semi-final can't be picked here.
+                        const takenElsewhere = new Set(
+                          matches
+                            .filter((m) => m.stage === 'semi' && m.id !== editingMatch.id)
+                            .flatMap((m) => [m.team1_id, m.team2_id])
+                            .filter(Boolean),
+                        );
+                        return (
+                          <div className="field" key={key}>
+                            <label>{label}</label>
+                            <select
+                              className="input"
+                              value={scheduleForm[key]}
+                              onChange={(e) => setScheduleForm({ ...scheduleForm, [key]: e.target.value })}
+                            >
+                              <option value="">TBD</option>
+                              {teams
+                                .filter((t) => !takenElsewhere.has(t.id) && t.id !== scheduleForm[otherKey])
+                                .map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                )}
 
                 <div className="grid-2" style={{ gap: '12px' }}>
                   <div className="field">

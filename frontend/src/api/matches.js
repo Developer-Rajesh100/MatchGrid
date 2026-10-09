@@ -13,6 +13,11 @@ export const matchesApi = {
   },
   getMatch: (matchId) => apiClient(`/api/matches/${matchId}`),
   updateMatch: (matchId, data) => apiClient(`/api/matches/${matchId}`, { method: 'PATCH', body: data }),
+  assignTeams: (matchId, team1Id, team2Id) =>
+    apiClient(`/api/matches/${matchId}/teams`, {
+      method: 'PUT',
+      body: { team1_id: team1Id, team2_id: team2Id },
+    }),
   startMatch: (matchId) => apiClient(`/api/matches/${matchId}/start`, { method: 'POST' }),
   endMatch: (matchId) => apiClient(`/api/matches/${matchId}/end`, { method: 'POST' }),
   reopenMatch: (matchId) => apiClient(`/api/matches/${matchId}/reopen`, { method: 'POST' }),

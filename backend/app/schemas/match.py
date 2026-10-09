@@ -57,6 +57,11 @@ class MatchUpdate(BaseModel):
         return v
 
 
+class AssignTeamsRequest(BaseModel):
+    team1_id: str = Field(pattern=r"^[0-9a-fA-F]{24}$")
+    team2_id: str = Field(pattern=r"^[0-9a-fA-F]{24}$")
+
+
 class WinnerRequest(BaseModel):
     team_id: str
 

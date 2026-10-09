@@ -5,7 +5,7 @@ from beanie import PydanticObjectId
 
 from app.core.errors import ConflictError, NotFoundError
 from app.core.websocket import broadcast
-from app.models import Group, GroupTeam, Match, MatchEvent, MatchLineup
+from app.models import Group, GroupTeam, Match, MatchEvent, MatchLineup, Team
 from app.services.standings import recalculate_group_standings, sorted_group_standings
 from app.services.tournament_stage import get_match_winner, refresh_tournament_stage
 
@@ -320,6 +320,36 @@ async def generate_semis(tournament_id: PydanticObjectId) -> list[Match]:
     for m in semis:
         await broadcast({"type": "match_updated", "match_id": str(m.id)})
     return semis
+
+
+async def assign_semi_teams(
+    match: Match, team1_id: PydanticObjectId, team2_id: PydanticObjectId
+) -> Match:
+    """Admin manual override: sets the two teams of a semi-final slot."""
+    if match.stage != "semi":
+        raise ConflictError("Teams can only be assigned manually to semi-final matches")
+    if match.status != "upcoming":
+        raise ConflictError("Teams can only be changed while the match is still upcoming")
+    if team1_id == team2_id:
+        raise ConflictError("A team cannot play against itself — pick two different teams")
+
+    for team_id in (team1_id, team2_id):
+        team = await Team.get(team_id)
+        if team is None or team.tournament_id != match.tournament_id:
+            raise NotFoundError("Selected team does not exist in this tournament")
+
+    other_semis = await Match.find(
+        Match.tournament_id == match.tournament_id, Match.stage == "semi", Match.id != match.id
+    ).to_list()
+    taken = {t for m in other_semis for t in (m.team1_id, m.team2_id) if t}
+    if {team1_id, team2_id} & taken:
+        raise ConflictError("A selected team is already assigned to the other semi-final")
+
+    match.team1_id, match.team2_id = team1_id, team2_id
+    await match.save()
+    await refresh_tournament_stage(match.tournament_id)
+    await broadcast({"type": "match_updated", "match_id": str(match.id)})
+    return match
 
 
 async def generate_final(tournament_id: PydanticObjectId) -> Match:
