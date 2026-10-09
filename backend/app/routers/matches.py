@@ -27,7 +27,7 @@ from app.services.matches import (
     cancel_match,
     compute_score,
     compute_scores_and_winners,
-    create_extra_match,
+    create_new_match,
     delete_match,
     end_match,
     generate_final,
@@ -186,12 +186,16 @@ async def update_match(
 
 @router.post("", response_model=MatchOut, status_code=201)
 async def create_match(payload: MatchCreate, _admin: Admin = Depends(get_current_admin)) -> MatchOut:
-    """Create an additional match (stage "extra") between two existing teams (admin only).
-    Never affects group standings, the tournament stage or tournament statistics."""
-    match = await create_extra_match(
+    """Create a match between two existing teams (admin only): an additional "extra" match
+    (never affects standings, the tournament stage or tournament statistics) or a real
+    group-stage fixture (stage="group" + group_id)."""
+    match = await create_new_match(
         await get_active_tournament_id(),
         PydanticObjectId(payload.team1_id),
         PydanticObjectId(payload.team2_id),
+        stage=payload.stage,
+        group_id=PydanticObjectId(payload.group_id) if payload.group_id else None,
+        match_number=payload.match_number,
         date=payload.date,
         time=payload.time,
         venue=payload.venue,

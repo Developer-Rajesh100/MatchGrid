@@ -43,6 +43,11 @@ class HalfTimePayload(BaseModel):
 
 
 class MatchCreate(BaseModel):
+    # "extra": an additional match (friendly) that never counts in standings/stats.
+    # "group": a real group-stage fixture; needs group_id and two teams of that group.
+    stage: Literal["extra", "group"] = "extra"
+    group_id: Optional[str] = Field(default=None, pattern=r"^[0-9a-fA-F]{24}$")
+    match_number: Optional[int] = Field(default=None, ge=1, le=999)  # omit for the next free number
     team1_id: str = Field(pattern=r"^[0-9a-fA-F]{24}$")
     team2_id: str = Field(pattern=r"^[0-9a-fA-F]{24}$")
     date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")  # YYYY-MM-DD

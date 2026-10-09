@@ -57,6 +57,7 @@ export function AdminDashboardPage() {
 
   // Create Match modal state
   const emptyCreateForm = {
+    type: 'extra', match_number: '',
     team1_id: '', team2_id: '', date: '', time: '', venue: '', label: '', duration_minutes: '', notes: '',
   };
   const [createOpen, setCreateOpen] = useState(false);
@@ -288,16 +289,27 @@ export function AdminDashboardPage() {
     if (!f.team1_id || !f.team2_id) return setCreateError('Select both teams.');
     if (f.team1_id === f.team2_id) return setCreateError('A team cannot play against itself.');
     if (!f.date) return setCreateError('Match date is required.');
+    const isGroup = f.type !== 'extra';
+    const number = f.match_number ? parseInt(f.match_number, 10) : null;
+    if (number !== null && (!Number.isInteger(number) || number < 1 || number > 999)) {
+      return setCreateError('Match number must be a whole number between 1 and 999.');
+    }
+    if (number !== null && matches.some((x) => x.match_number === number)) {
+      return setCreateError(`Match number ${number} is already used by another match.`);
+    }
     try {
       setActionLoading(true);
       setCreateError(null);
       await matchesApi.createMatch({
+        stage: isGroup ? 'group' : 'extra',
+        group_id: isGroup ? f.type : null,
+        match_number: number,
         team1_id: f.team1_id,
         team2_id: f.team2_id,
         date: f.date,
         time: f.time || null,
         venue: f.venue.trim() || null,
-        label: f.label.trim() || null,
+        label: isGroup ? null : f.label.trim() || null,
         duration_minutes: f.duration_minutes ? parseInt(f.duration_minutes, 10) : null,
         notes: f.notes.trim() || null,
       });
@@ -987,8 +999,37 @@ export function AdminDashboardPage() {
 
             <form onSubmit={handleCreateMatch}>
               <div className="modal-body">
+                <div className="grid-2" style={{ gap: '12px' }}>
+                  <div className="field">
+                    <label>Match Type *</label>
+                    <select
+                      className="input"
+                      value={createForm.type}
+                      onChange={(e) => setCreateForm({ ...createForm, type: e.target.value, team1_id: '', team2_id: '' })}
+                    >
+                      <option value="extra">Additional match (friendly)</option>
+                      {groups.map((g) => (
+                        <option key={g.id} value={g.id}>Group {g.name} fixture</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Match No. (optional)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="999"
+                      className="input"
+                      placeholder="auto"
+                      value={createForm.match_number}
+                      onChange={(e) => setCreateForm({ ...createForm, match_number: e.target.value })}
+                    />
+                  </div>
+                </div>
                 <p style={{ fontSize: '12px', color: 'var(--chalk-dim)', marginBottom: '12px' }}>
-                  Adds an extra match. It appears on the public Matches page and does not affect group standings or tournament stats.
+                  {createForm.type === 'extra'
+                    ? 'An additional match appears on the public Matches page but does not affect group standings or tournament stats.'
+                    : 'A group fixture counts in that group\'s standings and the tournament statistics, like the original fixtures.'}
                 </p>
                 {createError && (
                   <div style={{ marginBottom: '12px', padding: '8px 12px', borderRadius: '6px', background: 'rgba(209, 88, 90, 0.15)', border: '1px solid var(--red)', color: 'var(--red)', fontSize: '13px' }}>
@@ -1006,7 +1047,10 @@ export function AdminDashboardPage() {
                         required
                       >
                         <option value="">Select team…</option>
-                        {teams.filter((t) => t.id !== createForm[otherKey]).map((t) => (
+                        {teams
+                          .filter((t) => t.id !== createForm[otherKey])
+                          .filter((t) => createForm.type === 'extra' || t.group_name === (groups.find((g) => g.id === createForm.type) || {}).name)
+                          .map((t) => (
                           <option key={t.id} value={t.id}>{t.name}</option>
                         ))}
                       </select>
@@ -1041,11 +1085,13 @@ export function AdminDashboardPage() {
                   </div>
                 </div>
 
+                {createForm.type === 'extra' && (
                 <div className="field">
                   <label>Match Title</label>
                   <input type="text" className="input" maxLength={100} placeholder="Friendly"
                     value={createForm.label} onChange={(e) => setCreateForm({ ...createForm, label: e.target.value })} />
                 </div>
+                )}
 
                 <div className="field" style={{ marginBottom: 0 }}>
                   <label>Notes</label>

@@ -32,5 +32,5 @@ async def get_leaderboards(tournament_id: PydanticObjectId) -> LeaderboardsOut:
         top_scorers=top(rows, "goals", True),
         top_assists=top(rows, "assists", True),
         top_potm=top(rows, "potm_awards", True),
-        most_appearances=top(rows, "appearances", False),
+        most_appearances=top(rows, "appearances", True),
     )

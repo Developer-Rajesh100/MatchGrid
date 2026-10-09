@@ -283,3 +283,69 @@ async def test_match_number_validation_and_unchanged_number_is_fine(async_client
     r = await async_client.patch(url, json={"match_number": 1, "venue": "Court 1"}, headers=auth_headers)
     assert r.status_code == 200 and r.json()["venue"] == "Court 1" and r.json()["match_number"] == 1
     assert (await async_client.patch(url, json={"match_number": 5})).status_code == 401  # admin only
+
+
+def _group_body(group, a, b, **kw):
+    return {"stage": "group", "group_id": str(group.id), "team1_id": str(a.id), "team2_id": str(b.id),
+            "date": "2026-10-10", **kw}
+
+
+async def test_create_real_group_fixture_with_chosen_number(async_client, auth_headers, teams, groups, tournament):
+    r = await async_client.post(
+        "/api/matches",
+        json=_group_body(groups["B"], teams["Black Panthers"], teams["Green Alligators"], match_number=1, label="ignored"),
+        headers=auth_headers,
+    )
+    assert r.status_code == 201, r.json()
+    out = r.json()
+    assert (out["stage"], out["group_name"], out["match_number"], out["label"], out["status"]) == ("group", "B", 1, None, "upcoming")
+    # it is a real fixture: listed under its group, filterable by stage, no time set
+    assert [m["match_number"] for m in (await async_client.get("/api/matches?stage=group")).json()] == [1]
+    assert out["time"] is None
+
+
+async def test_group_fixture_without_number_gets_next_free_one(async_client, auth_headers, teams, groups, base_matches):
+    r = await async_client.post(
+        "/api/matches", json=_group_body(groups["A"], teams["White Lions"], teams["Red Dragons"]), headers=auth_headers
+    )
+    assert r.status_code == 201 and r.json()["match_number"] == 2
+
+
+async def test_group_fixture_rules(async_client, auth_headers, teams, groups, base_matches):
+    a = groups["A"]
+    cases = [
+        (_group_body(a, teams["Red Dragons"], teams["Blue Whales"]), 409),                 # team from the other group
+        ({**_group_body(a, teams["White Lions"], teams["Red Dragons"]), "group_id": None}, 409),  # group required
+        (_group_body(a, teams["Red Dragons"], teams["Golden Hawks"]), 409),                # pairing already exists (base match)
+        (_group_body(a, teams["White Lions"], teams["Red Dragons"], match_number=1), 409), # number taken
+        ({**_group_body(a, teams["White Lions"], teams["Red Dragons"]), "group_id": "0" * 24}, 404),
+        (_group_body(a, teams["White Lions"], teams["Red Dragons"], match_number=0), 422),
+        (_group_body(a, teams["White Lions"], teams["Red Dragons"], match_number=1000), 422),
+    ]
+    for body, code in cases:
+        r = await async_client.post("/api/matches", json=body, headers=auth_headers)
+        assert r.status_code == code, (body, r.status_code, r.json())
+
+
+async def test_created_group_fixture_counts_in_standings_unlike_extra(
+    async_client, auth_headers, teams, players, groups, tournament
+):
+    from app.models import TournamentStanding
+
+    fx = (await async_client.post(
+        "/api/matches", json=_group_body(groups["A"], teams["Red Dragons"], teams["Golden Hawks"]), headers=auth_headers
+    )).json()
+    scorer = players["Red Dragons"][3]
+    await _play(async_client, auth_headers, await Match.get(fx["id"]), teams["Red Dragons"], scorer)
+    rows = {r.team_id: r for r in await TournamentStanding.find(TournamentStanding.group_id == groups["A"].id).to_list()}
+    assert rows[teams["Red Dragons"].id].points == 3 and rows[teams["Red Dragons"].id].played == 1
+    assert (await PlayerStatistics.find_one(PlayerStatistics.player_id == scorer.id)).goals == 1
+
+
+async def test_most_appearances_hides_players_with_zero(async_client, tournament, teams, players):
+    stats = PlayerStatistics(
+        tournament_id=tournament.id, player_id=players["Red Dragons"][0].id, team_id=teams["Red Dragons"].id
+    )
+    await stats.insert()
+    board = (await async_client.get("/api/statistics/leaderboards")).json()
+    assert board["most_appearances"] == []

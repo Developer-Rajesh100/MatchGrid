@@ -362,11 +362,14 @@ async def _validate_teams_exist(
             raise NotFoundError("Selected team does not exist in this tournament")
 
 
-async def create_extra_match(
+async def create_new_match(
     tournament_id: PydanticObjectId,
     team1_id: PydanticObjectId,
     team2_id: PydanticObjectId,
     *,
+    stage: str = "extra",
+    group_id: Optional[PydanticObjectId] = None,
+    match_number: Optional[int] = None,
     date: str,
     time: Optional[str],
     venue: Optional[str],
@@ -374,16 +377,41 @@ async def create_extra_match(
     duration_minutes: Optional[int],
     notes: Optional[str],
 ) -> Match:
-    """Creates an additional match outside the group/knockout structure."""
+    """Creates a match: either an additional "extra" match, or a real group-stage fixture
+    (e.g. to restore one that was deleted)."""
     await _validate_teams_exist(tournament_id, team1_id, team2_id)
+
+    if stage == "group":
+        if group_id is None:
+            raise ConflictError("Choose the group for a group-stage fixture")
+        group = await Group.get(group_id)
+        if group is None or group.tournament_id != tournament_id:
+            raise NotFoundError("Group not found")
+        members = {gt.team_id for gt in await GroupTeam.find(GroupTeam.group_id == group_id).to_list()}
+        if not {team1_id, team2_id} <= members:
+            raise ConflictError(f"Both teams must belong to Group {group.name}")
+        for other in await Match.find(Match.group_id == group_id, Match.stage == "group").to_list():
+            if {other.team1_id, other.team2_id} == {team1_id, team2_id} and other.status != "cancelled":
+                raise ConflictError(f"These two teams already have a fixture in Group {group.name} (Match #{other.match_number})")
+        label = None  # group fixtures have no custom title
+    else:
+        group_id = None
+        label = label or "Friendly"
+
     await assert_no_conflict(tournament_id, team1_id, team2_id, date, time)
+
+    if match_number is not None and await Match.find_one(
+        Match.tournament_id == tournament_id, Match.match_number == match_number
+    ):
+        raise ConflictError(f"Match number {match_number} is already used by another match")
 
     for _ in range(5):  # retry if two admins create at the same instant (unique match_number)
         match = Match(
             tournament_id=tournament_id,
-            match_number=await _next_match_number(tournament_id),
-            stage="extra",
-            label=label or "Friendly",
+            match_number=match_number if match_number is not None else await _next_match_number(tournament_id),
+            stage=stage,
+            group_id=group_id,
+            label=label,
             date=date,
             time=time,
             venue=venue,
@@ -396,6 +424,8 @@ async def create_extra_match(
             await match.insert()
             break
         except DuplicateKeyError:
+            if match_number is not None:
+                raise ConflictError(f"Match number {match_number} is already used by another match")
             continue
     else:
         raise ConflictError("Could not allocate a match number — please try again")
