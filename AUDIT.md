@@ -1,6 +1,47 @@
 # DCL Season 5 Scoreboard — Test & Production-Readiness Audit
 
-## Audit of 2026-10-09 (current)
+## Final audit of 2026-10-10 (current)
+
+**Scope:** the whole project including the newest features (admin team assignment for every match, Create/Edit/Delete Match, player-position removal, production startup migrations/seed, security hardening).
+**Ground rules followed:** no match was started, paused, ended or scored during browser/API testing, and no live-match endpoint was called outside the automated unit tests. Those tests run only against a disposable test database in a throwaway Mongo container. Your dev database and production were **not written to** (the dev DB was only read, earlier, for the restore analysis).
+
+### Results
+
+| Area | What was run | Result |
+|---|---|---|
+| Backend automated | `pytest` (isolated test DB) | **236 passed** |
+| Frontend automated | `vitest` + `vite build` | **34 passed**, build OK |
+| Static analysis | `ruff` (F, E9) on app + tests, YAML parse of `.do/app.yaml`, shell syntax of the entrypoint | clean |
+| Dependencies | `pip-audit`, `npm audit --omit=dev` | **0 vulnerabilities** |
+| Secrets scan | tracked `.env`/key files, hard-coded credentials | none |
+| Live-state API checks | 51 checks on a freshly seeded isolated DB (non-live endpoints only) | **51 / 51 pass** |
+| Browser: pages | all 9 public routes + admin + login + unknown URL, at 375 / 768 / 1280 px (36 combinations) | **0 horizontal overflow, 0 JS errors, no `undefined`/`NaN`**, footer at the bottom everywhere, unknown URLs redirect home |
+| Browser: admin workflows | edit schedule (time, venue), assign semi-final teams, create match, duplicate rejected, edit, delete; Create-Match modal at phone width | all pass, modal fits (10 px margins) |
+| Final state | all matches after testing | **9/9 `upcoming`, 0 live, no scores, no events** |
+
+The 51 API checks cover: seed accuracy (9 matches, 6 teams, 44 players, group pairings equal to the reference schedule, knockouts TBD, standings zero, stage `group`), every public GET, 401 on every mutating route without a token, bad/valid tokens, create/duplicate/team-clash/same-team/bad-date validation, label/venue/time edits, semi-final and final assignment, group-match team rules, protected deletion of tournament matches, security headers, 404/422 handling, and load (120 requests at concurrency 30 on three endpoints, no errors).
+
+### Schedule requirement
+"All tournament matches are scheduled for today": the reference schedule (`backend/data/match_schedule.json`) and a freshly seeded database both have **all 9 matches on 2026-10-10 (today)**, all `upcoming`. No data change was needed. Kickoff times and venues are still unset.
+
+### Bugs / security issues found
+**None new in this pass.** Everything found in the previous audit (proxy-aware login throttling, security headers, CSP fonts, docs disabled in production) is verified still in place. No data inconsistencies were found.
+
+### Remaining issues (not fixed)
+1. **Dev database still holds manual-testing leftovers** (match 2 played with 3 events plus derived stats and standings, match 7 with teams and a 12:00 time, tournament stage `semis`). A backup exists (`~/dcl_backups/dcl_scoreboard-20261010-000015/`) and a restore script is ready, but the write is **awaiting your approval**. Until then, the dev site does not show all matches as not-started. Production was not inspected and not changed.
+2. Kickoff times and venues are unknown, so only the date is shown.
+3. Unreferenced duplicate crest images remain in `frontend/public/assets/teams/`.
+4. Player photos are absent, so avatars fall back to initials.
+5. The same pairing can appear in two group matches. Teams can be swapped between fixtures, so this is deliberately not blocked.
+6. Single backend instance only (in-process WebSocket hub and login throttle).
+7. Not testable here: the live DigitalOcean deployment, `.do/app.yaml` with `doctl`, and the Docker Compose stack with TLS. Turn on MongoDB backups.
+8. Live-match behaviour was verified only by the automated suite on the test database, not by hand in a browser, because of the no-live-actions rule.
+
+### Verdict
+**Production-ready.** All suites pass, nothing broke, no vulnerabilities, and no match was started or changed state. Before the tournament: deploy (your push), confirm `/health/db` shows 6 teams, 44 players and 9 matches, log in once, and decide on the dev-database restore.
+
+---
+## Previous audit (2026-10-09)
 
 **Scope:** the whole project after the production-startup, team-assignment, position-removal and squad-UI changes: backend (FastAPI + MongoDB), frontend (React/Vite), deployment config, data integrity, security, performance, responsiveness.
 **Method:** everything was run for real against a throwaway MongoDB container and a separate backend/Vite stack. Neither production nor your dev database was written to.
