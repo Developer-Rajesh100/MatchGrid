@@ -300,7 +300,7 @@ export function AdminDashboardPage() {
   };
 
   const handleDeleteMatch = async (m) => {
-    if (!window.confirm(`Delete match #${m.match_number} (${m.team1_name} vs ${m.team2_name})? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete match #${m.match_number} (${m.team1_name || 'TBD'} vs ${m.team2_name || 'TBD'})? This permanently removes the fixture and cannot be undone.`)) return;
     try {
       setActionLoading(true);
       await matchesApi.deleteMatch(m.id);
@@ -618,17 +618,6 @@ export function AdminDashboardPage() {
                           </button>
                         )}
 
-                        {m.stage === 'extra' && (m.status === 'upcoming' || m.status === 'cancelled') && (
-                          <button
-                            className="btn btn-sm btn-danger"
-                            onClick={() => handleDeleteMatch(m)}
-                            disabled={actionLoading}
-                            title="Delete this additional match"
-                          >
-                            <Trash2 size={12} /> Delete
-                          </button>
-                        )}
-
                         {m.status === 'cancelled' && (
                           <button
                             className="btn btn-sm btn-outline"
@@ -637,6 +626,18 @@ export function AdminDashboardPage() {
                             title="Restore Match"
                           >
                             <RotateCcw size={12} /> Restore
+                          </button>
+                        )}
+
+                        {/* Delete: unplayed group / extra matches only (never live, finished, semi or final) */}
+                        {(m.stage === 'group' || m.stage === 'extra') && (m.status === 'upcoming' || m.status === 'cancelled') && (
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleDeleteMatch(m)}
+                            disabled={actionLoading}
+                            title="Delete this match"
+                          >
+                            <Trash2 size={12} /> Delete
                           </button>
                         )}
                       </div>

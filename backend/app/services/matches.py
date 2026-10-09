@@ -405,10 +405,14 @@ async def create_extra_match(
     return match
 
 
-async def delete_extra_match(match: Match) -> None:
-    """Only admin-created extra matches that were never played can be deleted."""
-    if match.stage != "extra":
-        raise ConflictError("Only additional (admin-created) matches can be deleted")
+async def delete_match(match: Match) -> None:
+    """Deletes a match that was never played (upcoming or cancelled, no events).
+
+    Group-stage and admin-created matches can be deleted. Semi-final and final slots
+    are required by the knockout generation, so they can't be (use Cancel, or edit
+    their teams/schedule). Live and completed matches are always protected."""
+    if match.stage in ("semi", "final"):
+        raise ConflictError("Semi-final and final slots can't be deleted — edit or cancel them instead")
     if match.status not in ("upcoming", "cancelled"):
         raise ConflictError("A live or completed match cannot be deleted")
     if await MatchEvent.find(MatchEvent.match_id == match.id).count():
@@ -416,6 +420,7 @@ async def delete_extra_match(match: Match) -> None:
     await MatchLineup.find(MatchLineup.match_id == match.id).delete()
     match_id = str(match.id)
     await match.delete()
+    await refresh_tournament_stage(match.tournament_id)
     await broadcast({"type": "match_updated", "match_id": match_id})
 
 

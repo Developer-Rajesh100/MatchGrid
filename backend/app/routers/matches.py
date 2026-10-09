@@ -27,7 +27,7 @@ from app.services.matches import (
     compute_score,
     compute_scores_and_winners,
     create_extra_match,
-    delete_extra_match,
+    delete_match,
     end_match,
     generate_final,
     generate_group_fixtures,
@@ -193,9 +193,9 @@ async def create_match(payload: MatchCreate, _admin: Admin = Depends(get_current
 
 
 @router.delete("/{match_id}", status_code=204)
-async def delete_match(match_id: str, _admin: Admin = Depends(get_current_admin)) -> None:
-    """Delete an unplayed admin-created match. Group/knockout and played matches are protected."""
-    await delete_extra_match(await get_match_or_404(PydanticObjectId(match_id)))
+async def remove_match(match_id: str, _admin: Admin = Depends(get_current_admin)) -> None:
+    """Delete a match that was never played (group or extra). Played and knockout matches are protected."""
+    await delete_match(await get_match_or_404(PydanticObjectId(match_id)))
 
 
 @router.put("/{match_id}/teams", response_model=MatchOut)

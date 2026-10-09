@@ -88,6 +88,13 @@ async def run_startup_tasks() -> None:
         applied = await apply_migrations()
         logger.info("Migrations applied: %s", applied or "none (up to date)")
         if settings.auto_seed:
-            await _seed()
+            # Seed once per database. Without this marker a fixture (or team) the admin
+            # deliberately deleted would be re-created from the JSON files on the next deploy.
+            state = get_client()[settings.mongo_db_name]["startup_state"]
+            if await state.find_one({"_id": "initial_seed"}) is None:
+                await _seed()
+                await state.insert_one({"_id": "initial_seed", "done_at": datetime.now(timezone.utc)})
+            else:
+                logger.info("Initial seed already done — skipping")
     finally:
         await _release_lock()

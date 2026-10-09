@@ -104,15 +104,42 @@ async def test_group_match_label_cannot_be_changed(async_client, auth_headers, b
     assert r.status_code == 200 and r.json()["label"] is None
 
 
-async def test_delete_extra_only(async_client, auth_headers, teams, base_matches):
+async def test_delete_unplayed_matches(async_client, auth_headers, teams, base_matches, tournament):
     m = (await async_client.post("/api/matches", json=_body(teams["Red Dragons"], teams["Blue Whales"]), headers=auth_headers)).json()
-    # protected: tournament matches
-    assert (await async_client.delete(f"/api/matches/{base_matches.id}", headers=auth_headers)).status_code == 409
-    assert await Match.get(base_matches.id) is not None
     # extra match deletes cleanly
     assert (await async_client.delete(f"/api/matches/{m['id']}", headers=auth_headers)).status_code == 204
     assert (await async_client.get(f"/api/matches/{m['id']}")).status_code == 404
     assert (await async_client.delete(f"/api/matches/{m['id']}", headers=auth_headers)).status_code == 404
+    # an unplayed group-stage match can be deleted too; other matches are untouched
+    other = Match(
+        tournament_id=tournament.id, match_number=5, stage="group", group_id=base_matches.group_id,
+        team1_id=teams["White Lions"].id, team2_id=teams["Golden Hawks"].id,
+    )
+    await other.insert()
+    assert (await async_client.delete(f"/api/matches/{base_matches.id}", headers=auth_headers)).status_code == 204
+    assert await Match.get(base_matches.id) is None
+    assert await Match.get(other.id) is not None
+
+
+async def test_cancelled_match_can_be_deleted(async_client, auth_headers, base_matches):
+    assert (await async_client.post(f"/api/matches/{base_matches.id}/cancel", headers=auth_headers)).status_code == 200
+    assert (await async_client.delete(f"/api/matches/{base_matches.id}", headers=auth_headers)).status_code == 204
+
+
+async def test_knockout_slots_and_played_matches_are_protected(async_client, auth_headers, teams, tournament, base_matches):
+    semi = Match(tournament_id=tournament.id, match_number=7, stage="semi", label="Semi-final 1")
+    final = Match(tournament_id=tournament.id, match_number=9, stage="final", label="Final")
+    await semi.insert()
+    await final.insert()
+    for m in (semi, final):
+        assert (await async_client.delete(f"/api/matches/{m.id}", headers=auth_headers)).status_code == 409
+        assert await Match.get(m.id) is not None
+    base_matches.status = "full_time"
+    await base_matches.save()
+    assert (await async_client.delete(f"/api/matches/{base_matches.id}", headers=auth_headers)).status_code == 409
+    base_matches.status = "live"
+    await base_matches.save()
+    assert (await async_client.delete(f"/api/matches/{base_matches.id}", headers=auth_headers)).status_code == 409
 
 
 async def test_played_extra_match_cannot_be_deleted_and_is_isolated(
@@ -143,3 +170,26 @@ async def test_played_extra_match_cannot_be_deleted_and_is_isolated(
     assert (await Tournament.find_one()).stage == "group"
     detail = (await async_client.get(f"/api/players/{scorer.id}")).json()
     assert detail["history"] == [] and detail["stats"]["goals"] == 0
+
+
+async def test_startup_seed_runs_once_so_deleted_fixtures_do_not_come_back(tournament):
+    """After the first seed, a deleted fixture must not be re-created by later startups."""
+    import app.core.bootstrap as bootstrap
+    from app.core.config import get_settings
+    from app.core.database import get_client
+
+    state = get_client()[get_settings().mongo_db_name]["startup_state"]
+    await state.delete_many({})
+    calls = []
+
+    async def fake_seed():
+        calls.append(1)
+
+    original, bootstrap._seed = bootstrap._seed, fake_seed
+    try:
+        await bootstrap.run_startup_tasks()
+        await bootstrap.run_startup_tasks()
+        assert len(calls) == 1
+    finally:
+        bootstrap._seed = original
+        await state.delete_many({})
