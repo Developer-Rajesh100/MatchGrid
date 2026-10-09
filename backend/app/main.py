@@ -40,8 +40,14 @@ async def lifespan(app: FastAPI):
     await close_db()
 
 
+is_production = settings.environment == "production"
+
 app = FastAPI(
     title=settings.app_name,
+    # The interactive API docs / schema aren't needed in production.
+    docs_url=None if is_production else "/docs",
+    redoc_url=None if is_production else "/redoc",
+    openapi_url=None if is_production else "/openapi.json",
     description=(
         "REST API for the DCL Season 5 digital scoreboard.\n\n"
         "All GET endpoints are public. Every other method (POST/PATCH/PUT/DELETE) requires an "
@@ -58,6 +64,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return response
+
 
 register_request_logging(app)
 register_exception_handlers(app)

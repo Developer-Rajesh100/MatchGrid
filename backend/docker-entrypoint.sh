@@ -12,4 +12,8 @@ if [ "$#" -gt 0 ]; then
     exec "$@"
 fi
 
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
+# --proxy-headers/--forwarded-allow-ips: the container is only reachable through the
+# platform's reverse proxy (DigitalOcean / nginx), so trust its X-Forwarded-For. Without
+# this every visitor shares the proxy's IP and the per-IP login throttle would let anyone
+# lock the admin out by failing a few logins.
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --proxy-headers --forwarded-allow-ips "*"

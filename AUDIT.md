@@ -1,5 +1,59 @@
 # DCL Season 5 Scoreboard — Test & Production-Readiness Audit
 
+## Audit of 2026-10-09 (current)
+
+**Scope:** the whole project after the production-startup, team-assignment, position-removal and squad-UI changes: backend (FastAPI + MongoDB), frontend (React/Vite), deployment config, data integrity, security, performance, responsiveness.
+**Method:** everything was run for real against a throwaway MongoDB container and a separate backend/Vite stack. Neither production nor your dev database was written to.
+
+### Results
+
+| Area | What was run | Result |
+|---|---|---|
+| Backend automated | `pytest` against a real MongoDB test DB | **227 passed** |
+| Frontend automated | `vitest` and `vite build` | **34 passed**, build OK |
+| Static analysis | `ruff` (F, E9) on the backend; unused-import scan on the frontend | clean |
+| Dependencies | `pip-audit`, `npm audit --omit=dev` | **0 vulnerabilities** |
+| API robustness | 12 bad-id/bad-filter GETs and 33 authenticated bad-input calls (invalid dates, times, colours, ids, oversized text, illegal state transitions, malformed JSON, duplicate lineups, unknown teams) | **no 5xx**; every case returned 2xx/4xx as appropriate |
+| Auth | NoSQL-operator login payload, brute force, missing/garbage tokens | 422 / 429 after 5 failures / 401 |
+| Full workflow | Entire tournament through the API: 6 group matches, standings, semi-final generation, both semis, final, champion, event deletion and reopen | Standings matched an independent recomputation (0 mismatches). Goals in matches = goals in events. |
+| Data integrity | Direct DB scan: orphan players/events/matches/group links, self-matches, duplicate teams/players/matches/admins, completed matches without teams | **0 issues** |
+| Load | 150 requests at concurrency 30 on each of 5 public endpoints | 0 errors; p95 105–148 ms |
+| Browser (Chrome) | All 9 public routes, admin login, dashboard + 3 tabs, Live Control, 404 redirect, admin guard, add-player form, team assignment, WebSocket push (ping/pong + event broadcast) | all working, no console errors |
+| Responsiveness | 11 pages x 2 widths (375 px, 768 px), checked for horizontal overflow | **0 overflows** |
+| Container check | Frontend image built and run under real nginx; page loaded in Chrome | renders, SPA routes work, Google Fonts load under the CSP |
+
+### Bugs and risks found, and fixed
+
+| # | Severity | Finding | Fix |
+|---|---|---|---|
+| 1 | **High** | **Admin lock-out risk behind a proxy.** Login throttling is per client IP, but uvicorn did not trust `X-Forwarded-For`. On DigitalOcean every visitor appears to come from the platform proxy's IP, so anyone failing 6 logins would lock the admin out. | `docker-entrypoint.sh` starts uvicorn with `--proxy-headers --forwarded-allow-ips "*"` (the container is reachable only through the platform proxy). Verified: an attacker IP gets 429 while the admin from another IP logs in (200). |
+| 2 | Medium | The Docker/nginx proxy CSP (`style-src 'self'`) would have **blocked the Google Fonts** the app loads, so the site would silently fall back to system fonts in that deployment. | CSP in `proxy/nginx.conf.template` now allows `fonts.googleapis.com` / `fonts.gstatic.com`. |
+| 3 | Medium | The DigitalOcean frontend (plain nginx) and the API sent **no security headers**. | Added `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and a CSP to `frontend/nginx.conf` (repeated per location, since nginx drops inherited headers), and the first three to every API response. Verified in Chrome that the app and fonts still load. |
+| 4 | Low | `/docs`, `/redoc` and `/openapi.json` were public in production. | Disabled when `ENVIRONMENT=production`. Still available in development. |
+| 5 | Low | Admin could not choose teams for matches, so knockout matches stayed TBD. | New `PUT /api/matches/{id}/teams` and an Edit-modal team picker for every upcoming match (group teams only for group matches, no team in both semis, never on live/finished matches). Covered by 11 tests. |
+| 6 | Low | Player positions were a placeholder (item 2 of the previous audit). | Removed from UI, API, importers, seed data and docs. Stored legacy values stay in the DB, ignored. |
+| 7 | Info | Production DB was empty because migrations never ran. | Migrations and a create-only seed now run at startup under a Mongo lock (`app/core/bootstrap.py`), with an optional `PRE_DEPLOY` job in `.do/app.yaml`. |
+
+No data inconsistencies were found. Nothing in the existing tournament data was modified.
+
+### Remaining recommendations (not changed)
+1. **Duplicate crest images** in `frontend/public/assets/teams/` (`1-6.jpeg`, `<team>.jpeg`, `<team>.png`; only `<team>.png` is used). Left in place to avoid touching assets; safe to remove the unreferenced copies.
+2. **Same pairing twice in a group.** Team assignment checks group membership but deliberately does not forbid the same pairing in two group matches, because swapping teams between fixtures passes through temporary duplicates.
+3. **Single instance.** The WebSocket hub and the login throttle are in-process, so run one backend instance (as `.do/app.yaml` does). Scaling out needs a shared pub/sub and rate-limit store.
+4. **Mobile nav** still scrolls sideways on narrow screens (works, but not obvious).
+5. **Backups.** Turn on automatic backups for the production MongoDB cluster.
+6. **Secrets.** `MONGO_URI`, `JWT_SECRET` (32+ chars), `ADMIN_BOOTSTRAP_PASSWORD` and `CORS_ORIGINS` must be real production values; the app refuses to start otherwise.
+7. **Not tested here:** the live DigitalOcean deployment itself, the `.do/app.yaml` spec (no `doctl`), the full Docker Compose stack with TLS, and print/accessibility audits.
+
+### Verdict
+**Production-ready.** All automated suites pass, no 5xx errors or data inconsistencies were found across the fuzzing, the full-tournament run and the DB scan, and no known vulnerabilities remain. The one high-impact risk found (admin lock-out behind the platform proxy) is fixed and verified. After deploying, check `/health/db` on the live site (6 teams, 44 players, 9 matches) and log in once.
+
+---
+
+## Previous audit (2026-10-08)
+
+> Items 2 (player positions) and 8 (API security headers) below are resolved by the 2026-10-09 audit above.
+
 **Date:** 2026-10-08
 **Scope:** backend (FastAPI + MongoDB), frontend (React/Vite), data, security, performance, deployment config.
 **Earlier audit history** (2026-09-29, timer/half-time and eleven follow-up passes) lives in `reference/AUDIT.md` (git-ignored); this file is the current audit.
