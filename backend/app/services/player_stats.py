@@ -8,7 +8,7 @@ docs/PROJECT_ANALYSIS.md §7 for why this closes a known prototype gap.
 
 from beanie import PydanticObjectId
 
-from app.models import MatchEvent, MatchLineup, Player, PlayerStatistics, Team
+from app.models import Match, MatchEvent, MatchLineup, Player, PlayerStatistics, Team
 
 
 async def recalculate_player_statistics(player_id: PydanticObjectId) -> PlayerStatistics | None:
@@ -16,7 +16,12 @@ async def recalculate_player_statistics(player_id: PydanticObjectId) -> PlayerSt
     if player is None:
         return None
 
-    appearances = await MatchLineup.find(MatchLineup.player_id == player_id).count()
+    # Admin-created "extra" matches (friendlies) are not part of the tournament record.
+    extra_ids = [m.id for m in await Match.find(Match.stage == "extra").to_list()]
+
+    appearances = await MatchLineup.find(
+        {"player_id": player_id, "match_id": {"$nin": extra_ids}}
+    ).count()
 
     # One query for every event touching this player (as the primary player
     # or as an assist provider), instead of 5 separate .count() queries (one
@@ -26,7 +31,10 @@ async def recalculate_player_statistics(player_id: PydanticObjectId) -> PlayerSt
     # into admin-panel latency. Found during the Timer/Half-Time audit's
     # Performance & Scalability follow-up.
     events = await MatchEvent.find(
-        {"$or": [{"player_id": player_id}, {"assist_player_id": player_id}]}
+        {
+            "$or": [{"player_id": player_id}, {"assist_player_id": player_id}],
+            "match_id": {"$nin": extra_ids},
+        }
     ).to_list()
     goals = sum(1 for e in events if e.player_id == player_id and e.type == "goal")
     assists = sum(1 for e in events if e.assist_player_id == player_id and e.type == "goal")

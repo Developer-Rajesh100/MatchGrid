@@ -12,6 +12,8 @@ export const matchesApi = {
     return apiClient(`/api/matches${qs ? `?${qs}` : ''}`);
   },
   getMatch: (matchId) => apiClient(`/api/matches/${matchId}`),
+  createMatch: (data) => apiClient('/api/matches', { method: 'POST', body: data }),
+  deleteMatch: (matchId) => apiClient(`/api/matches/${matchId}`, { method: 'DELETE' }),
   updateMatch: (matchId, data) => apiClient(`/api/matches/${matchId}`, { method: 'PATCH', body: data }),
   assignTeams: (matchId, team1Id, team2Id) =>
     apiClient(`/api/matches/${matchId}/teams`, {

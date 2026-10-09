@@ -113,7 +113,11 @@ async def get_player_detail(player: Player) -> PlayerDetailOut:
     )
 
     matches = await Match.find(
-        {"$or": [{"team1_id": player.team_id}, {"team2_id": player.team_id}], "status": {"$ne": "upcoming"}}
+        {
+            "$or": [{"team1_id": player.team_id}, {"team2_id": player.team_id}],
+            "status": {"$ne": "upcoming"},
+            "stage": {"$ne": "extra"},
+        }
     ).sort("match_number").to_list()
 
     opponents = await Team.find(

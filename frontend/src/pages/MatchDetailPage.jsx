@@ -143,7 +143,7 @@ export function MatchDetailPage() {
   const isPlayed = match.status === 'full_time' || match.status === 'live' || match.status === 'completed';
   const label =
     match.label ||
-    (match.group_name ? `Group ${match.group_name}` : match.stage === 'semi' ? 'Semi-final' : match.stage === 'final' ? 'Final' : '');
+    (match.group_name ? `Group ${match.group_name}` : match.stage === 'semi' ? 'Semi-final' : match.stage === 'final' ? 'Final' : match.stage === 'extra' ? 'Friendly' : '');
 
   // Sorted events by minute
   const events = [...(match.events || [])].sort((a, b) => (a.minute || 0) - (b.minute || 0));

@@ -10,6 +10,7 @@ from app.schemas.match import (
     AssignTeamsRequest,
     GenerateGroupFixturesRequest,
     HalfTimePayload,
+    MatchCreate,
     MatchDetailOut,
     MatchOut,
     MatchUpdate,
@@ -21,9 +22,12 @@ from app.services.lineups import set_lineup
 from app.services.match_events import add_event, remove_event
 from app.services.matches import (
     assign_match_teams,
+    assert_no_conflict,
     cancel_match,
     compute_score,
     compute_scores_and_winners,
+    create_extra_match,
+    delete_extra_match,
     end_match,
     generate_final,
     generate_group_fixtures,
@@ -155,11 +159,43 @@ async def update_match(
 ) -> MatchOut:
     """Update a match's scheduled date/time/venue/duration/notes. Does not change status or score."""
     match = await get_match_or_404(PydanticObjectId(match_id))
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    if match.stage != "extra":
+        changes.pop("label", None)  # labels of group/knockout matches are fixed
+    elif {"date", "time"} & changes.keys() and match.team1_id and match.team2_id:
+        await assert_no_conflict(
+            match.tournament_id, match.team1_id, match.team2_id,
+            changes.get("date", match.date), changes.get("time", match.time), exclude_id=match.id,
+        )
+    for field, value in changes.items():
         setattr(match, field, value)
     await match.save()
     await broadcast({"type": "match_updated", "match_id": str(match.id)})
     return await _to_out(match)
+
+
+@router.post("", response_model=MatchOut, status_code=201)
+async def create_match(payload: MatchCreate, _admin: Admin = Depends(get_current_admin)) -> MatchOut:
+    """Create an additional match (stage "extra") between two existing teams (admin only).
+    Never affects group standings, the tournament stage or tournament statistics."""
+    match = await create_extra_match(
+        await get_active_tournament_id(),
+        PydanticObjectId(payload.team1_id),
+        PydanticObjectId(payload.team2_id),
+        date=payload.date,
+        time=payload.time,
+        venue=payload.venue,
+        label=payload.label,
+        duration_minutes=payload.duration_minutes,
+        notes=payload.notes,
+    )
+    return await _to_out(match)
+
+
+@router.delete("/{match_id}", status_code=204)
+async def delete_match(match_id: str, _admin: Admin = Depends(get_current_admin)) -> None:
+    """Delete an unplayed admin-created match. Group/knockout and played matches are protected."""
+    await delete_extra_match(await get_match_or_404(PydanticObjectId(match_id)))
 
 
 @router.put("/{match_id}/teams", response_model=MatchOut)

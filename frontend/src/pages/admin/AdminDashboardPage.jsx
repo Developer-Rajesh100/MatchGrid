@@ -51,7 +51,16 @@ export function AdminDashboardPage() {
     notes: '',
     team1_id: '',
     team2_id: '',
+    label: '',
   });
+
+  // Create Match modal state
+  const emptyCreateForm = {
+    team1_id: '', team2_id: '', date: '', time: '', venue: '', label: '', duration_minutes: '', notes: '',
+  };
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState(emptyCreateForm);
+  const [createError, setCreateError] = useState(null);
 
   // New Player Form State
   const [newPlayer, setNewPlayer] = useState({
@@ -202,6 +211,7 @@ export function AdminDashboardPage() {
       notes: match.notes || '',
       team1_id: match.team1_id || '',
       team2_id: match.team2_id || '',
+      label: match.stage === 'extra' ? match.label || '' : '',
     });
   };
 
@@ -241,6 +251,7 @@ export function AdminDashboardPage() {
           : null,
         notes: scheduleForm.notes || null,
       };
+      if (editingMatch.stage === 'extra') payload.label = scheduleForm.label.trim() || null;
       await matchesApi.updateMatch(editingMatch.id, payload);
       showSuccess(`Schedule updated for Match #${editingMatch.match_number}`);
       setEditingMatch(null);
@@ -252,6 +263,55 @@ export function AdminDashboardPage() {
     }
   };
 
+
+  const handleOpenCreate = () => {
+    setCreateForm(emptyCreateForm);
+    setCreateError(null);
+    setCreateOpen(true);
+  };
+
+  const handleCreateMatch = async (e) => {
+    e.preventDefault();
+    const f = createForm;
+    if (!f.team1_id || !f.team2_id) return setCreateError('Select both teams.');
+    if (f.team1_id === f.team2_id) return setCreateError('A team cannot play against itself.');
+    if (!f.date) return setCreateError('Match date is required.');
+    try {
+      setActionLoading(true);
+      setCreateError(null);
+      await matchesApi.createMatch({
+        team1_id: f.team1_id,
+        team2_id: f.team2_id,
+        date: f.date,
+        time: f.time || null,
+        venue: f.venue.trim() || null,
+        label: f.label.trim() || null,
+        duration_minutes: f.duration_minutes ? parseInt(f.duration_minutes, 10) : null,
+        notes: f.notes.trim() || null,
+      });
+      showSuccess('Match created');
+      setCreateOpen(false);
+      await loadAll(false);
+    } catch (err) {
+      setCreateError(err.message || 'Failed to create match');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteMatch = async (m) => {
+    if (!window.confirm(`Delete match #${m.match_number} (${m.team1_name} vs ${m.team2_name})? This cannot be undone.`)) return;
+    try {
+      setActionLoading(true);
+      await matchesApi.deleteMatch(m.id);
+      showSuccess(`Match #${m.match_number} deleted`);
+      await loadAll(false);
+    } catch (err) {
+      setError(err.message || 'Failed to delete match');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   // Tournament Generation Actions
   const handleGenerateGroupFixtures = async () => {
@@ -452,6 +512,11 @@ export function AdminDashboardPage() {
       {/* TAB 1: MATCHES */}
       {activeTab === 'matches' && (
         <div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+            <button className="btn btn-primary btn-sm" onClick={handleOpenCreate} disabled={actionLoading}>
+              <Plus size={14} /> Create Match
+            </button>
+          </div>
           <div className="table-wrapper">
             <table className="dcl-table">
               <thead>
@@ -550,6 +615,17 @@ export function AdminDashboardPage() {
                             title="Cancel Match"
                           >
                             <Ban size={12} /> Cancel
+                          </button>
+                        )}
+
+                        {m.stage === 'extra' && (m.status === 'upcoming' || m.status === 'cancelled') && (
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleDeleteMatch(m)}
+                            disabled={actionLoading}
+                            title="Delete this additional match"
+                          >
+                            <Trash2 size={12} /> Delete
                           </button>
                         )}
 
@@ -874,6 +950,107 @@ export function AdminDashboardPage() {
         </div>
       )}
 
+      {/* Create Match Modal */}
+      {createOpen && (
+        <div className="modal-backdrop" onClick={() => setCreateOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>
+                <Plus size={18} color="var(--amber)" /> Create Match
+              </h3>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setCreateOpen(false)}
+                style={{ padding: '4px', border: 'none' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateMatch}>
+              <div className="modal-body">
+                <p style={{ fontSize: '12px', color: 'var(--chalk-dim)', marginBottom: '12px' }}>
+                  Adds an extra match. It appears on the public Matches page and does not affect group standings or tournament stats.
+                </p>
+                {createError && (
+                  <div style={{ marginBottom: '12px', padding: '8px 12px', borderRadius: '6px', background: 'rgba(209, 88, 90, 0.15)', border: '1px solid var(--red)', color: 'var(--red)', fontSize: '13px' }}>
+                    {createError}
+                  </div>
+                )}
+                <div className="grid-2" style={{ gap: '12px' }}>
+                  {[['team1_id', 'Team 1 *', 'team2_id'], ['team2_id', 'Team 2 *', 'team1_id']].map(([key, label, otherKey]) => (
+                    <div className="field" key={key}>
+                      <label>{label}</label>
+                      <select
+                        className="input"
+                        value={createForm[key]}
+                        onChange={(e) => setCreateForm({ ...createForm, [key]: e.target.value })}
+                        required
+                      >
+                        <option value="">Select team…</option>
+                        {teams.filter((t) => t.id !== createForm[otherKey]).map((t) => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid-2" style={{ gap: '12px' }}>
+                  <div className="field">
+                    <label>Match Date *</label>
+                    <input type="date" className="input" required value={createForm.date}
+                      onChange={(e) => setCreateForm({ ...createForm, date: e.target.value })} />
+                  </div>
+                  <div className="field">
+                    <label>Kickoff Time</label>
+                    <input type="time" className="input" value={createForm.time}
+                      onChange={(e) => setCreateForm({ ...createForm, time: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="grid-2" style={{ gap: '12px' }}>
+                  <div className="field">
+                    <label>Venue / Pitch</label>
+                    <input type="text" className="input" maxLength={200} placeholder="e.g. Stadia Main Arena"
+                      value={createForm.venue} onChange={(e) => setCreateForm({ ...createForm, venue: e.target.value })} />
+                  </div>
+                  <div className="field">
+                    <label>Duration (Minutes)</label>
+                    <input type="number" min="1" max="240" className="input" placeholder="e.g. 40"
+                      value={createForm.duration_minutes}
+                      onChange={(e) => setCreateForm({ ...createForm, duration_minutes: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label>Match Title</label>
+                  <input type="text" className="input" maxLength={100} placeholder="Friendly"
+                    value={createForm.label} onChange={(e) => setCreateForm({ ...createForm, label: e.target.value })} />
+                </div>
+
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label>Notes</label>
+                  <textarea className="input" rows={2} maxLength={1000} value={createForm.notes}
+                    onChange={(e) => setCreateForm({ ...createForm, notes: e.target.value })}
+                    style={{ resize: 'vertical' }} />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setCreateOpen(false)} disabled={actionLoading}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={actionLoading}>
+                  Create Match
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Schedule Edit Modal */}
       {editingMatch && (
         <div className="modal-backdrop" onClick={handleCloseEditSchedule}>
@@ -902,6 +1079,20 @@ export function AdminDashboardPage() {
                     Stage: {editingMatch.stage ? editingMatch.stage.toUpperCase() : ''} {editingMatch.label ? `(${editingMatch.label})` : ''} · Status: {editingMatch.status}
                   </div>
                 </div>
+
+                {editingMatch.stage === 'extra' && (
+                  <div className="field">
+                    <label>Match Title</label>
+                    <input
+                      type="text"
+                      className="input"
+                      maxLength={100}
+                      placeholder="Friendly"
+                      value={scheduleForm.label}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, label: e.target.value })}
+                    />
+                  </div>
+                )}
 
                 {editingMatch.status === 'upcoming' && (
                   <div className="grid-2" style={{ gap: '12px' }}>

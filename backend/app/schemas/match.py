@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.match_event import MatchEventOut
 
-Stage = Literal["group", "semi", "final"]
+Stage = Literal["group", "semi", "final", "extra"]
 MatchStatus = Literal["upcoming", "live", "full_time", "cancelled"]
 
 
@@ -42,7 +42,30 @@ class HalfTimePayload(BaseModel):
     elapsed_seconds: Optional[int] = Field(default=None, ge=0, le=7200)
 
 
+class MatchCreate(BaseModel):
+    team1_id: str = Field(pattern=r"^[0-9a-fA-F]{24}$")
+    team2_id: str = Field(pattern=r"^[0-9a-fA-F]{24}$")
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")  # YYYY-MM-DD
+    time: Optional[str] = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")  # HH:MM, 24h
+    venue: Optional[str] = Field(default=None, max_length=200)
+    label: Optional[str] = Field(default=None, max_length=100)
+    duration_minutes: Optional[int] = Field(default=None, ge=1, le=240)
+    notes: Optional[str] = Field(default=None, max_length=1000)
+
+    @field_validator("date")
+    @classmethod
+    def _real_calendar_date(cls, v: str) -> str:
+        date.fromisoformat(v)
+        return v
+
+    @field_validator("venue", "label", "notes")
+    @classmethod
+    def _strip(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip() or None if v is not None else None
+
+
 class MatchUpdate(BaseModel):
+    label: Optional[str] = Field(default=None, max_length=100)  # only applied to extra matches
     date: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")  # YYYY-MM-DD
     time: Optional[str] = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")  # HH:MM, 24h
     venue: Optional[str] = Field(default=None, max_length=200)

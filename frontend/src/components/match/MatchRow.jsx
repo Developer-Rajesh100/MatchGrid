@@ -13,7 +13,7 @@ export function MatchRow({ match, showVenue = false }) {
 
   const label =
     match.label ||
-    (match.group_name ? `Group ${match.group_name}` : match.stage === 'semi' ? 'Semi-final' : match.stage === 'final' ? 'Final' : '');
+    (match.group_name ? `Group ${match.group_name}` : match.stage === 'semi' ? 'Semi-final' : match.stage === 'final' ? 'Final' : match.stage === 'extra' ? 'Friendly' : '');
 
   const getTeamLogo = (name, logoUrl) =>
     logoUrl || (name && name !== 'TBD' ? `/assets/teams/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}.png` : null);

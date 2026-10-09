@@ -5,7 +5,9 @@ from beanie import Document, PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
 
-Stage = Literal["group", "semi", "final"]
+# "extra" = admin-created additional match (e.g. a friendly). It never affects group
+# standings, the tournament stage, or the tournament player statistics.
+Stage = Literal["group", "semi", "final", "extra"]
 # "upcoming"/"full_time" are the reference prototype's terms for "scheduled"/"completed"
 # (see docs/PROJECT_ANALYSIS.md §6) — kept as-is rather than renamed, to avoid a disruptive
 # rename across code/docs already built on them. "cancelled" is new in Part 5.

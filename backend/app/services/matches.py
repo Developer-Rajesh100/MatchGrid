@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from beanie import PydanticObjectId
+from pymongo.errors import DuplicateKeyError
 
 from app.core.errors import ConflictError, NotFoundError
 from app.core.websocket import broadcast
@@ -9,7 +10,7 @@ from app.models import Group, GroupTeam, Match, MatchEvent, MatchLineup, Team
 from app.services.standings import recalculate_group_standings, sorted_group_standings
 from app.services.tournament_stage import get_match_winner, refresh_tournament_stage
 
-STAGE_RANK = {"group": 0, "semi": 1, "final": 2}
+STAGE_RANK = {"group": 0, "semi": 1, "final": 2, "extra": 3}
 
 
 async def compute_score(match: Match) -> tuple[int, int]:
@@ -322,6 +323,102 @@ async def generate_semis(tournament_id: PydanticObjectId) -> list[Match]:
     return semis
 
 
+async def assert_no_conflict(
+    tournament_id: PydanticObjectId,
+    team1_id: PydanticObjectId,
+    team2_id: PydanticObjectId,
+    date: Optional[str],
+    time: Optional[str],
+    exclude_id: Optional[PydanticObjectId] = None,
+) -> None:
+    """Rejects a duplicate fixture (same two teams, same date and time) and a team
+    being booked into two matches at the same date and time. Cancelled matches
+    don't count."""
+    if not date:
+        return
+    others = await Match.find(
+        Match.tournament_id == tournament_id, Match.date == date, Match.status != "cancelled"
+    ).to_list()
+    pair = {team1_id, team2_id}
+    for other in others:
+        if exclude_id is not None and other.id == exclude_id:
+            continue
+        if {other.team1_id, other.team2_id} == pair and other.time == time:
+            raise ConflictError(
+                f"A match between these teams is already scheduled on {date}"
+                + (f" at {time}" if time else "")
+            )
+        if time and other.time == time and pair & {other.team1_id, other.team2_id}:
+            raise ConflictError(f"A selected team already plays another match on {date} at {time}")
+
+
+async def _validate_teams_exist(
+    tournament_id: PydanticObjectId, team1_id: PydanticObjectId, team2_id: PydanticObjectId
+) -> None:
+    if team1_id == team2_id:
+        raise ConflictError("A team cannot play against itself — pick two different teams")
+    for team_id in (team1_id, team2_id):
+        team = await Team.get(team_id)
+        if team is None or team.tournament_id != tournament_id:
+            raise NotFoundError("Selected team does not exist in this tournament")
+
+
+async def create_extra_match(
+    tournament_id: PydanticObjectId,
+    team1_id: PydanticObjectId,
+    team2_id: PydanticObjectId,
+    *,
+    date: str,
+    time: Optional[str],
+    venue: Optional[str],
+    label: Optional[str],
+    duration_minutes: Optional[int],
+    notes: Optional[str],
+) -> Match:
+    """Creates an additional match outside the group/knockout structure."""
+    await _validate_teams_exist(tournament_id, team1_id, team2_id)
+    await assert_no_conflict(tournament_id, team1_id, team2_id, date, time)
+
+    for _ in range(5):  # retry if two admins create at the same instant (unique match_number)
+        last = await Match.find(Match.tournament_id == tournament_id).sort("-match_number").first_or_none()
+        match = Match(
+            tournament_id=tournament_id,
+            match_number=(last.match_number if last else 0) + 1,
+            stage="extra",
+            label=label or "Friendly",
+            date=date,
+            time=time,
+            venue=venue,
+            duration_minutes=duration_minutes,
+            notes=notes,
+            team1_id=team1_id,
+            team2_id=team2_id,
+        )
+        try:
+            await match.insert()
+            break
+        except DuplicateKeyError:
+            continue
+    else:
+        raise ConflictError("Could not allocate a match number — please try again")
+    await broadcast({"type": "match_updated", "match_id": str(match.id)})
+    return match
+
+
+async def delete_extra_match(match: Match) -> None:
+    """Only admin-created extra matches that were never played can be deleted."""
+    if match.stage != "extra":
+        raise ConflictError("Only additional (admin-created) matches can be deleted")
+    if match.status not in ("upcoming", "cancelled"):
+        raise ConflictError("A live or completed match cannot be deleted")
+    if await MatchEvent.find(MatchEvent.match_id == match.id).count():
+        raise ConflictError("This match has recorded events and cannot be deleted")
+    await MatchLineup.find(MatchLineup.match_id == match.id).delete()
+    match_id = str(match.id)
+    await match.delete()
+    await broadcast({"type": "match_updated", "match_id": match_id})
+
+
 async def assign_match_teams(
     match: Match, team1_id: PydanticObjectId, team2_id: PydanticObjectId
 ) -> Match:
@@ -333,13 +430,11 @@ async def assign_match_teams(
     """
     if match.status != "upcoming":
         raise ConflictError("Teams can only be changed while the match is still upcoming")
-    if team1_id == team2_id:
-        raise ConflictError("A team cannot play against itself — pick two different teams")
-
-    for team_id in (team1_id, team2_id):
-        team = await Team.get(team_id)
-        if team is None or team.tournament_id != match.tournament_id:
-            raise NotFoundError("Selected team does not exist in this tournament")
+    await _validate_teams_exist(match.tournament_id, team1_id, team2_id)
+    if match.stage == "extra":
+        await assert_no_conflict(
+            match.tournament_id, team1_id, team2_id, match.date, match.time, exclude_id=match.id
+        )
 
     if match.stage == "group":
         members = {

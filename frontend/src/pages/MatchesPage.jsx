@@ -46,7 +46,7 @@ export function MatchesPage() {
       <div className="section-title">
         <div>
           <h2><Calendar size={24} color="var(--amber)" /> Match Fixtures & Results</h2>
-          <p>Full schedule of group stages, semi-finals, and final</p>
+          <p>Full schedule of group stages, semi-finals, final, and additional matches</p>
         </div>
         <button className="btn btn-outline btn-sm" onClick={fetchMatches}>
           <RefreshCw size={13} /> Refresh
@@ -85,6 +85,14 @@ export function MatchesPage() {
         >
           Final
         </button>
+        {matches.some((m) => m.stage === 'extra') && (
+          <button
+            className={`sub-tab ${filterStage === 'extra' && filterStatus === 'all' ? 'active' : ''}`}
+            onClick={() => { setFilterStage('extra'); setFilterStatus('all'); }}
+          >
+            Other Matches
+          </button>
+        )}
         <button
           className={`sub-tab ${filterStatus === 'completed' ? 'active' : ''}`}
           onClick={() => { setFilterStage('all'); setFilterStatus('completed'); }}
@@ -143,6 +151,23 @@ export function MatchesPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {matches
                   .filter((m) => m.stage === 'semi' || m.stage === 'final')
+                  .map((m) => (
+                    <MatchRow key={m.id} match={m} showVenue />
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Additional (admin-created) matches */}
+          {matches.some((m) => m.stage === 'extra') && (
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--chalk-dim)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--chalk-dim)' }}></span>
+                Other Matches
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {matches
+                  .filter((m) => m.stage === 'extra')
                   .map((m) => (
                     <MatchRow key={m.id} match={m} showVenue />
                   ))}
