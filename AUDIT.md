@@ -1,5 +1,25 @@
 # DCL Season 5 Scoreboard — Test & Production-Readiness Audit
 
+## Release retest of 2026-10-10 (latest, before pushing the match-number editing feature)
+
+Full re-run after adding admin editing of match numbers (M1, M2, …). All testing used throwaway databases; real data was only read.
+
+| Area | Result |
+|---|---|
+| Backend `pytest` | **248 passed** |
+| Frontend `vitest` / `vite build` | **34 passed**, build OK |
+| `ruff`, `pip-audit`, `npm audit`, secret scan, `.do/app.yaml` and entrypoint syntax | clean, 0 vulnerabilities |
+| API checks on a fresh DB | **51 / 51 pass** |
+| API fuzzing (45 bad inputs), full live tournament to champion, load (150 req at 30 concurrent) | no 5xx, standings match an independent recomputation, 0 errors, p95 < 145 ms |
+| Spoofed rotating `X-Forwarded-For` | throttled (429 after 6 attempts) |
+| Browser: 14 routes at 375 / 768 / 1280 px (42 combinations) | 0 overflow, 0 JS errors, no `undefined`/`NaN` |
+| Browser: Live Control UI (start, goal, half-time, resume, end) | works; score 1-0, 1 event |
+| Browser: admin (schedule edit, semi-final assignment, create match, renumber, renumber conflict blocked, delete extra, delete a completed match with standings/leaderboard recomputed) | all pass |
+
+New in this release: admins can edit a match's number (1-999, unique, validated on client and server). No new bugs were found.
+
+---
+
 ## Final audit of 2026-10-10, second pass (current)
 
 **Scope:** the whole project including the newest features: delete for every match (including live/completed), Create/Edit/Delete Match, team assignment, the reset script, and the production startup seed.
