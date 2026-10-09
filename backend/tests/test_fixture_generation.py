@@ -123,15 +123,16 @@ async def test_generate_semis_requires_both_groups_complete(tournament, groups, 
         await generate_semis(tournament.id)
 
 
-async def test_generate_semis_requires_the_2_semi_slots_to_already_exist(tournament, groups, teams, players):
+async def test_generate_semis_recreates_deleted_semi_slots(tournament, groups, teams, players):
     group_a_matches = await generate_group_fixtures(groups["A"].id, force=False)
     group_b_matches = await generate_group_fixtures(groups["B"].id, force=False)
     for m in group_a_matches + group_b_matches:
         m = await start_match(m)
         await end_match(m)
-    # No semi slots inserted at all.
-    with pytest.raises(ConflictError):
-        await generate_semis(tournament.id)
+    # No semi slots exist (e.g. deleted by the admin): generation re-creates them.
+    semis = await generate_semis(tournament.id)
+    assert [m.label for m in semis] == ["Semi-final 1", "Semi-final 2"]
+    assert all(m.team1_id and m.team2_id for m in semis)
 
 
 async def test_generate_semis_seeds_correctly_from_group_standings(tournament, groups, teams, players):
@@ -196,7 +197,7 @@ async def test_generate_semis_rejects_regenerating_once_already_seeded(tournamen
 # ---- generate_final ----
 
 
-async def test_generate_final_requires_a_final_slot_to_exist(tournament, teams, players):
+async def test_generate_final_recreates_a_deleted_final_slot(tournament, teams, players):
     semi1, semi2 = _semi_slots(tournament)
     semi1.team1_id, semi1.team2_id, semi1.status = teams["Red Dragons"].id, teams["Golden Hawks"].id, "full_time"
     semi2.team1_id, semi2.team2_id, semi2.status = teams["Blue Whales"].id, teams["Black Panthers"].id, "full_time"
@@ -209,8 +210,9 @@ async def test_generate_final_requires_a_final_slot_to_exist(tournament, teams, 
         match_id=semi2.id, type="goal", team_id=teams["Blue Whales"].id, player_id=players["Blue Whales"][3].id, minute=1
     ).insert()
 
-    with pytest.raises(NotFoundError):
-        await generate_final(tournament.id)
+    final = await generate_final(tournament.id)  # no final slot existed: it is re-created
+    assert final.stage == "final" and final.label == "Final"
+    assert {final.team1_id, final.team2_id} == {teams["Red Dragons"].id, teams["Blue Whales"].id}
 
 
 async def test_generate_final_requires_both_semis_full_time_with_decided_winners(tournament, teams, players):

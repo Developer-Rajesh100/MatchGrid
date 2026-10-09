@@ -126,23 +126,84 @@ async def test_cancelled_match_can_be_deleted(async_client, auth_headers, base_m
     assert (await async_client.delete(f"/api/matches/{base_matches.id}", headers=auth_headers)).status_code == 204
 
 
-async def test_knockout_slots_and_played_matches_are_protected(async_client, auth_headers, teams, tournament, base_matches):
-    semi = Match(tournament_id=tournament.id, match_number=7, stage="semi", label="Semi-final 1")
+async def _play(async_client, auth_headers, match, team, scorer, finish=True):
+    mid = str(match.id)
+    assert (await async_client.post(f"/api/matches/{mid}/start", headers=auth_headers)).status_code == 200
+    ev = await async_client.post(
+        f"/api/matches/{mid}/events",
+        json={"type": "goal", "team_id": str(team.id), "player_id": str(scorer.id), "minute": 5},
+        headers=auth_headers,
+    )
+    assert ev.status_code == 201
+    if finish:
+        assert (await async_client.post(f"/api/matches/{mid}/end", headers=auth_headers)).status_code == 200
+
+
+async def test_completed_group_match_can_be_deleted_and_everything_recomputes(
+    async_client, auth_headers, teams, players, groups, tournament, base_matches
+):
+    from app.models import MatchEvent, TournamentStanding
+
+    other = Match(
+        tournament_id=tournament.id, match_number=2, stage="group", group_id=groups["A"].id,
+        team1_id=teams["Red Dragons"].id, team2_id=teams["White Lions"].id,
+    )
+    await other.insert()
+    scorer = players["Red Dragons"][3]
+    await _play(async_client, auth_headers, base_matches, teams["Red Dragons"], scorer)
+    await _play(async_client, auth_headers, other, teams["Red Dragons"], scorer)
+    assert (await PlayerStatistics.find_one(PlayerStatistics.player_id == scorer.id)).goals == 2
+
+    r = await async_client.delete(f"/api/matches/{base_matches.id}", headers=auth_headers)
+    assert r.status_code == 204
+    assert await Match.get(base_matches.id) is None
+    events = await MatchEvent.find_all().to_list()
+    assert len(events) == 1 and events[0].match_id == other.id
+    assert (await PlayerStatistics.find_one(PlayerStatistics.player_id == scorer.id)).goals == 1
+    rows = {x.team_id: x for x in await TournamentStanding.find(TournamentStanding.group_id == groups["A"].id).to_list()}
+    assert rows[teams["Red Dragons"].id].played == 1 and rows[teams["Red Dragons"].id].points == 3
+    assert rows[teams["Golden Hawks"].id].played == 0  # the deleted match no longer counts
+    assert await Match.get(other.id) is not None  # other matches untouched
+
+
+async def test_live_match_can_be_deleted(async_client, auth_headers, teams, players, base_matches):
+    await _play(async_client, auth_headers, base_matches, teams["Red Dragons"], players["Red Dragons"][3], finish=False)
+    assert (await async_client.delete(f"/api/matches/{base_matches.id}", headers=auth_headers)).status_code == 204
+    assert await Match.get(base_matches.id) is None
+    stats = await PlayerStatistics.find_one(PlayerStatistics.player_id == players["Red Dragons"][3].id)
+    assert stats is None or stats.goals == 0
+
+
+async def test_deleted_knockout_slots_are_recreated_by_generation(
+    async_client, auth_headers, teams, groups, tournament
+):
+    semis = []
+    for n, label in ((7, "Semi-final 1"), (8, "Semi-final 2")):
+        m = Match(tournament_id=tournament.id, match_number=n, stage="semi", label=label)
+        await m.insert()
+        semis.append(m)
     final = Match(tournament_id=tournament.id, match_number=9, stage="final", label="Final")
-    await semi.insert()
     await final.insert()
-    for m in (semi, final):
-        assert (await async_client.delete(f"/api/matches/{m.id}", headers=auth_headers)).status_code == 409
-        assert await Match.get(m.id) is not None
-    base_matches.status = "full_time"
-    await base_matches.save()
-    assert (await async_client.delete(f"/api/matches/{base_matches.id}", headers=auth_headers)).status_code == 409
-    base_matches.status = "live"
-    await base_matches.save()
-    assert (await async_client.delete(f"/api/matches/{base_matches.id}", headers=auth_headers)).status_code == 409
+    # every knockout slot can be deleted...
+    for m in (*semis, final):
+        assert (await async_client.delete(f"/api/matches/{m.id}", headers=auth_headers)).status_code == 204
+    assert await Match.find(Match.stage != "group").count() == 0
+    # ...and group play still completes, then semi-finals are regenerated with the slots back
+    for name_a, name_b, n in (("Red Dragons", "Golden Hawks", 1), ("Black Panthers", "Blue Whales", 2)):
+        gm = Match(
+            tournament_id=tournament.id, match_number=n, stage="group",
+            group_id=groups["A" if n == 1 else "B"].id,
+            team1_id=teams[name_a].id, team2_id=teams[name_b].id, status="full_time",
+        )
+        await gm.insert()
+    r = await async_client.post("/api/matches/generate-semis", headers=auth_headers)
+    assert r.status_code == 200, r.json()
+    got = [(m["label"], m["match_number"]) for m in r.json()]
+    assert [lbl for lbl, _ in got] == ["Semi-final 1", "Semi-final 2"]
+    assert all(m["team1_name"] and m["team2_name"] for m in r.json())
 
 
-async def test_played_extra_match_cannot_be_deleted_and_is_isolated(
+async def test_played_extra_match_is_isolated_from_tournament_data_and_deletable(
     async_client, auth_headers, teams, players, groups, base_matches, tournament
 ):
     from app.models import Tournament
@@ -159,7 +220,8 @@ async def test_played_extra_match_cannot_be_deleted_and_is_isolated(
     assert ev.status_code == 201
     assert (await async_client.post(f"/api/matches/{m['id']}/end", headers=auth_headers)).status_code == 200
     assert (await async_client.get(f"/api/matches/{m['id']}")).json()["score1"] == 1
-    assert (await async_client.delete(f"/api/matches/{m['id']}", headers=auth_headers)).status_code == 409
+    assert (await async_client.delete(f"/api/matches/{m['id']}", headers=auth_headers)).status_code == 204
+    assert await PlayerStatistics.find_one(PlayerStatistics.player_id == players["Red Dragons"][3].id) is None
 
     # tournament data unaffected: no stats row counts the friendly goal, no standings, stage unchanged
     stats = await PlayerStatistics.find_one(PlayerStatistics.player_id == scorer.id)

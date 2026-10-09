@@ -7,6 +7,7 @@ from pymongo.errors import DuplicateKeyError
 from app.core.errors import ConflictError, NotFoundError
 from app.core.websocket import broadcast
 from app.models import Group, GroupTeam, Match, MatchEvent, MatchLineup, Team
+from app.services.player_stats import recalculate_player_statistics
 from app.services.standings import recalculate_group_standings, sorted_group_standings
 from app.services.tournament_stage import get_match_winner, refresh_tournament_stage
 
@@ -298,9 +299,7 @@ async def generate_semis(tournament_id: PydanticObjectId) -> list[Match]:
         if not group_matches or any(m.status != "full_time" for m in group_matches):
             raise ConflictError("Both groups must be complete before generating semi-finals")
 
-    semis = await Match.find(Match.tournament_id == tournament_id, Match.stage == "semi").sort(
-        "match_number"
-    ).to_list()
+    semis = await _ensure_semi_slots(tournament_id)
     if len(semis) != 2:
         raise ConflictError("Expected exactly 2 semi-final slots")
     if any(m.team1_id for m in semis):
@@ -406,22 +405,76 @@ async def create_extra_match(
 
 
 async def delete_match(match: Match) -> None:
-    """Deletes a match that was never played (upcoming or cancelled, no events).
+    """Permanently deletes any match, whatever its status or stage, together with its
+    events and lineup, then recomputes everything derived from it: the affected players'
+    statistics, the group standings and the tournament stage.
 
-    Group-stage and admin-created matches can be deleted. Semi-final and final slots
-    are required by the knockout generation, so they can't be (use Cancel, or edit
-    their teams/schedule). Live and completed matches are always protected."""
-    if match.stage in ("semi", "final"):
-        raise ConflictError("Semi-final and final slots can't be deleted — edit or cancel them instead")
-    if match.status not in ("upcoming", "cancelled"):
-        raise ConflictError("A live or completed match cannot be deleted")
-    if await MatchEvent.find(MatchEvent.match_id == match.id).count():
-        raise ConflictError("This match has recorded events and cannot be deleted")
+    A deleted semi-final / final slot is re-created by "Generate semi-finals / final"."""
+    events = await MatchEvent.find(MatchEvent.match_id == match.id).to_list()
+    lineup = await MatchLineup.find(MatchLineup.match_id == match.id).to_list()
+    affected = (
+        {e.player_id for e in events}
+        | {e.assist_player_id for e in events if e.assist_player_id}
+        | {entry.player_id for entry in lineup}
+    )
+    match_id, group_id, tournament_id, stage = str(match.id), match.group_id, match.tournament_id, match.stage
+
+    await MatchEvent.find(MatchEvent.match_id == match.id).delete()
     await MatchLineup.find(MatchLineup.match_id == match.id).delete()
-    match_id = str(match.id)
     await match.delete()
-    await refresh_tournament_stage(match.tournament_id)
+
+    for player_id in affected:
+        stats = await recalculate_player_statistics(player_id)
+        if stats and not any(
+            [stats.goals, stats.assists, stats.yellow_cards, stats.red_cards, stats.potm_awards, stats.appearances]
+        ):
+            await stats.delete()
+    if stage == "group" and group_id:
+        await recalculate_group_standings(group_id)
+    await refresh_tournament_stage(tournament_id)
     await broadcast({"type": "match_updated", "match_id": match_id})
+
+
+_SEMI_SLOTS = (
+    ("Semi-final 1", "Group A (2nd) vs Group B (1st)"),
+    ("Semi-final 2", "Group B (2nd) vs Group A (1st)"),
+)
+
+
+async def _next_match_number(tournament_id: PydanticObjectId) -> int:
+    last = await Match.find(Match.tournament_id == tournament_id).sort("-match_number").first_or_none()
+    return (last.match_number if last else 0) + 1
+
+
+async def _ensure_semi_slots(tournament_id: PydanticObjectId) -> list[Match]:
+    """Returns the 2 semi-final slots in order (SF1, SF2), re-creating any that were deleted."""
+    semis = await Match.find(Match.tournament_id == tournament_id, Match.stage == "semi").to_list()
+    used = {m.label for m in semis}
+    for label, notes in _SEMI_SLOTS:
+        if len(semis) >= 2:
+            break
+        if label in used:
+            continue
+        slot = Match(
+            tournament_id=tournament_id, match_number=await _next_match_number(tournament_id),
+            stage="semi", label=label, notes=notes,
+            date=next((m.date for m in semis if m.date), None),
+        )
+        await slot.insert()
+        semis.append(slot)
+    semis.sort(key=lambda m: (m.label or "~", m.match_number))
+    return semis
+
+
+async def _ensure_final_slot(tournament_id: PydanticObjectId) -> Match:
+    final = await Match.find_one(Match.tournament_id == tournament_id, Match.stage == "final")
+    if final is None:
+        final = Match(
+            tournament_id=tournament_id, match_number=await _next_match_number(tournament_id),
+            stage="final", label="Final", notes="Winner SF1 vs Winner SF2",
+        )
+        await final.insert()
+    return final
 
 
 async def assign_match_teams(
@@ -467,9 +520,10 @@ async def assign_match_teams(
 
 
 async def generate_final(tournament_id: PydanticObjectId) -> Match:
-    semis = await Match.find(Match.tournament_id == tournament_id, Match.stage == "semi").sort(
-        "match_number"
-    ).to_list()
+    semis = sorted(
+        await Match.find(Match.tournament_id == tournament_id, Match.stage == "semi").to_list(),
+        key=lambda m: (m.label or "~", m.match_number),
+    )
     if len(semis) != 2 or any(m.status != "full_time" for m in semis):
         raise ConflictError("Both semi-finals must be completed before generating the final")
 
@@ -477,9 +531,7 @@ async def generate_final(tournament_id: PydanticObjectId) -> Match:
     if any(w is None for w in winners):
         raise ConflictError("Both semi-finals must have a decided winner")
 
-    final = await Match.find_one(Match.tournament_id == tournament_id, Match.stage == "final")
-    if final is None:
-        raise NotFoundError("Final match slot not found")
+    final = await _ensure_final_slot(tournament_id)
     if final.team1_id:
         raise ConflictError("The final has already been generated")
 

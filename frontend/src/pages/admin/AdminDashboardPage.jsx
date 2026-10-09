@@ -300,7 +300,13 @@ export function AdminDashboardPage() {
   };
 
   const handleDeleteMatch = async (m) => {
-    if (!window.confirm(`Delete match #${m.match_number} (${m.team1_name || 'TBD'} vs ${m.team2_name || 'TBD'})? This permanently removes the fixture and cannot be undone.`)) return;
+    const title = `#${m.match_number} (${m.team1_name || 'TBD'} vs ${m.team2_name || 'TBD'})`;
+    const hasData = m.status === 'live' || m.status === 'full_time';
+    const warning = hasData
+      ? `Delete match ${title}?\n\nThis match is ${m.status === 'live' ? 'LIVE' : 'completed'} (score ${m.score1}-${m.score2}). ` +
+        'Its result, goals, cards, lineup and all related data will be permanently deleted, and standings and player statistics will be recalculated.\n\nThis cannot be undone.'
+      : `Delete match ${title}? This permanently removes the fixture and cannot be undone.`;
+    if (!window.confirm(warning)) return;
     try {
       setActionLoading(true);
       await matchesApi.deleteMatch(m.id);
@@ -629,17 +635,15 @@ export function AdminDashboardPage() {
                           </button>
                         )}
 
-                        {/* Delete: unplayed group / extra matches only (never live, finished, semi or final) */}
-                        {(m.stage === 'group' || m.stage === 'extra') && (m.status === 'upcoming' || m.status === 'cancelled') && (
-                          <button
-                            className="btn btn-sm btn-danger"
-                            onClick={() => handleDeleteMatch(m)}
-                            disabled={actionLoading}
-                            title="Delete this match"
-                          >
-                            <Trash2 size={12} /> Delete
-                          </button>
-                        )}
+                        {/* Delete: any match, any status — removes its events/lineup too */}
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => handleDeleteMatch(m)}
+                          disabled={actionLoading}
+                          title="Delete this match and all its data"
+                        >
+                          <Trash2 size={12} /> Delete
+                        </button>
                       </div>
                     </td>
                   </tr>

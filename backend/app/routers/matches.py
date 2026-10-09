@@ -194,7 +194,8 @@ async def create_match(payload: MatchCreate, _admin: Admin = Depends(get_current
 
 @router.delete("/{match_id}", status_code=204)
 async def remove_match(match_id: str, _admin: Admin = Depends(get_current_admin)) -> None:
-    """Delete a match that was never played (group or extra). Played and knockout matches are protected."""
+    """Permanently delete any match (admin only), including its events and lineup, and recompute
+    standings, player statistics and the tournament stage."""
     await delete_match(await get_match_or_404(PydanticObjectId(match_id)))
 
 
