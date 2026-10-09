@@ -322,12 +322,15 @@ async def generate_semis(tournament_id: PydanticObjectId) -> list[Match]:
     return semis
 
 
-async def assign_semi_teams(
+async def assign_match_teams(
     match: Match, team1_id: PydanticObjectId, team2_id: PydanticObjectId
 ) -> Match:
-    """Admin manual override: sets the two teams of a semi-final slot."""
-    if match.stage != "semi":
-        raise ConflictError("Teams can only be assigned manually to semi-final matches")
+    """Admin manual override: sets the two teams of any not-yet-started match.
+
+    Group matches only accept teams of that match's group; semi-finals can't
+    reuse a team already placed in the other semi-final. Played/live/cancelled
+    matches are never touched, so results, scores and events stay intact.
+    """
     if match.status != "upcoming":
         raise ConflictError("Teams can only be changed while the match is still upcoming")
     if team1_id == team2_id:
@@ -338,15 +341,26 @@ async def assign_semi_teams(
         if team is None or team.tournament_id != match.tournament_id:
             raise NotFoundError("Selected team does not exist in this tournament")
 
-    other_semis = await Match.find(
-        Match.tournament_id == match.tournament_id, Match.stage == "semi", Match.id != match.id
-    ).to_list()
-    taken = {t for m in other_semis for t in (m.team1_id, m.team2_id) if t}
-    if {team1_id, team2_id} & taken:
-        raise ConflictError("A selected team is already assigned to the other semi-final")
+    if match.stage == "group":
+        members = {
+            gt.team_id for gt in await GroupTeam.find(GroupTeam.group_id == match.group_id).to_list()
+        }
+        if not {team1_id, team2_id} <= members:
+            raise ConflictError("Both teams must belong to this match's group")
+    elif match.stage == "semi":
+        other_semis = await Match.find(
+            Match.tournament_id == match.tournament_id, Match.stage == "semi", Match.id != match.id
+        ).to_list()
+        taken = {t for m in other_semis for t in (m.team1_id, m.team2_id) if t}
+        if {team1_id, team2_id} & taken:
+            raise ConflictError("A selected team is already assigned to the other semi-final")
 
+    changed = (match.team1_id, match.team2_id) != (team1_id, team2_id)
     match.team1_id, match.team2_id = team1_id, team2_id
     await match.save()
+    if changed:
+        # Lineup entries are tied to the old teams' players.
+        await MatchLineup.find(MatchLineup.match_id == match.id).delete()
     await refresh_tournament_stage(match.tournament_id)
     await broadcast({"type": "match_updated", "match_id": str(match.id)})
     return match

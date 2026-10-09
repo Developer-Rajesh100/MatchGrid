@@ -20,7 +20,7 @@ from app.schemas.match_lineup import LineupEntryOut, LineupSetRequest
 from app.services.lineups import set_lineup
 from app.services.match_events import add_event, remove_event
 from app.services.matches import (
-    assign_semi_teams,
+    assign_match_teams,
     cancel_match,
     compute_score,
     compute_scores_and_winners,
@@ -166,9 +166,9 @@ async def update_match(
 async def assign_teams(
     match_id: str, payload: AssignTeamsRequest, _admin: Admin = Depends(get_current_admin)
 ) -> MatchOut:
-    """Manually assign the two teams of an upcoming semi-final (admin only)."""
+    """Manually assign the two teams of an upcoming match — group, semi-final or final (admin only)."""
     match = await get_match_or_404(PydanticObjectId(match_id))
-    await assign_semi_teams(
+    await assign_match_teams(
         match, PydanticObjectId(payload.team1_id), PydanticObjectId(payload.team2_id)
     )
     return await _to_out(match)

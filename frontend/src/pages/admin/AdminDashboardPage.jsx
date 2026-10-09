@@ -213,14 +213,14 @@ export function AdminDashboardPage() {
   const handleSaveSchedule = async (e) => {
     e.preventDefault();
     if (!editingMatch) return;
-    const canPickTeams = editingMatch.stage === 'semi' && editingMatch.status === 'upcoming';
+    const canPickTeams = editingMatch.status === 'upcoming';
     const { team1_id, team2_id } = scheduleForm;
     const teamsChanged =
       canPickTeams &&
       (team1_id !== (editingMatch.team1_id || '') || team2_id !== (editingMatch.team2_id || ''));
     if (teamsChanged) {
       if (!team1_id || !team2_id) {
-        setError('Select both teams for the semi-final (or leave both unchanged).');
+        setError('Select both teams for this match (or leave both unchanged).');
         return;
       }
       if (team1_id === team2_id) {
@@ -895,7 +895,7 @@ export function AdminDashboardPage() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>
-                <Calendar size={18} color="var(--amber)" /> {editingMatch.stage === 'semi' ? 'Edit Semi-Final' : 'Edit Match Schedule'}
+                <Calendar size={18} color="var(--amber)" /> Edit Match
               </h3>
               <button
                 type="button"
@@ -918,16 +918,19 @@ export function AdminDashboardPage() {
                   </div>
                 </div>
 
-                {editingMatch.stage === 'semi' && editingMatch.status === 'upcoming' && (
+                {editingMatch.status === 'upcoming' && (
                   <div className="grid-2" style={{ gap: '12px' }}>
                     {[['team1_id', 'Team 1', 'team2_id'], ['team2_id', 'Team 2', 'team1_id']].map(
                       ([key, label, otherKey]) => {
-                        // Teams already playing in the other semi-final can't be picked here.
+                        // Group matches: only that group's teams. Semi-finals: not a team
+                        // already playing in the other semi-final.
                         const takenElsewhere = new Set(
-                          matches
-                            .filter((m) => m.stage === 'semi' && m.id !== editingMatch.id)
-                            .flatMap((m) => [m.team1_id, m.team2_id])
-                            .filter(Boolean),
+                          editingMatch.stage === 'semi'
+                            ? matches
+                                .filter((m) => m.stage === 'semi' && m.id !== editingMatch.id)
+                                .flatMap((m) => [m.team1_id, m.team2_id])
+                                .filter(Boolean)
+                            : [],
                         );
                         return (
                           <div className="field" key={key}>
@@ -939,7 +942,12 @@ export function AdminDashboardPage() {
                             >
                               <option value="">TBD</option>
                               {teams
-                                .filter((t) => !takenElsewhere.has(t.id) && t.id !== scheduleForm[otherKey])
+                                .filter(
+                                  (t) =>
+                                    !takenElsewhere.has(t.id) &&
+                                    t.id !== scheduleForm[otherKey] &&
+                                    (editingMatch.stage !== 'group' || t.group_name === editingMatch.group_name),
+                                )
                                 .map((t) => (
                                   <option key={t.id} value={t.id}>
                                     {t.name}
