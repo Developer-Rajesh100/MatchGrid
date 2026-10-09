@@ -255,3 +255,31 @@ async def test_startup_seed_runs_once_so_deleted_fixtures_do_not_come_back(tourn
     finally:
         bootstrap._seed = original
         await state.delete_many({})
+
+
+async def test_admin_can_renumber_a_match(async_client, auth_headers, base_matches, tournament, teams, groups):
+    other = Match(
+        tournament_id=tournament.id, match_number=2, stage="group", group_id=groups["A"].id,
+        team1_id=teams["White Lions"].id, team2_id=teams["Golden Hawks"].id,
+    )
+    await other.insert()
+    r = await async_client.patch(f"/api/matches/{base_matches.id}", json={"match_number": 20}, headers=auth_headers)
+    assert r.status_code == 200 and r.json()["match_number"] == 20
+    assert [m["match_number"] for m in (await async_client.get("/api/matches")).json()] == [2, 20]  # ordering follows
+    # the freed number can be reused
+    r = await async_client.patch(f"/api/matches/{other.id}", json={"match_number": 1}, headers=auth_headers)
+    assert r.status_code == 200
+    # a number in use by another match is rejected and nothing changes
+    r = await async_client.patch(f"/api/matches/{other.id}", json={"match_number": 20}, headers=auth_headers)
+    assert r.status_code == 409
+    assert (await Match.get(other.id)).match_number == 1
+
+
+async def test_match_number_validation_and_unchanged_number_is_fine(async_client, auth_headers, base_matches):
+    url = f"/api/matches/{base_matches.id}"
+    for bad in (0, -3, 1000, "x", 1.5):
+        assert (await async_client.patch(url, json={"match_number": bad}, headers=auth_headers)).status_code == 422
+    # sending the match's own number alongside other edits is fine
+    r = await async_client.patch(url, json={"match_number": 1, "venue": "Court 1"}, headers=auth_headers)
+    assert r.status_code == 200 and r.json()["venue"] == "Court 1" and r.json()["match_number"] == 1
+    assert (await async_client.patch(url, json={"match_number": 5})).status_code == 401  # admin only

@@ -52,6 +52,7 @@ export function AdminDashboardPage() {
     team1_id: '',
     team2_id: '',
     label: '',
+    match_number: '',
   });
 
   // Create Match modal state
@@ -212,6 +213,7 @@ export function AdminDashboardPage() {
       team1_id: match.team1_id || '',
       team2_id: match.team2_id || '',
       label: match.stage === 'extra' ? match.label || '' : '',
+      match_number: String(match.match_number),
     });
   };
 
@@ -223,6 +225,15 @@ export function AdminDashboardPage() {
     e.preventDefault();
     if (!editingMatch) return;
     const canPickTeams = editingMatch.status === 'upcoming';
+    const newNumber = parseInt(scheduleForm.match_number, 10);
+    if (!Number.isInteger(newNumber) || newNumber < 1 || newNumber > 999) {
+      setError('Match number must be a whole number between 1 and 999.');
+      return;
+    }
+    if (matches.some((x) => x.id !== editingMatch.id && x.match_number === newNumber)) {
+      setError(`Match number ${newNumber} is already used by another match.`);
+      return;
+    }
     const { team1_id, team2_id } = scheduleForm;
     const teamsChanged =
       canPickTeams &&
@@ -243,6 +254,7 @@ export function AdminDashboardPage() {
         await matchesApi.assignTeams(editingMatch.id, team1_id, team2_id);
       }
       const payload = {
+        match_number: newNumber,
         date: scheduleForm.date || null,
         time: scheduleForm.time || null,
         venue: scheduleForm.venue || null,
@@ -253,7 +265,7 @@ export function AdminDashboardPage() {
       };
       if (editingMatch.stage === 'extra') payload.label = scheduleForm.label.trim() || null;
       await matchesApi.updateMatch(editingMatch.id, payload);
-      showSuccess(`Schedule updated for Match #${editingMatch.match_number}`);
+      showSuccess(`Match #${newNumber} updated`);
       setEditingMatch(null);
       await loadAll(false);
     } catch (err) {
@@ -1083,6 +1095,19 @@ export function AdminDashboardPage() {
                   <div style={{ color: 'var(--chalk-dim)', fontSize: '12px' }}>
                     Stage: {editingMatch.stage ? editingMatch.stage.toUpperCase() : ''} {editingMatch.label ? `(${editingMatch.label})` : ''} · Status: {editingMatch.status}
                   </div>
+                </div>
+
+                <div className="field">
+                  <label>Match No. (shown as M{scheduleForm.match_number || '–'})</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="999"
+                    className="input"
+                    required
+                    value={scheduleForm.match_number}
+                    onChange={(e) => setScheduleForm({ ...scheduleForm, match_number: e.target.value })}
+                  />
                 </div>
 
                 {editingMatch.stage === 'extra' && (

@@ -65,6 +65,7 @@ class MatchCreate(BaseModel):
 
 
 class MatchUpdate(BaseModel):
+    match_number: Optional[int] = Field(default=None, ge=1, le=999)  # the "M1", "M2" … number
     label: Optional[str] = Field(default=None, max_length=100)  # only applied to extra matches
     date: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")  # YYYY-MM-DD
     time: Optional[str] = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")  # HH:MM, 24h

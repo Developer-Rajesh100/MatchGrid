@@ -4,6 +4,7 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import get_current_admin
+from app.core.errors import ConflictError
 from app.core.websocket import broadcast
 from app.models import Admin, Group, Match, MatchEvent, MatchLineup, Player, Team, Tournament
 from app.schemas.match import (
@@ -157,9 +158,18 @@ async def get_match(match_id: str) -> MatchDetailOut:
 async def update_match(
     match_id: str, payload: MatchUpdate, _admin: Admin = Depends(get_current_admin)
 ) -> MatchOut:
-    """Update a match's scheduled date/time/venue/duration/notes. Does not change status or score."""
+    """Update a match's match number and scheduled date/time/venue/duration/notes. Does not change status or score."""
     match = await get_match_or_404(PydanticObjectId(match_id))
     changes = payload.model_dump(exclude_unset=True)
+    if "match_number" in changes:
+        new_number = changes.pop("match_number")
+        if new_number is not None and new_number != match.match_number:
+            clash = await Match.find_one(
+                Match.tournament_id == match.tournament_id, Match.match_number == new_number
+            )
+            if clash is not None:
+                raise ConflictError(f"Match number {new_number} is already used by another match")
+            match.match_number = new_number
     if match.stage != "extra":
         changes.pop("label", None)  # labels of group/knockout matches are fixed
     elif {"date", "time"} & changes.keys() and match.team1_id and match.team2_id:
