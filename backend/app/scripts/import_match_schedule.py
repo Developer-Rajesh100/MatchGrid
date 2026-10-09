@@ -86,7 +86,9 @@ async def validate_teams(data: dict) -> list[str]:
     return errors
 
 
-async def import_schedule(data: dict, dry_run: bool) -> dict:
+async def import_schedule(data: dict, dry_run: bool, update_existing: bool = True) -> dict:
+    """update_existing=False never overwrites: an existing match only has its
+    empty (null) fields filled in, and only while still 'upcoming'."""
     tournament = await Tournament.find_one()
     if tournament is None:
         raise RuntimeError("Tournament not found — run migrations first")
@@ -103,7 +105,21 @@ async def import_schedule(data: dict, dry_run: bool) -> dict:
         team1_id = teams_by_name[m["team1"].lower()].id if m.get("team1") else None
         team2_id = teams_by_name[m["team2"].lower()].id if m.get("team2") else None
 
-        if existing:
+        if existing and not update_existing:
+            if existing.status == "upcoming":
+                changed = False
+                for field, value in (
+                    ("label", m.get("label")), ("team1_id", team1_id), ("team2_id", team2_id),
+                    ("date", m.get("date")), ("time", m.get("time")), ("venue", m.get("venue")),
+                    ("duration_minutes", m.get("duration_minutes")), ("notes", m.get("notes")),
+                ):
+                    if value is not None and getattr(existing, field) is None:
+                        setattr(existing, field, value)
+                        changed = True
+                if changed and not dry_run:
+                    await existing.save()
+                    stats["updated"] += 1
+        elif existing:
             existing.stage = m["stage"]
             existing.group_id = group_id
             if m.get("label") is not None:

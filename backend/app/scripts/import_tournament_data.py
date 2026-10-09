@@ -115,7 +115,9 @@ def validate(data: dict) -> list[str]:
     return errors
 
 
-async def import_data(data: dict, dry_run: bool) -> dict:
+async def import_data(data: dict, dry_run: bool, update_existing: bool = True) -> dict:
+    """update_existing=False is create-only: records already in the database
+    (matched the same way) are left completely untouched."""
     tournament = await Tournament.find_one()
     if tournament is None:
         raise RuntimeError("Tournament not found — run migrations first (python -m app.migrations.runner)")
@@ -131,7 +133,10 @@ async def import_data(data: dict, dry_run: bool) -> dict:
         name = team_data["name"].strip()
         existing_team = await Team.find_one(Team.name == re.compile(f"^{re.escape(name)}$", re.IGNORECASE))
 
-        if existing_team:
+        if existing_team and not update_existing:
+            team = existing_team
+            stats["teams_skipped"] = stats.get("teams_skipped", 0) + 1
+        elif existing_team:
             existing_team.name = name
             existing_team.color = team_data["color"]
             if team_data.get("logo_url"):
@@ -153,7 +158,7 @@ async def import_data(data: dict, dry_run: bool) -> dict:
                 await team.insert()
             stats["teams_created"] += 1
 
-        if not dry_run and team.id:
+        if not dry_run and team.id and not (existing_team and not update_existing):
             await assign_team_group(team.id, groups[team_data["group"]].id)
 
         for player_data in team_data.get("players", []):
@@ -170,6 +175,9 @@ async def import_data(data: dict, dry_run: bool) -> dict:
             if not photo_url and dcl_id:
                 photo_url = f"/assets/players/{dcl_id}.jpg"
 
+            if existing_player and not update_existing:
+                stats["players_skipped"] = stats.get("players_skipped", 0) + 1
+                continue
             if existing_player:
                 existing_player.name = player_data["name"]
                 existing_player.number = player_data["number"]

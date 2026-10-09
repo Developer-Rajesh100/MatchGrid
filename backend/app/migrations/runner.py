@@ -29,8 +29,8 @@ MIGRATIONS = [
 ]
 
 
-async def run_migrations() -> list[str]:
-    await init_db()
+async def apply_migrations() -> list[str]:
+    """Applies pending migrations against an already-initialised DB connection."""
     settings = get_settings()
     collection = get_client()[settings.mongo_db_name]["schema_migrations"]
 
@@ -49,8 +49,15 @@ async def run_migrations() -> list[str]:
         newly_applied.append(migration.NAME)
         print(f"  - {migration.NAME}: done")
 
-    await close_db()
     return newly_applied
+
+
+async def run_migrations() -> list[str]:
+    await init_db()
+    try:
+        return await apply_migrations()
+    finally:
+        await close_db()
 
 
 def main() -> None:

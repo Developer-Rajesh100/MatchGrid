@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
+from app.core.bootstrap import run_startup_tasks
 from app.core.database import close_db, init_db
 from app.core.errors import register_exception_handlers
 from app.core.logging import register_request_logging, setup_logging
@@ -32,6 +33,9 @@ setup_logging(level="DEBUG" if settings.debug else "INFO")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    # Migrations + seed complete before the server accepts any request; a failure
+    # aborts startup so a broken deploy never goes live.
+    await run_startup_tasks()
     yield
     await close_db()
 

@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     mongo_uri: str = "mongodb://localhost:27017"
     mongo_db_name: str = "dcl_scoreboard"
 
+    # Startup bootstrap (see app/core/bootstrap.py): run pending migrations and
+    # create-only seed the bundled data/*.json before serving requests.
+    auto_migrate: bool = True
+    auto_seed: bool = True
+
     # Auth
     jwt_secret: str = "change-me-in-.env"
     jwt_algorithm: str = "HS256"

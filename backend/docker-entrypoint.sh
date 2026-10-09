@@ -1,13 +1,15 @@
 #!/bin/sh
-# Runs the idempotent migration runner (safe to run on every container start
-# — each migration tracks whether it's already applied) before starting the
-# server, so `docker compose up -d` alone is enough to get a fresh database
-# to a working state, matching reference/implementation.txt Phase 10's
-# expected outcome.
+# With arguments: runs them instead (e.g. the DigitalOcean PRE_DEPLOY job runs
+# `python -m app.migrations.runner`). Without: starts the server.
+#
+# Migrations + create-only data seeding are NOT run here: app/main.py's
+# lifespan does it (under a Mongo lock, so concurrent instances can't race)
+# before the server accepts any request. The port comes from $PORT when the
+# platform sets it, else 8000.
 set -e
 
-echo "Running database migrations..."
-python -m app.migrations.runner
+if [ "$#" -gt 0 ]; then
+    exec "$@"
+fi
 
-echo "Starting server..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
