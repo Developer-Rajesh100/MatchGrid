@@ -37,9 +37,9 @@ export function TeamDetailPage() {
   if (loading) return <LoadingState message="Loading squad & fixtures..." />;
   if (error || !team) return <ErrorState message={error || 'Team not found'} />;
 
-  // Group players by position
-  const positions = ['GK', 'DEF', 'MID', 'FWD'];
-  const posLabels = { GK: 'Goalkeepers', DEF: 'Defenders', MID: 'Midfielders', FWD: 'Forwards' };
+  // Manager(s) get their own section; everyone else is listed by jersey number
+  const managers = players.filter((p) => p.is_manager);
+  const squadPlayers = players.filter((p) => !p.is_manager).sort((a, b) => a.number - b.number);
 
   const getTeamLogo = (name, logoUrl) =>
     logoUrl || (name ? `/assets/teams/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}.png` : null);
@@ -97,61 +97,59 @@ export function TeamDetailPage() {
           <p>Click on any player to view their profile and stats</p>
         </div>
 
-        <div className="grid-2">
-          {positions.map((pos) => {
-            const posPlayers = players.filter((p) => p.position === pos);
-            if (posPlayers.length === 0) return null;
-            return (
-              <div key={pos} className="card">
-                <div style={{ fontWeight: 700, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--chalk-dim)', marginBottom: '12px', borderBottom: '1px solid var(--line)', paddingBottom: '6px' }}>
-                  {posLabels[pos]} ({posPlayers.length})
+        {managers.length > 0 && (
+          <div className="squad-group">
+            <div className="squad-group-title">Manager{managers.length > 1 ? 's' : ''}</div>
+            <div className="squad-grid">
+              {managers.map((m) => (
+                <div
+                  key={m.id}
+                  className="squad-card squad-card-manager"
+                  style={{ '--squad-accent': team.color || 'var(--amber)' }}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigate(`/players/${m.id}`)}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/players/${m.id}`)}
+                >
+                  <Avatar name={m.name} size={52} photoUrl={m.photo_url} />
+                  <div className="squad-info">
+                    <div className="squad-name"><span>{m.name}</span></div>
+                    <div className="squad-id">{m.dcl_id || ''}</div>
+                  </div>
+                  <span className="squad-badge-manager">MANAGER</span>
                 </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {posPlayers.map((player) => (
-                    <div
-                      key={player.id}
-                      onClick={() => navigate(`/players/${player.id}`)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 10px',
-                        borderRadius: '6px',
-                        background: 'var(--panel-alt)',
-                        cursor: 'pointer',
-                        transition: 'background 0.15s',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '16px', color: 'var(--amber)', width: '22px' }}>
-                          #{player.number}
-                        </span>
-                        <Avatar name={player.name} size={30} photoUrl={player.photo_url} />
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {player.name}
-                            {player.is_manager && (
-                              <span style={{ fontSize: '10px', background: 'var(--amber)', color: 'var(--base)', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
-                                MANAGER
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--chalk-dim)' }}>
-                            {player.dcl_id || ''}
-                          </div>
-                        </div>
-                      </div>
-
-                      <span style={{ fontSize: '12px', color: 'var(--chalk-dim)', fontWeight: 600 }}>
-                        {player.position}
-                      </span>
-                    </div>
-                  ))}
+        <div className="squad-group">
+          <div className="squad-group-title">Players ({squadPlayers.length})</div>
+          <div className="squad-grid">
+            {squadPlayers.map((player, i) => (
+              <div
+                key={player.id}
+                className="squad-card"
+                style={{ '--squad-accent': team.color || 'var(--amber)' }}
+                role="link"
+                tabIndex={0}
+                onClick={() => navigate(`/players/${player.id}`)}
+                onKeyDown={(e) => e.key === 'Enter' && navigate(`/players/${player.id}`)}
+              >
+                <span className="squad-serial">{i + 1}</span>
+                <Avatar name={player.name} size={40} photoUrl={player.photo_url} />
+                <div className="squad-info">
+                  <div className="squad-name"><span>{player.name}</span></div>
+                  <div className="squad-id">{player.dcl_id || ''}</div>
                 </div>
               </div>
-            );
-          })}
+            ))}
+            {squadPlayers.length === 0 && (
+              <div className="card" style={{ textAlign: 'center', color: 'var(--chalk-dim)', padding: '24px', gridColumn: '1 / -1' }}>
+                No players registered yet.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

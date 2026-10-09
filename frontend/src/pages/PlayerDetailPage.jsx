@@ -91,10 +91,6 @@ export function PlayerDetailPage() {
             >
               <Shield size={14} /> {player.team_name}
             </NavLink>
-            <span style={{ color: 'var(--line)' }}>•</span>
-            <span style={{ fontSize: '13px', background: 'var(--panel-alt)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--line)' }}>
-              {player.position}
-            </span>
             {player.is_manager && (
               <span style={{ fontSize: '11px', background: 'var(--amber)', color: 'var(--base)', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
                 TEAM MANAGER

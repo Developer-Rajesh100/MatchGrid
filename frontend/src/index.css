@@ -238,7 +238,15 @@ a {
 }
 
 /* Layout */
+.dcl-app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
 main {
+  flex: 1 0 auto;
+  width: 100%;
   max-width: 1060px;
   margin: 0 auto;
   padding: 28px 16px 80px;
@@ -1124,3 +1132,99 @@ html, body {
   }
 }
 
+
+/* ── Team squad: single roster list ── */
+.squad-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.squad-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--squad-accent, var(--amber));
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.squad-card:hover,
+.squad-card:focus-visible {
+  background: var(--panel-hover);
+  border-color: var(--line-light);
+  border-left-color: var(--squad-accent, var(--amber));
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.squad-serial {
+  min-width: 30px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1;
+  text-align: center;
+  color: var(--amber);
+}
+
+.squad-group + .squad-group {
+  margin-top: 22px;
+}
+
+.squad-group-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--chalk-dim);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.squad-card-manager {
+  background: linear-gradient(135deg, var(--panel-alt), var(--panel));
+  border-color: var(--amber-dim);
+  border-left-width: 4px;
+}
+
+.squad-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.squad-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 14.5px;
+}
+
+.squad-name > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.squad-id {
+  font-size: 11px;
+  color: var(--chalk-muted);
+  margin-top: 2px;
+}
+
+
+.squad-badge-manager {
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--amber);
+  color: var(--base);
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
