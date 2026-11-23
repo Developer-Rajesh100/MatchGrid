@@ -1,90 +1,22 @@
 services:
   mongo:
     image: mongo:7
-    container_name: dcl_mongo
+    container_name: matchgrid_mongo
     restart: unless-stopped
     ports:
       - "${MONGO_PORT:-27017}:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-dcl_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-change-me-strong-password}
     volumes:
       - mongo_data:/data/db
-      - ./database/mongo/init:/docker-entrypoint-initdb.d:ro
+      - ./infra/mongo/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    container_name: dcl_backend
-    restart: unless-stopped
-    # Most settings come from backend/.env (see backend/.env.example for
-    # what's required); MONGO_URI/MONGO_DB_NAME are overridden below
-    # because the value in backend/.env points at localhost:${MONGO_PORT}
-    # for local (non-Docker) dev — inside this compose network the mongo
-    # service is reachable as `mongo` on its container port (27017), not
-    # via the host-mapped one.
-    env_file:
-      - backend/.env
-    environment:
-      MONGO_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/?authSource=admin
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-dcl_scoreboard}
-    depends_on:
-      mongo:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    container_name: dcl_frontend
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
       start_period: 5s
-
-  proxy:
-    build:
-      context: .
-      dockerfile: proxy/Dockerfile
-    container_name: dcl_proxy
-    restart: unless-stopped
-    environment:
-      # The container's own listen port stays 443 either way (see
-      # proxy/nginx.conf.template); this is only used to build a correct
-      # HTTP->HTTPS redirect URL when the *external* published port isn't
-      # the default 443 (e.g. this project's own 8443 default, chosen to
-      # avoid colliding with another project's 443 on the same dev
-      # machine). In a real deployment on standard ports, set this to 443
-      # (or just leave it — the default below already is).
-      HTTPS_PORT: ${HTTPS_PORT:-8443}
-    ports:
-      - "${HTTP_PORT:-8090}:80"
-      - "${HTTPS_PORT:-8443}:443"
-    volumes:
-      # Self-signed for local testing (proxy/generate-dev-cert.sh) or a real
-      # certificate for production — same two filenames either way, see
-      # proxy/nginx.conf.template.
-      - ./proxy/certs:/etc/nginx/certs:ro
-    depends_on:
-      backend:
-        condition: service_healthy
-      frontend:
-        condition: service_healthy
 
 volumes:
   mongo_data:
