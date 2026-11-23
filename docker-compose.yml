@@ -1,7 +1,7 @@
 services:
   mongo:
     image: mongo:7
-    container_name: dcl_mongo
+    container_name: matchgrid_mongo
     restart: unless-stopped
     ports:
       - "${MONGO_PORT:-27017}:27017"

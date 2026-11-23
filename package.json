@@ -12,13 +12,17 @@
     "dev:backend": "cd apps/backend && ./.venv/bin/uvicorn app.main:app --reload --port 8001",
     "dev:frontend": "bun --filter frontend dev",
     "dev": "bun run db:up && concurrently --kill-others -n \"backend,frontend\" -c \"cyan,magenta\" \"bun run dev:backend\" \"bun run dev:frontend\"",
-    "test:backend": "cd apps/backend && ./.venv/bin/pytest",
+    "test:backend": "cd apps/backend && ./.venv/bin/pytest -v",
     "test:frontend": "bun --filter frontend test",
+    "test:e2e": "bunx playwright test",
+    "test:e2e:ui": "bunx playwright test --ui",
     "test": "bun run test:backend && bun run test:frontend",
+    "test:all": "bun run test:backend && bun run test:frontend && bun run build && bun run test:e2e",
     "build": "bun --filter frontend build",
     "lint": "bun --filter frontend build"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "concurrently": "^9.2.5"
   }
 }

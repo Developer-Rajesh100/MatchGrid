@@ -298,14 +298,20 @@ export function HomePage() {
               Full tables <ArrowRight size={14} />
             </NavLink>
           </div>
-          {standings.map((grp) => (
-            <StandingsTable
-              key={grp.group_id}
-              groupName={grp.group_name}
-              standings={grp.standings}
-              showLegend={false}
-            />
-          ))}
+          {standings.length === 0 ? (
+            <div className="card text-center" style={{ padding: '28px', color: 'var(--text-muted)' }}>
+              No group tables formed yet. Standings will appear once tournament groups and matches are scheduled.
+            </div>
+          ) : (
+            standings.map((grp) => (
+              <StandingsTable
+                key={grp.group_id}
+                groupName={grp.group_name}
+                standings={grp.standings}
+                showLegend={false}
+              />
+            ))
+          )}
         </div>
 
         {/* Right: Fixtures & Leaders */}
@@ -318,9 +324,15 @@ export function HomePage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '28px' }}>
-            {matches.slice(0, 4).map((m) => (
-              <MatchRow key={m.id} match={m} />
-            ))}
+            {matches.length === 0 ? (
+              <div className="card text-center" style={{ padding: '24px', color: 'var(--text-muted)' }}>
+                No fixtures scheduled yet. Matches will appear here once drawn.
+              </div>
+            ) : (
+              matches.slice(0, 4).map((m) => (
+                <MatchRow key={m.id} match={m} />
+              ))
+            )}
           </div>
 
           {/* Leaders Preview */}

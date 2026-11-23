@@ -49,15 +49,21 @@ export function StandingsPage() {
         <ErrorState message={error} onRetry={fetchStandings} />
       ) : (
         <>
-          <div className="grid-2" style={{ marginBottom: '32px' }}>
-            {standings.map((grp) => (
-              <StandingsTable
-                key={grp.group_id}
-                groupName={grp.group_name}
-                standings={grp.standings}
-              />
-            ))}
-          </div>
+          {standings.length === 0 ? (
+            <div className="card text-center" style={{ padding: '36px', marginBottom: '32px', color: 'var(--text-muted)' }}>
+              No tournament groups or standings available. Group tables will appear once teams are drawn and fixtures begin.
+            </div>
+          ) : (
+            <div className="grid-2" style={{ marginBottom: '32px' }}>
+              {standings.map((grp) => (
+                <StandingsTable
+                  key={grp.group_id}
+                  groupName={grp.group_name}
+                  standings={grp.standings}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Qualification rules callout */}
           <div

@@ -22,6 +22,12 @@ apps/frontend/node_modules/
 apps/frontend/dist/
 apps/frontend/coverage/
 
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+.auth/
+
 # Editors / OS
 .DS_Store
 .vscode/

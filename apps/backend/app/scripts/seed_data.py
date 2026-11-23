@@ -19,84 +19,9 @@ from app.services.player_stats import recalculate_player_statistics
 from app.services.standings import recalculate_group_standings
 from app.services.tournament_stage import refresh_tournament_stage
 
-TEAMS = [
-    {
-        "name": "Red Dragons", "group": "A", "color": "#d0483f",
-        "players": [
-            ("DCL-001", "Prahlad", 1, False),
-            ("DCL-002", "Changte", 2, False),
-            ("DCL-003", "Sagar", 3, False),
-            ("DCL-004", "Suman Chakraborty", 4, False),
-            ("DCL-005", "Soutrik", 5, False),
-            ("DCL-006", "Manoj", 6, False),
-            ("DCL-007", "Subhra", 7, True),
-        ],
-    },
-    {
-        "name": "Golden Hawks", "group": "A", "color": "#d9a71b",
-        "players": [
-            ("DCL-008", "Sumit", 1, False),
-            ("DCL-009", "Nikunj", 2, False),
-            ("DCL-010", "Jisu", 3, False),
-            ("DCL-011", "Mukul", 4, False),
-            ("DCL-012", "Gautam", 5, False),
-            ("DCL-013", "Souvik", 6, False),
-            ("DCL-014", "Upendra", 7, False),
-            ("DCL-015", "Rajesh", 8, True),
-        ],
-    },
-    {
-        "name": "White Lions", "group": "A", "color": "#c9cdd0",
-        "players": [
-            ("DCL-038", "Soumava", 1, False),
-            ("DCL-039", "Joy", 2, False),
-            ("DCL-040", "Pankaj", 3, False),
-            ("DCL-041", "Hruda", 4, False),
-            ("DCL-042", "Trideb", 5, False),
-            ("DCL-043", "Sandip", 6, False),
-            ("DCL-044", "Mayukh", 7, True),
-        ],
-    },
-    {
-        "name": "Black Panthers", "group": "B", "color": "#565b66",
-        "players": [
-            ("DCL-016", "Ritwik", 1, False),
-            ("DCL-017", "Shamindra", 2, False),
-            ("DCL-018", "Ishaan", 3, False),
-            ("DCL-019", "Arush", 4, False),
-            ("DCL-020", "Nilotpal", 5, False),
-            ("DCL-021", "Haseeb", 6, False),
-            ("DCL-022", "Sumon Sarkar", 7, True),
-        ],
-    },
-    {
-        "name": "Blue Whales", "group": "B", "color": "#3d8fd6",
-        "players": [
-            ("DCL-023", "Sagnik", 1, False),
-            ("DCL-024", "Rounak", 2, False),
-            ("DCL-025", "Salim", 3, False),
-            ("DCL-026", "Suman Kundu", 4, False),
-            ("DCL-027", "Maharana", 5, False),
-            ("DCL-028", "Chotu", 6, False),
-            ("DCL-029", "Tamojit", 7, False),
-            ("DCL-030", "Arindam", 8, True),
-        ],
-    },
-    {
-        "name": "Green Alligators", "group": "B", "color": "#3f9958",
-        "players": [
-            ("DCL-031", "Anirban", 1, False),
-            ("DCL-032", "Shakti", 2, False),
-            ("DCL-033", "Rup", 3, False),
-            ("DCL-034", "Sayan", 4, False),
-            ("DCL-035", "Ujjal", 5, False),
-            ("DCL-036", "Sourav", 6, False),
-            ("DCL-037", "Shantanu", 7, True),
-        ],
-    },
-]
+TEAMS: list[dict] = []
 
-GROUP_PAIRS = [(0, 1), (0, 2), (1, 2)]  # indexes into each group's 3 teams
+GROUP_PAIRS = [(0, 1), (0, 2), (1, 2)]  # indexes into each group's teams
 
 
 async def seed() -> None:
@@ -104,7 +29,12 @@ async def seed() -> None:
 
     tournament = await Tournament.find_one(Tournament.name == settings.tournament_name)
     if tournament is None:
-        raise RuntimeError("Tournament not found — run migrations first (python -m app.migrations.runner)")
+        print("Tournament not found — run migrations first (python -m app.migrations.runner)")
+        return
+
+    if not TEAMS:
+        print("No sample teams configured in seed_data.py — clean slate maintained (skipping seed).")
+        return
 
     if await Team.find_all().count() > 0:
         print("Teams already exist — skipping seed (already seeded).")

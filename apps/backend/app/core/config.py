@@ -7,13 +7,13 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # App
-    app_name: str = "DCL Scoreboard API"
+    app_name: str = "MatchGrid API"
     environment: str = "development"
     debug: bool = True
 
     # Database
     mongo_uri: str = "mongodb://localhost:27017"
-    mongo_db_name: str = "dcl_scoreboard"
+    mongo_db_name: str = "matchgrid"
 
     # Startup bootstrap (see app/core/bootstrap.py): run pending migrations and
     # create-only seed the bundled data/*.json before serving requests.
@@ -39,8 +39,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
 
     # Tournament (seed defaults)
-    tournament_name: str = "DCL Season 5"
-    tournament_season: str = "5"
+    tournament_name: str = "MatchGrid"
+    tournament_season: str = "1"
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -11,11 +11,13 @@ mocks — so these are integration-style tests against a real (test) MongoDB.
 import os
 
 os.environ["MONGO_DB_NAME"] = "dcl_scoreboard_test"
+os.environ["AUTO_SEED"] = "true"
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import get_settings
+get_settings.cache_clear()
 from app.core.database import close_db, get_client, init_db
 from app.core.rate_limit import login_rate_limiter
 from app.core.security import create_access_token, hash_password

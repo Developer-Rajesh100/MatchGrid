@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { teamsApi } from '../api/teams';
 import { Avatar } from '../components/common/Avatar';
-import { LoadingState, ErrorState } from '../components/common/Common';
+import { LoadingState, ErrorState, EmptyState } from '../components/common/Common';
 import { Shield, Users, ArrowRight } from 'lucide-react';
 
 export function TeamsPage() {
@@ -80,12 +80,27 @@ export function TeamsPage() {
       <div className="section-title">
         <div>
           <h2><Shield size={24} color="var(--brand-primary)" /> Competing Clubs</h2>
-          <p>The 6 competing clubs of MatchGrid</p>
+          <p>Official competing clubs and squad registries</p>
         </div>
       </div>
 
-      {renderTeamGrid(groupA, 'Group A')}
-      {renderTeamGrid(groupB, 'Group B')}
+      {teams.length === 0 ? (
+        <EmptyState
+          title="No clubs registered"
+          description="No clubs have registered for MatchGrid yet. Teams will appear here once added in the Admin Portal."
+          icon={Shield}
+        />
+      ) : (
+        <>
+          {groupA.length > 0 && renderTeamGrid(groupA, 'Group A')}
+          {groupB.length > 0 && renderTeamGrid(groupB, 'Group B')}
+          {teams.some((t) => !['A', 'B'].includes(t.group_name)) &&
+            renderTeamGrid(
+              teams.filter((t) => !['A', 'B'].includes(t.group_name)),
+              'Other Clubs'
+            )}
+        </>
+      )}
     </div>
   );
 }
