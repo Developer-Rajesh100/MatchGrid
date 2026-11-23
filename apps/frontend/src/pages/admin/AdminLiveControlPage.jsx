@@ -452,8 +452,8 @@ export function AdminLiveControlPage() {
         <button onClick={() => navigate('/admin')} className="btn btn-outline btn-sm">
           <ArrowLeft size={13} /> Back to Dashboard
         </button>
-        <span style={{ fontSize: '12px', color: 'var(--chalk-dim)', fontWeight: 600 }}>
-          LIVE CONTROL CONSOLE
+        <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.6px' }}>
+          MATCHGRID LIVE CONTROL CONSOLE
         </span>
       </div>
 

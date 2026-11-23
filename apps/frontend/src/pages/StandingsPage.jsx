@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { standingsApi } from '../api/standings';
 import { StandingsTable } from '../components/standings/StandingsTable';
 import { LoadingState, ErrorState } from '../components/common/Common';
-import { BarChart3, Info, RefreshCw } from 'lucide-react';
+import { BarChart3, Info, RefreshCw, Trophy } from 'lucide-react';
 import { useLiveSocket } from '../hooks/useLiveSocket';
 
 export function StandingsPage() {
@@ -35,8 +35,8 @@ export function StandingsPage() {
     <div>
       <div className="section-title">
         <div>
-          <h2><BarChart3 size={24} color="var(--amber)" /> Tournament Standings</h2>
-          <p>Live group tables, points, and qualification status</p>
+          <h2><BarChart3 size={24} color="var(--brand-primary)" /> Tournament Standings</h2>
+          <p>Real-time group tables, goal difference calculations, and knockout seeding</p>
         </div>
         <button className="btn btn-outline btn-sm" onClick={fetchStandings}>
           <RefreshCw size={13} /> Refresh
@@ -44,12 +44,12 @@ export function StandingsPage() {
       </div>
 
       {loading ? (
-        <LoadingState message="Loading standings..." />
+        <LoadingState message="Calculating live standings..." />
       ) : error ? (
         <ErrorState message={error} onRetry={fetchStandings} />
       ) : (
         <>
-          <div className="grid-2" style={{ marginBottom: '28px' }}>
+          <div className="grid-2" style={{ marginBottom: '32px' }}>
             {standings.map((grp) => (
               <StandingsTable
                 key={grp.group_id}
@@ -63,21 +63,40 @@ export function StandingsPage() {
           <div
             className="card"
             style={{
-              background: 'rgba(21, 34, 25, 0.7)',
-              borderColor: 'var(--line-light)',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              borderLeft: '4px solid var(--brand-primary)',
               display: 'flex',
               alignItems: 'flex-start',
-              gap: '14px',
+              gap: '16px',
+              padding: '20px',
             }}
           >
-            <Info size={22} color="var(--amber)" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'var(--brand-primary-tint)',
+                color: 'var(--brand-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Info size={20} />
+            </div>
             <div>
-              <h4 style={{ fontWeight: 600, fontSize: '15px', marginBottom: '4px' }}>
-                Tournament Format & Tie-breakers
+              <h4 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '16px', color: 'var(--text-primary)', marginBottom: '6px' }}>
+                MatchGrid Progression Rules & Tie-breakers
               </h4>
-              <p style={{ fontSize: '13px', color: 'var(--chalk-dim)', lineHeight: '1.6' }}>
-                Teams are ranked by: <strong>Points (3 for a Win, 1 for a Draw)</strong> &rarr; <strong>Goal Difference (GD)</strong> &rarr; <strong>Goals For (GF)</strong>.
-                The top 2 teams from each group qualify for the semi-finals: <strong>Semi-final 1: Group A Runner-up vs Group B Winner (A2 vs B1)</strong> and <strong>Semi-final 2: Group B Runner-up vs Group A Winner (B2 vs A1)</strong>.
+              <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
+                Clubs receive <strong>3 points for a win</strong>, <strong>1 point for a draw</strong>, and <strong>0 for a defeat</strong>.
+                Tie-breaker hierarchy: <strong>Points</strong> &rarr; <strong>Goal Difference (GD)</strong> &rarr; <strong>Goals For (GF)</strong> &rarr; <strong>Club Name Alphabetical</strong>.
+                The top 2 clubs from each group advance to the Knockout Semi-Finals:
+                <strong> Semi-final 1: Group A 2nd vs Group B 1st (A2 vs B1)</strong> &bull;
+                <strong> Semi-final 2: Group B 2nd vs Group A 1st (B2 vs A1)</strong>.
               </p>
             </div>
           </div>
@@ -86,3 +105,4 @@ export function StandingsPage() {
     </div>
   );
 }
+export default StandingsPage;

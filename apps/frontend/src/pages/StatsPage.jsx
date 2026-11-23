@@ -35,8 +35,8 @@ export function StatsPage() {
     <div>
       <div className="section-title">
         <div>
-          <h2><Trophy size={24} color="var(--amber)" /> Tournament Statistics</h2>
-          <p>Player leaderboards and individual honors</p>
+          <h2><Trophy size={24} color="var(--brand-primary)" /> Tournament Statistics</h2>
+          <p>Official player performance leaderboards and tournament individual honors</p>
         </div>
         <button className="btn btn-outline btn-sm" onClick={fetchStats}>
           <RefreshCw size={13} /> Refresh
@@ -44,14 +44,14 @@ export function StatsPage() {
       </div>
 
       {loading ? (
-        <LoadingState message="Loading leaderboards..." />
+        <LoadingState message="Loading leaderboard rankings..." />
       ) : error ? (
         <ErrorState message={error} onRetry={fetchStats} />
       ) : (
         <div className="grid-2">
           {/* Top Scorers */}
           <LeaderCard
-            title="Top Scorers (Golden Boot)"
+            title="Golden Boot (Top Scorers)"
             icon={Flame}
             unit="goals"
             items={leaderboards?.top_scorers || []}
@@ -77,7 +77,7 @@ export function StatsPage() {
           <LeaderCard
             title="Most Appearances"
             icon={Activity}
-            unit="apps"
+            unit="matches"
             items={leaderboards?.most_appearances || []}
           />
         </div>
@@ -85,3 +85,4 @@ export function StatsPage() {
     </div>
   );
 }
+export default StatsPage;

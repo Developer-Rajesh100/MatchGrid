@@ -1,7 +1,9 @@
 const BASE_URL = '';
 
 export async function apiClient(endpoint, options = {}) {
-  const token = localStorage.getItem('dcl_admin_token');
+  const token =
+    localStorage.getItem('matchgrid_admin_token') ||
+    localStorage.getItem('dcl_admin_token');
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -21,11 +23,12 @@ export async function apiClient(endpoint, options = {}) {
 
   if (response.status === 401) {
     // Auth expired or invalid
-    if (localStorage.getItem('dcl_admin_token')) {
-      localStorage.removeItem('dcl_admin_token');
-      localStorage.removeItem('dcl_admin_username');
-      window.dispatchEvent(new Event('dcl-auth-changed'));
-    }
+    localStorage.removeItem('matchgrid_admin_token');
+    localStorage.removeItem('matchgrid_admin_username');
+    localStorage.removeItem('dcl_admin_token');
+    localStorage.removeItem('dcl_admin_username');
+    window.dispatchEvent(new Event('matchgrid-auth-changed'));
+    window.dispatchEvent(new Event('dcl-auth-changed'));
   }
 
   if (!response.ok) {

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, RefreshCw } from 'lucide-react';
+import { Calendar, RefreshCw, Trophy, Filter, Award } from 'lucide-react';
 import { matchesApi } from '../api/matches';
 import { MatchRow } from '../components/match/MatchRow';
-import { LoadingState, ErrorState } from '../components/common/Common';
+import { LoadingState, ErrorState, EmptyState } from '../components/common/Common';
 import { useLiveSocket } from '../hooks/useLiveSocket';
 
 export function MatchesPage() {
@@ -41,12 +41,15 @@ export function MatchesPage() {
     return true;
   });
 
+  const liveCount = matches.filter((m) => m.status === 'live').length;
+  const completedCount = matches.filter((m) => m.status === 'full_time' || m.status === 'completed').length;
+
   return (
     <div>
       <div className="section-title">
         <div>
-          <h2><Calendar size={24} color="var(--amber)" /> Match Fixtures & Results</h2>
-          <p>Full schedule of group stages, semi-finals, final, and additional matches</p>
+          <h2><Calendar size={24} color="var(--brand-primary)" /> Match Fixtures & Results</h2>
+          <p>Complete tournament schedule across group stages, semi-finals, and final</p>
         </div>
         <button className="btn btn-outline btn-sm" onClick={fetchMatches}>
           <RefreshCw size={13} /> Refresh
@@ -65,7 +68,7 @@ export function MatchesPage() {
           className={`sub-tab ${filterStatus === 'live' ? 'active' : ''}`}
           onClick={() => { setFilterStage('all'); setFilterStatus('live'); }}
         >
-          Live ({matches.filter((m) => m.status === 'live').length})
+          Live ({liveCount})
         </button>
         <button
           className={`sub-tab ${filterStage === 'group' && filterStatus === 'all' ? 'active' : ''}`}
@@ -90,28 +93,28 @@ export function MatchesPage() {
             className={`sub-tab ${filterStage === 'extra' && filterStatus === 'all' ? 'active' : ''}`}
             onClick={() => { setFilterStage('extra'); setFilterStatus('all'); }}
           >
-            Other Matches
+            Friendlies
           </button>
         )}
         <button
           className={`sub-tab ${filterStatus === 'completed' ? 'active' : ''}`}
           onClick={() => { setFilterStage('all'); setFilterStatus('completed'); }}
         >
-          Completed
+          Completed ({completedCount})
         </button>
       </div>
 
       {loading ? (
-        <LoadingState message="Loading fixtures..." />
+        <LoadingState message="Loading match schedule..." />
       ) : error ? (
         <ErrorState message={error} onRetry={fetchMatches} />
       ) : filterStage === 'all' && filterStatus === 'all' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '26px' }}>
           {/* Group A */}
           {matches.some((m) => m.group_name === 'A') && (
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--amber)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--amber)' }}></span>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--brand-primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--brand-primary)' }} />
                 Group A Fixtures
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -127,8 +130,8 @@ export function MatchesPage() {
           {/* Group B */}
           {matches.some((m) => m.group_name === 'B') && (
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#3ecf6e', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3ecf6e' }}></span>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--brand-primary-hover)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--brand-primary-hover)' }} />
                 Group B Fixtures
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -144,8 +147,8 @@ export function MatchesPage() {
           {/* Knockouts */}
           {matches.some((m) => m.stage === 'semi' || m.stage === 'final') && (
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#3b82f6', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3b82f6' }}></span>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Trophy size={16} />
                 Knockout Stage (Semi-Finals & Final)
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -158,12 +161,12 @@ export function MatchesPage() {
             </div>
           )}
 
-          {/* Additional (admin-created) matches */}
+          {/* Additional matches */}
           {matches.some((m) => m.stage === 'extra') && (
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--chalk-dim)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--chalk-dim)' }}></span>
-                Other Matches
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--text-secondary)' }} />
+                Other Fixtures
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {matches
@@ -176,9 +179,11 @@ export function MatchesPage() {
           )}
 
           {matches.length === 0 && (
-            <div className="state-container">
-              <p>No fixtures scheduled yet.</p>
-            </div>
+            <EmptyState
+              title="No fixtures scheduled"
+              description="Tournament fixtures have not yet been drawn or scheduled."
+              icon={Calendar}
+            />
           )}
         </div>
       ) : (
@@ -187,12 +192,15 @@ export function MatchesPage() {
             <MatchRow key={m.id} match={m} showVenue />
           ))}
           {filteredMatches.length === 0 && (
-            <div className="state-container">
-              <p>No matches match the selected filter.</p>
-            </div>
+            <EmptyState
+              title="No matches found"
+              description="No matches match the selected criteria or filter."
+              icon={Filter}
+            />
           )}
         </div>
       )}
     </div>
   );
 }
+export default MatchesPage;

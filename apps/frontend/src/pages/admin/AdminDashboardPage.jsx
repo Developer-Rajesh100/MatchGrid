@@ -469,8 +469,8 @@ export function AdminDashboardPage() {
     <div>
       <div className="section-title">
         <div>
-          <h2><Settings size={24} color="var(--amber)" /> Tournament Administration</h2>
-          <p>Logged in as {authApi.getUsername()} · DCL Season 5 Management</p>
+          <h2><Settings size={24} color="var(--brand-primary)" /> Tournament Administration</h2>
+          <p>Logged in as {authApi.getUsername()} &bull; MatchGrid Tournament Operations</p>
         </div>
         <button className="btn btn-outline btn-sm" onClick={loadAll} disabled={actionLoading}>
           <RefreshCw size={13} /> Refresh
@@ -758,11 +758,11 @@ export function AdminDashboardPage() {
                 </div>
 
                 <div className="field">
-                  <label>DCL ID (optional)</label>
+                  <label>Registration ID (optional)</label>
                   <input
                     type="text"
                     className="input"
-                    placeholder="e.g. DCL-045"
+                    placeholder="e.g. MG-045"
                     value={newPlayer.dcl_id}
                     onChange={(e) => setNewPlayer({ ...newPlayer, dcl_id: e.target.value })}
                   />

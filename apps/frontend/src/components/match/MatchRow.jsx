@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StatusPill } from '../common/StatusPill';
 import { Avatar } from '../common/Avatar';
-import { Calendar, Clock, MapPin } from 'lucide-react';
+import { Calendar, Clock, MapPin, Activity } from 'lucide-react';
 
 export function MatchRow({ match, showVenue = false }) {
   const navigate = useNavigate();
@@ -13,10 +13,17 @@ export function MatchRow({ match, showVenue = false }) {
 
   const label =
     match.label ||
-    (match.group_name ? `Group ${match.group_name}` : match.stage === 'semi' ? 'Semi-final' : match.stage === 'final' ? 'Final' : match.stage === 'extra' ? 'Friendly' : '');
+    (match.group_name
+      ? `Group ${match.group_name}`
+      : match.stage === 'semi'
+      ? 'Semi-final'
+      : match.stage === 'final'
+      ? 'Final'
+      : match.stage === 'extra'
+      ? 'Friendly'
+      : '');
 
-  const getTeamLogo = (name, logoUrl) =>
-    logoUrl || (name && name !== 'TBD' ? `/assets/teams/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}.png` : null);
+  const isLive = match.status === 'live';
 
   return (
     <div
@@ -24,59 +31,88 @@ export function MatchRow({ match, showVenue = false }) {
       onClick={() => navigate(`/matches/${match.id}`)}
       role="button"
       tabIndex={0}
+      style={{
+        borderLeft: isLive
+          ? '4px solid var(--status-live)'
+          : match.status === 'full_time'
+          ? '4px solid var(--brand-primary)'
+          : '4px solid var(--border-subtle)',
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter') navigate(`/matches/${match.id}`);
       }}
     >
       <div className="match-teams">
-        <div style={{ fontSize: '11px', color: 'var(--chalk-muted)', fontWeight: 600, letterSpacing: '0.4px', textTransform: 'uppercase', marginBottom: '2px' }}>
-          Match #{match.match_number} {label ? `· ${label}` : ''}
+        <div
+          style={{
+            fontSize: '11px',
+            color: 'var(--text-muted)',
+            fontWeight: 700,
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase',
+            marginBottom: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          <span>Match #{match.match_number}</span>
+          {label && <span>&bull; {label}</span>}
         </div>
 
         {/* Team 1 */}
         <div className="match-team">
           <div className="match-team-info">
-            <Avatar name={team1Name} photoUrl={getTeamLogo(team1Name, match.team1_logo)} size={24} color="#f0a53d" />
+            <Avatar
+              name={team1Name}
+              photoUrl={match.team1_logo}
+              size={26}
+              color={match.team1_color || '#10B981'}
+            />
             <span
               className="match-team-name"
               style={{
                 fontWeight: match.winner_id === match.team1_id ? 700 : 500,
-                color: match.winner_id === match.team1_id ? 'var(--chalk)' : 'inherit',
+                color: match.winner_id === match.team1_id ? 'var(--text-primary)' : 'var(--text-secondary)',
               }}
             >
               {team1Name}
             </span>
           </div>
           <span className="match-score">
-            {isPlayed && match.score1 !== null ? match.score1 : '-'}
+            {isPlayed && match.score1 !== null ? match.score1 : '—'}
           </span>
         </div>
 
         {/* Team 2 */}
         <div className="match-team">
           <div className="match-team-info">
-            <Avatar name={team2Name} photoUrl={getTeamLogo(team2Name, match.team2_logo)} size={24} color="#3ecf6e" />
+            <Avatar
+              name={team2Name}
+              photoUrl={match.team2_logo}
+              size={26}
+              color={match.team2_color || '#34D399'}
+            />
             <span
               className="match-team-name"
               style={{
                 fontWeight: match.winner_id === match.team2_id ? 700 : 500,
-                color: match.winner_id === match.team2_id ? 'var(--chalk)' : 'inherit',
+                color: match.winner_id === match.team2_id ? 'var(--text-primary)' : 'var(--text-secondary)',
               }}
             >
               {team2Name}
             </span>
           </div>
           <span className="match-score">
-            {isPlayed && match.score2 !== null ? match.score2 : '-'}
+            {isPlayed && match.score2 !== null ? match.score2 : '—'}
           </span>
         </div>
       </div>
 
       <div className="match-meta">
         <StatusPill status={match.status} isHalfTime={Boolean(match.is_half_time)} />
-        {match.status === 'live' && (
+        {isLive && (
           <div
-            className="match-live-timer-indicator"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -84,11 +120,11 @@ export function MatchRow({ match, showVenue = false }) {
               marginTop: '5px',
               fontSize: '11px',
               fontWeight: 700,
-              color: match.is_half_time ? 'var(--amber)' : 'var(--green)',
+              color: match.is_half_time ? 'var(--accent-gold)' : 'var(--status-live)',
             }}
           >
-            <Clock size={11} />
-            <span>{match.is_half_time ? 'Half Time' : 'Live Match'}</span>
+            <Activity size={12} className={match.is_half_time ? '' : 'pulse-live'} />
+            <span>{match.is_half_time ? 'Half Time' : 'In Progress'}</span>
           </div>
         )}
         {match.date && (
@@ -110,3 +146,4 @@ export function MatchRow({ match, showVenue = false }) {
     </div>
   );
 }
+export default MatchRow;

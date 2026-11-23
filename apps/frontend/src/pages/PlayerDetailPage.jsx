@@ -54,16 +54,16 @@ export function PlayerDetailPage() {
       <button
         onClick={() => navigate(-1)}
         className="btn btn-outline btn-sm"
-        style={{ marginBottom: '16px' }}
+        style={{ marginBottom: '18px' }}
       >
         <ArrowLeft size={13} /> Back
       </button>
 
-      {/* Profile Card */}
+      {/* Profile Card with 4px vertical accent bar */}
       <div
         className="card"
         style={{
-          borderLeft: `6px solid ${player.team_color || '#f0a53d'}`,
+          borderLeft: `4px solid ${player.team_color || 'var(--brand-primary)'}`,
           marginBottom: '28px',
           padding: '24px',
           display: 'flex',
@@ -72,14 +72,19 @@ export function PlayerDetailPage() {
           flexWrap: 'wrap',
         }}
       >
-        <Avatar name={player.name} size={72} color={player.team_color || '#f0a53d'} photoUrl={player.photo_url} />
+        <Avatar
+          name={player.name}
+          size={72}
+          color={player.team_color || '#10B981'}
+          photoUrl={player.photo_url}
+        />
 
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: 700, margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
               {player.name}
             </h2>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 700, color: 'var(--amber)' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 700, color: 'var(--brand-primary)' }}>
               #{player.number}
             </span>
           </div>
@@ -87,18 +92,28 @@ export function PlayerDetailPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
             <NavLink
               to={`/teams/${player.team_id}`}
-              style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--amber)', fontWeight: 600, fontSize: '14px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--brand-primary)', fontWeight: 600, fontSize: '14px' }}
             >
               <Shield size={14} /> {player.team_name}
             </NavLink>
             {player.is_manager && (
-              <span style={{ fontSize: '11px', background: 'var(--amber)', color: 'var(--base)', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+              <span
+                style={{
+                  fontSize: '10px',
+                  background: 'var(--accent-gold)',
+                  color: '#000',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  fontWeight: 800,
+                  letterSpacing: '0.5px',
+                }}
+              >
                 TEAM MANAGER
               </span>
             )}
             {player.dcl_id && (
-              <span style={{ fontSize: '12px', color: 'var(--chalk-muted)' }}>
-                ID: {player.dcl_id}
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Registration ID: {player.dcl_id}
               </span>
             )}
           </div>
@@ -107,13 +122,13 @@ export function PlayerDetailPage() {
 
       {/* Player Stats Grid */}
       <div className="section-title">
-        <h2><Trophy size={20} color="var(--amber)" /> Tournament Record</h2>
+        <h2><Trophy size={20} color="var(--brand-primary)" /> Tournament Performance Record</h2>
       </div>
 
       <div className="stat-grid" style={{ marginBottom: '32px' }}>
-        <StatTile label="Goals" value={stats.goals} sublabel="Tournament goals" />
-        <StatTile label="Assists" value={stats.assists} sublabel="Key passes" />
-        <StatTile label="POTM Awards" value={stats.potm_awards} sublabel="Player of the match" />
+        <StatTile label="Goals" value={stats.goals} sublabel="Official goals" />
+        <StatTile label="Assists" value={stats.assists} sublabel="Key goal assists" />
+        <StatTile label="POTM Awards" value={stats.potm_awards} sublabel="Player of match" />
         <StatTile label="Appearances" value={stats.appearances} sublabel="Matches played" />
         <StatTile label="Yellow Cards" value={stats.yellow_cards} sublabel="Cautions" />
         <StatTile label="Red Cards" value={stats.red_cards} sublabel="Dismissals" />
@@ -123,8 +138,8 @@ export function PlayerDetailPage() {
       <div className="grid-2">
         {/* Match History */}
         <div className="card">
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 600, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Calendar size={18} color="var(--amber)" /> Match History ({history.length})
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+            <Calendar size={18} color="var(--brand-primary)" /> Match Appearances ({history.length})
           </h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -136,35 +151,37 @@ export function PlayerDetailPage() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  background: 'var(--panel-alt)',
+                  padding: '11px 14px',
+                  borderRadius: '8px',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-subtle)',
                   cursor: 'pointer',
-                  border: '1px solid var(--line)',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '13.5px' }}>
-                    vs {m.opponent_name}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--chalk-dim)', marginTop: '2px' }}>
-                    {m.label} · Result: <strong style={{ color: m.result === 'Won' ? 'var(--green)' : m.result === 'Lost' ? 'var(--red)' : 'var(--amber)' }}>{m.result} ({m.my_score}–{m.opponent_score})</strong>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                    #{m.match_number}
+                  </span>
+                  <span style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)' }}>
+                    vs {m.opponent_team_name}
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    ({m.stage})
+                  </span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
-                  {m.goals > 0 && <span title={`${m.goals} Goals`}>⚽ {m.goals}</span>}
-                  {m.assists > 0 && <span title={`${m.assists} Assists`}>👟 {m.assists}</span>}
-                  {m.yellow_cards > 0 && <span>🟨</span>}
-                  {m.red_cards > 0 && <span>🟥</span>}
-                  {m.potm && <span title="Player of the Match" style={{ color: 'var(--amber)' }}>⭐ POTM</span>}
-                  <ArrowRight size={14} color="var(--chalk-muted)" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)' }}>
+                    {m.score_display}
+                  </span>
+                  <ArrowRight size={13} color="var(--text-muted)" />
                 </div>
               </div>
             ))}
 
             {history.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--chalk-muted)', fontSize: '13px' }}>
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '13px' }}>
                 No match appearances recorded for this player yet.
               </div>
             )}
@@ -173,47 +190,45 @@ export function PlayerDetailPage() {
 
         {/* Goal Log */}
         <div className="card">
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 600, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Flame size={18} color="var(--amber)" /> Goal Log ({goalLog.length})
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+            <Flame size={18} color="var(--brand-primary)" /> Goal Scoring Log ({goalLog.length})
           </h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {goalLog.map((g, idx) => (
               <div
-                key={idx}
-                onClick={() => navigate(`/matches/${g.match_id}`)}
+                key={g.event_id || idx}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  background: 'var(--panel-alt)',
-                  cursor: 'pointer',
-                  border: '1px solid var(--line)',
+                  padding: '11px 14px',
+                  borderRadius: '8px',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-subtle)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '16px' }}>⚽</span>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '13.5px' }}>
-                      vs {g.opponent_name}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--chalk-dim)' }}>
-                      {g.label}
-                    </div>
-                  </div>
+                  <span>⚽</span>
+                  <span style={{ fontWeight: 700, color: 'var(--brand-primary)', fontSize: '13.5px' }}>
+                    {g.minute}'
+                  </span>
+                  <span style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
+                    vs {g.opponent_team_name}
+                  </span>
                 </div>
 
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '16px', color: 'var(--amber)' }}>
-                  {g.minute ? `${g.minute}'` : 'Goal'}
-                </div>
+                {g.assist_player_name && (
+                  <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                    Assist: {g.assist_player_name}
+                  </span>
+                )}
               </div>
             ))}
 
             {goalLog.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--chalk-muted)', fontSize: '13px' }}>
-                No tournament goals scored yet.
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                No goals scored yet in this tournament.
               </div>
             )}
           </div>
@@ -222,3 +237,4 @@ export function PlayerDetailPage() {
     </div>
   );
 }
+export default PlayerDetailPage;

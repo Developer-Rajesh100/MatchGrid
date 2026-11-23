@@ -1,32 +1,22 @@
 import React from 'react';
 import { NavBar } from './components/nav/NavBar';
+import { Footer } from './components/layout/Footer';
 import { AppRouter } from './routes/AppRouter';
 import { WebSocketProvider } from './context/WebSocketContext';
 
 export function App() {
   return (
     <WebSocketProvider>
-      <div className="dcl-app">
+      <div className="matchgrid-app">
         <NavBar />
-        <div className="dcl-banner">
-          <span className="dcl-banner-badge">OFFICIAL SCOREBOARD</span>
-          <span>DCL Season 5 Football Tournament · 6 Teams · 2 Groups · Knockouts</span>
+        <div className="brand-banner">
+          <span className="brand-banner-badge">MATCHGRID LIVE</span>
+          <span>Tournament Live Scoreboard &bull; Real-Time Match Clocks &bull; Standings &bull; Knockout Brackets</span>
         </div>
         <main>
           <AppRouter />
         </main>
-        <footer
-          style={{
-            borderTop: '1px solid var(--line)',
-            padding: '24px 16px',
-            textAlign: 'center',
-            fontSize: '12px',
-            color: 'var(--chalk-dim)',
-            background: 'var(--base-dark)',
-          }}
-        >
-          <p>DCL Season 5 Digital Scoreboard & Live Match Centre · Built for Football Tournaments</p>
-        </footer>
+        <Footer />
       </div>
     </WebSocketProvider>
   );

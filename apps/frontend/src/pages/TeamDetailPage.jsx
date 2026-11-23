@@ -5,8 +5,8 @@ import { playersApi } from '../api/players';
 import { matchesApi } from '../api/matches';
 import { Avatar } from '../components/common/Avatar';
 import { MatchRow } from '../components/match/MatchRow';
-import { LoadingState, ErrorState } from '../components/common/Common';
-import { ArrowLeft, Users, Calendar } from 'lucide-react';
+import { LoadingState, ErrorState, EmptyState } from '../components/common/Common';
+import { ArrowLeft, Users, Calendar, Shield } from 'lucide-react';
 
 export function TeamDetailPage() {
   const { teamId } = useParams();
@@ -35,30 +35,27 @@ export function TeamDetailPage() {
   }, [teamId]);
 
   if (loading) return <LoadingState message="Loading squad & fixtures..." />;
-  if (error || !team) return <ErrorState message={error || 'Team not found'} />;
+  if (error || !team) return <ErrorState message={error || 'Club not found'} />;
 
   // Manager(s) get their own section; everyone else is listed by jersey number
   const managers = players.filter((p) => p.is_manager);
   const squadPlayers = players.filter((p) => !p.is_manager).sort((a, b) => a.number - b.number);
-
-  const getTeamLogo = (name, logoUrl) =>
-    logoUrl || (name ? `/assets/teams/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}.png` : null);
 
   return (
     <div>
       <button
         onClick={() => navigate('/teams')}
         className="btn btn-outline btn-sm"
-        style={{ marginBottom: '16px' }}
+        style={{ marginBottom: '18px' }}
       >
-        <ArrowLeft size={13} /> Back to Teams
+        <ArrowLeft size={13} /> Back to Clubs
       </button>
 
-      {/* Team Header Card */}
+      {/* Team Header Card with 4px vertical accent bar */}
       <div
         className="card"
         style={{
-          borderLeft: `6px solid ${team.color || 'var(--amber)'}`,
+          borderLeft: `4px solid ${team.color || 'var(--brand-primary)'}`,
           marginBottom: '28px',
           display: 'flex',
           alignItems: 'center',
@@ -69,21 +66,26 @@ export function TeamDetailPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-          <Avatar name={team.name} size={64} color={team.color || '#f0a53d'} photoUrl={getTeamLogo(team.name, team.logo_url)} />
+          <Avatar
+            name={team.name}
+            size={64}
+            color={team.color || '#10B981'}
+            photoUrl={team.logo_url}
+          />
           <div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '30px', fontWeight: 700, margin: 0 }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
               {team.name}
             </h2>
-            <div style={{ fontSize: '13px', color: 'var(--chalk-dim)', marginTop: '4px', display: 'flex', gap: '12px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', gap: '12px' }}>
               <span>Group {team.group_name || 'TBD'}</span>
-              <span>•</span>
-              <span>{players.length} Registered Players</span>
+              <span>&bull;</span>
+              <span>{players.length} Registered Squad Members</span>
             </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
-          <div className="stat-tile" style={{ minWidth: '90px', padding: '8px 14px' }}>
+          <div className="stat-tile" style={{ minWidth: '96px', padding: '10px 16px' }}>
             <div className="stat-tile-val">{teamMatches.length}</div>
             <div className="stat-tile-lbl">Matches</div>
           </div>
@@ -93,25 +95,25 @@ export function TeamDetailPage() {
       {/* Squad Roster */}
       <div style={{ marginBottom: '32px' }}>
         <div className="section-title">
-          <h2><Users size={22} color="var(--amber)" /> Team Squad ({players.length})</h2>
-          <p>Click on any player to view their profile and stats</p>
+          <h2><Users size={22} color="var(--brand-primary)" /> Squad Roster ({players.length})</h2>
+          <p>Official registered squad lineup for MatchGrid</p>
         </div>
 
         {managers.length > 0 && (
-          <div className="squad-group">
+          <div className="squad-group" style={{ marginBottom: '22px' }}>
             <div className="squad-group-title">Manager{managers.length > 1 ? 's' : ''}</div>
             <div className="squad-grid">
               {managers.map((m) => (
                 <div
                   key={m.id}
                   className="squad-card squad-card-manager"
-                  style={{ '--squad-accent': team.color || 'var(--amber)' }}
+                  style={{ '--squad-accent': team.color || 'var(--brand-primary)' }}
                   role="link"
                   tabIndex={0}
                   onClick={() => navigate(`/players/${m.id}`)}
                   onKeyDown={(e) => e.key === 'Enter' && navigate(`/players/${m.id}`)}
                 >
-                  <Avatar name={m.name} size={52} photoUrl={m.photo_url} />
+                  <Avatar name={m.name} size={48} photoUrl={m.photo_url} color={team.color || '#10B981'} />
                   <div className="squad-info">
                     <div className="squad-name"><span>{m.name}</span></div>
                     <div className="squad-id">{m.dcl_id || ''}</div>
@@ -130,14 +132,14 @@ export function TeamDetailPage() {
               <div
                 key={player.id}
                 className="squad-card"
-                style={{ '--squad-accent': team.color || 'var(--amber)' }}
+                style={{ '--squad-accent': team.color || 'var(--brand-primary)' }}
                 role="link"
                 tabIndex={0}
                 onClick={() => navigate(`/players/${player.id}`)}
                 onKeyDown={(e) => e.key === 'Enter' && navigate(`/players/${player.id}`)}
               >
-                <span className="squad-serial">{i + 1}</span>
-                <Avatar name={player.name} size={40} photoUrl={player.photo_url} />
+                <span className="squad-serial">{player.number || i + 1}</span>
+                <Avatar name={player.name} size={40} photoUrl={player.photo_url} color={team.color || '#10B981'} />
                 <div className="squad-info">
                   <div className="squad-name"><span>{player.name}</span></div>
                   <div className="squad-id">{player.dcl_id || ''}</div>
@@ -145,8 +147,8 @@ export function TeamDetailPage() {
               </div>
             ))}
             {squadPlayers.length === 0 && (
-              <div className="card" style={{ textAlign: 'center', color: 'var(--chalk-dim)', padding: '24px', gridColumn: '1 / -1' }}>
-                No players registered yet.
+              <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px', gridColumn: '1 / -1' }}>
+                No players registered in this squad yet.
               </div>
             )}
           </div>
@@ -156,15 +158,15 @@ export function TeamDetailPage() {
       {/* Team Matches */}
       <div>
         <div className="section-title">
-          <h2><Calendar size={22} color="var(--amber)" /> Matches & Schedule</h2>
+          <h2><Calendar size={22} color="var(--brand-primary)" /> Matches & Schedule</h2>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {teamMatches.map((m) => (
             <MatchRow key={m.id} match={m} showVenue />
           ))}
           {teamMatches.length === 0 && (
-            <div className="card" style={{ textAlign: 'center', color: 'var(--chalk-dim)', padding: '24px' }}>
-              No matches scheduled yet for this team.
+            <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
+              No matches scheduled yet for this club.
             </div>
           )}
         </div>
@@ -172,3 +174,4 @@ export function TeamDetailPage() {
     </div>
   );
 }
+export default TeamDetailPage;

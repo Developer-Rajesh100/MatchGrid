@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { playersApi } from '../api/players';
 import { teamsApi } from '../api/teams';
 import { Avatar } from '../components/common/Avatar';
-import { LoadingState, ErrorState } from '../components/common/Common';
-import { Users, Search } from 'lucide-react';
+import { LoadingState, ErrorState, EmptyState } from '../components/common/Common';
+import { Users, Search, Filter } from 'lucide-react';
 
 export function PlayersPage() {
   const [players, setPlayers] = useState([]);
@@ -32,9 +32,9 @@ export function PlayersPage() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchName = p.name?.toLowerCase().includes(q);
-      const matchDcl = p.dcl_id?.toLowerCase().includes(q);
+      const matchId = p.dcl_id?.toLowerCase().includes(q);
       const matchTeam = p.team_name?.toLowerCase().includes(q);
-      if (!matchName && !matchDcl && !matchTeam) return false;
+      if (!matchName && !matchId && !matchTeam) return false;
     }
     return true;
   });
@@ -43,8 +43,8 @@ export function PlayersPage() {
     <div>
       <div className="section-title">
         <div>
-          <h2><Users size={24} color="var(--amber)" /> Tournament Players ({players.length})</h2>
-          <p>Search and filter players across all 6 teams</p>
+          <h2><Users size={24} color="var(--brand-primary)" /> Tournament Squad Players ({players.length})</h2>
+          <p>Search and filter players across all competing clubs</p>
         </div>
       </div>
 
@@ -52,35 +52,35 @@ export function PlayersPage() {
       <div
         className="card"
         style={{
-          marginBottom: '24px',
+          marginBottom: '28px',
           display: 'flex',
-          gap: '12px',
+          gap: '14px',
           flexWrap: 'wrap',
           alignItems: 'center',
-          padding: '14px',
+          padding: '16px 20px',
         }}
       >
         {/* Search */}
-        <div style={{ flex: '1 1 200px', position: 'relative' }}>
+        <div style={{ flex: '1 1 240px', position: 'relative' }}>
           <input
             type="text"
             className="input"
-            placeholder="Search by player name or DCL ID..."
+            placeholder="Search by player name or Registration ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '34px' }}
+            style={{ paddingLeft: '38px' }}
           />
-          <Search size={15} color="var(--chalk-dim)" style={{ position: 'absolute', left: '11px', top: '12px' }} />
+          <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '13px', top: '13px' }} />
         </div>
 
         {/* Team Filter */}
-        <div style={{ flex: '0 1 180px' }}>
+        <div style={{ flex: '0 1 200px' }}>
           <select
             className="select"
             value={selectedTeam}
             onChange={(e) => setSelectedTeam(e.target.value)}
           >
-            <option value="all">All Teams</option>
+            <option value="all">All Competing Clubs</option>
             {teams.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -91,7 +91,7 @@ export function PlayersPage() {
       </div>
 
       {loading ? (
-        <LoadingState message="Loading players..." />
+        <LoadingState message="Loading squad roster..." />
       ) : error ? (
         <ErrorState message={error} />
       ) : (
@@ -99,42 +99,56 @@ export function PlayersPage() {
           {filteredPlayers.map((player) => (
             <div
               key={player.id}
-              className="card"
+              className="card card-clickable"
               onClick={() => navigate(`/players/${player.id}`)}
               style={{
-                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '14px',
-                borderLeft: `4px solid ${player.team_color || '#f0a53d'}`,
-                padding: '14px',
+                borderLeft: `4px solid ${player.team_color || 'var(--brand-primary)'}`,
+                padding: '16px',
               }}
             >
-              <Avatar name={player.name} size={44} color={player.team_color || '#f0a53d'} photoUrl={player.photo_url} />
+              <Avatar
+                name={player.name}
+                size={46}
+                color={player.team_color || '#10B981'}
+                photoUrl={player.photo_url}
+              />
 
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 700, fontSize: '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <span style={{ fontWeight: 700, fontSize: '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>
                     {player.name}
                   </span>
-                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--amber)', fontSize: '14px' }}>
+                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--brand-primary)', fontSize: '14px' }}>
                     #{player.number}
                   </span>
                 </div>
 
-                <div style={{ fontSize: '12px', color: 'var(--chalk-dim)', marginTop: '2px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                   {player.team_name}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                   {player.is_manager && (
-                    <span style={{ fontSize: '10px', background: 'var(--amber)', color: 'var(--base)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                    <span
+                      style={{
+                        fontSize: '9.5px',
+                        background: 'var(--accent-gold)',
+                        color: '#000',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontWeight: 800,
+                        letterSpacing: '0.4px',
+                      }}
+                    >
                       MANAGER
                     </span>
                   )}
                   {player.dcl_id && (
-                    <span style={{ fontSize: '10px', color: 'var(--chalk-muted)', marginLeft: 'auto' }}>
-                      {player.dcl_id}
+                    <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                      ID: {player.dcl_id}
                     </span>
                   )}
                 </div>
@@ -143,8 +157,12 @@ export function PlayersPage() {
           ))}
 
           {filteredPlayers.length === 0 && (
-            <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '36px', color: 'var(--chalk-muted)' }}>
-              No players found matching current filters.
+            <div style={{ gridColumn: '1 / -1' }}>
+              <EmptyState
+                title="No players match your search"
+                description="Try clearing search query or selecting another club."
+                icon={Filter}
+              />
             </div>
           )}
         </div>
@@ -152,3 +170,4 @@ export function PlayersPage() {
     </div>
   );
 }
+export default PlayersPage;

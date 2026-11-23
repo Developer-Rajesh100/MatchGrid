@@ -19,29 +19,25 @@ export function TeamsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <LoadingState message="Loading tournament teams..." />;
+  if (loading) return <LoadingState message="Loading competing clubs..." />;
   if (error) return <ErrorState message={error} />;
 
   const groupA = teams.filter((t) => t.group_name === 'A');
   const groupB = teams.filter((t) => t.group_name === 'B');
 
-  const getTeamLogo = (name, logoUrl) =>
-    logoUrl || (name ? `/assets/teams/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}.png` : null);
-
   const renderTeamGrid = (teamList, title) => (
     <div style={{ marginBottom: '32px' }}>
-      <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 600, marginBottom: '14px', color: 'var(--chalk)' }}>
+      <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)' }}>
         {title}
       </h3>
       <div className="grid-3">
         {teamList.map((team) => (
           <div
             key={team.id}
-            className="card"
+            className="card card-clickable"
             onClick={() => navigate(`/teams/${team.id}`)}
             style={{
-              cursor: 'pointer',
-              borderTop: `4px solid ${team.color || 'var(--amber)'}`,
+              borderLeft: `4px solid ${team.color || 'var(--brand-primary)'}`,
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -50,21 +46,26 @@ export function TeamsPage() {
           >
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                <Avatar name={team.name} color={team.color || '#f0a53d'} size={40} photoUrl={getTeamLogo(team.name, team.logo_url)} />
+                <Avatar
+                  name={team.name}
+                  color={team.color || '#10B981'}
+                  size={42}
+                  photoUrl={team.logo_url}
+                />
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '16px' }}>{team.name}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--chalk-dim)' }}>
+                  <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--text-primary)' }}>{team.name}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                     Group {team.group_name || 'TBD'}
                   </div>
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--line)', paddingTop: '10px' }}>
-              <span style={{ fontSize: '12.5px', color: 'var(--chalk-dim)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Users size={13} /> {team.player_count || 0} players
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
+              <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Users size={13} /> {team.player_count || 0} registered players
               </span>
-              <span style={{ fontSize: '12px', color: 'var(--amber)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--brand-primary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
                 Squad <ArrowRight size={13} />
               </span>
             </div>
@@ -78,8 +79,8 @@ export function TeamsPage() {
     <div>
       <div className="section-title">
         <div>
-          <h2><Shield size={24} color="var(--amber)" /> Tournament Teams</h2>
-          <p>The 6 competing clubs of DCL Season 5</p>
+          <h2><Shield size={24} color="var(--brand-primary)" /> Competing Clubs</h2>
+          <p>The 6 competing clubs of MatchGrid</p>
         </div>
       </div>
 
@@ -88,3 +89,4 @@ export function TeamsPage() {
     </div>
   );
 }
+export default TeamsPage;
