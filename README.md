@@ -1,99 +1,117 @@
-# DCL Season 5 — Digital Scoreboard
+# DCL Season 5 — Digital Scoreboard (Bun Workspace Monorepo)
 
-Full-stack scoreboard for a single football tournament (6 teams, 2 groups, semi-finals, final). See `docs/` for the original analysis/architecture documents, `reference/plan.txt` + `reference/implementation.txt` for the project's phase-by-phase history, and `reference/AUDIT.md` for the current, authoritative production-readiness status and any known open issues.
+A full-stack live digital scoreboard and tournament management platform built for a single football tournament (6 teams, 2 groups, semi-finals, and final).
 
-## Status
+This project is organized as a **Bun workspace monorepo**:
+- **MongoDB 7** runs containerized in Docker with persistent volume storage and healthchecks.
+- **FastAPI backend** (`apps/backend`) and **React/Vite frontend** (`apps/frontend`) run natively on the host machine for blazing fast hot-reloading and development.
 
-Backend (database, REST API, JWT auth, WebSocket live updates, the Timer/Half-Time feature), frontend (all public pages, single-admin control panel, real-time updates), security hardening, and a containerized production deployment (Docker Compose + an Nginx reverse proxy with TLS) are all implemented and tested — see `reference/AUDIT.md` for the full audit history and current status. What's **not** done: importing the real tournament roster/schedule (the app currently runs on a dev/test roster) and actually deploying to a real host with a real domain and real TLS certificates.
+---
+
+## Architecture & Directory Layout
+
+```
+DCL_score_board/
+├── apps/
+│   ├── backend/            # FastAPI async REST API & WebSocket server
+│   │   ├── .venv/          # Isolated Python virtual environment
+│   │   ├── app/            # Application logic (routers, models, services, migrations)
+│   │   ├── data/           # Bundled tournament data and schedule JSON files
+│   │   ├── tests/          # Pytest backend test suite (253 tests)
+│   │   └── requirements.txt# Backend dependencies
+│   └── frontend/           # React 18 + Vite SPA (named "frontend" in workspace)
+│       ├── src/            # Components, pages, router, hooks, CSS tokens
+│       └── package.json    # Frontend dependencies and test scripts
+├── infra/
+│   └── mongo/              # MongoDB Docker setup & init scripts
+│       └── init/
+├── docs/                   # Architecture audit & onboarding documentation
+├── scripts/
+│   ├── setup.sh            # Complete one-time bootstrap script
+│   └── db-up.sh            # Starts MongoDB in Docker and waits until healthy
+├── docker-compose.yml      # Defines ONLY the MongoDB 7 Docker container
+├── package.json            # Root Bun workspace configuration and runner scripts
+├── bun.lock                # Bun lockfile
+└── .env.example            # Root environment variable templates
+```
+
+---
 
 ## Prerequisites
 
-- Docker + Docker Compose
-- Python 3.14 (backend) — the pinned dependency versions in `backend/requirements.txt` are built and tested against 3.14; if your default `python3` is a different major version, create the virtualenv with `python3.14` explicitly (some dependencies may not have prebuilt wheels for other versions yet).
-- Node.js 20+ (frontend)
+1. **Docker & Docker Compose** (for MongoDB)
+2. **Bun** (`>= 1.1`): `curl -fsSL https://bun.sh/install | bash`
+3. **Python 3.14** (recommended) or **Python 3.12+**
 
-## Running everything via Docker (closest to production)
+---
 
-```bash
-cp .env.example .env            # adjust Mongo credentials if you like
-cp backend/.env.example backend/.env   # set real secrets for anything beyond local testing
-./proxy/generate-dev-cert.sh    # self-signed cert for local HTTPS testing (see the script's own comment for real-cert setup)
-docker compose up -d
-```
+## Quickstart (Single-Command Setup)
 
-Serves the whole stack — frontend, backend, and MongoDB — behind a single TLS-terminating reverse proxy, by default at `https://localhost:8443` (and an HTTP→HTTPS redirect on `:8090`; both ports are non-standard only to avoid clashing with anything else already running locally — set `HTTP_PORT`/`HTTPS_PORT` to `80`/`443` in `.env` for a real deployment). Migrations run automatically on backend startup. `docker compose ps` should show all four services `healthy`.
-
-## Running for local development (hot-reload, no Docker for the app itself)
-
-### Database
+Run the one-time bootstrap script from the repository root:
 
 ```bash
-cp .env.example .env   # adjust credentials if you like
-docker compose up -d mongo
+bun run setup
 ```
 
-Starts MongoDB only, on `localhost:27018` (not the default 27017 — see `reference/plan.txt` for why), with data persisted in the `mongo_data` Docker volume.
+This single command automatically:
+1. Copies `.env.example` templates to `.env` in the root and `apps/backend/` if missing.
+2. Starts the MongoDB 7 Docker container and waits until it passes healthchecks.
+3. Creates the Python virtual environment in `apps/backend/.venv` and installs all dependencies (`requirements-dev.txt`).
+4. Installs Bun workspace dependencies across the monorepo (`bun install`).
+5. Executes database schema migrations (`app.migrations.runner`).
+6. Seeds initial tournament roster and fixtures (`app.scripts.seed_data`).
 
-### Backend
+---
+
+## Development
+
+To start the full development stack (MongoDB in Docker + FastAPI Backend + React Frontend):
 
 ```bash
-cd backend
-python3.14 -m venv venv
-./venv/bin/pip install -r requirements.txt
-cp .env.example .env   # adjust MONGO_URI to match the root .env credentials, and set real secrets
+bun run dev
 ```
 
-Apply migrations (creates indexes, the singleton tournament + groups, the bootstrap admin account, and the fixed knockout match slots):
+This automatically:
+- Ensures the MongoDB container is running and healthy (`db:up`).
+- Launches the **FastAPI backend** with auto-reload at [http://localhost:8001](http://localhost:8001).
+- Launches the **Vite frontend** dev server at [http://localhost:5173](http://localhost:5173).
+- Displays color-coded prefixed logs (`[backend]` in cyan, `[frontend]` in magenta) in a single unified terminal.
 
-```bash
-./venv/bin/python -m app.migrations.runner
-```
+### URLs
+- **Web App:** [http://localhost:5173](http://localhost:5173)
+- **API Health:** [http://localhost:8001/health](http://localhost:8001/health)
+- **Database Status:** [http://localhost:8001/health/db](http://localhost:8001/health/db)
+- **Interactive OpenAPI Docs:** [http://localhost:8001/docs](http://localhost:8001/docs)
 
-Optionally load development sample data (ported from `reference/index.html`'s demo roster — **not** the real tournament data):
+---
 
-```bash
-./venv/bin/python -m app.scripts.seed_data
-```
+## All Root Commands
 
-To import real tournament data / a real match schedule instead, see `backend/data/README.md`.
+| Command | Action |
+|---|---|
+| `bun run setup` | Complete bootstrap: sets up Docker Mongo, Python `.venv`, Bun packages, migrations, and seed data. |
+| `bun run dev` | Starts MongoDB (Docker) + Backend (`:8001`) + Frontend (`:5173`) with unified live logs. |
+| `bun run db:up` | Starts MongoDB container in Docker and waits until healthy. |
+| `bun run db:down` | Stops the MongoDB container (`docker compose down`). |
+| `bun run test` | Runs the full test suite: Backend (Pytest) + Frontend (Vitest). |
+| `bun run test:backend` | Runs the backend Pytest suite (`apps/backend/.venv/bin/pytest`). |
+| `bun run test:frontend`| Runs the frontend Vitest suite (`bun --filter frontend test`). |
+| `bun run build` | Builds the production Vite bundle in `apps/frontend/dist`. |
+| `bun run lint` | Validates frontend build without errors. |
 
-Run the API:
+---
 
-```bash
-./venv/bin/uvicorn app.main:app --reload --port 8001
-```
+## Database & Port Details
 
-Then check `http://localhost:8001/health` and `http://localhost:8001/health/db`. Interactive API docs: `http://localhost:8001/docs`.
+- **MongoDB Container Name:** `dcl_mongo`
+- **Host Port:** `${MONGO_PORT:-27018}` (mapped to container port `27017` to prevent collisions with other local databases).
+- **Volume:** `dcl_score_board_mongo_data` (persists tournament state across container restarts).
+- **Backend Port:** `8001` (FastAPI + Uvicorn)
+- **Frontend Port:** `5173` (Vite, proxies `/api` and `/ws` to `8001`)
 
-### Frontend
+---
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+## Documentation
 
-Serves on `http://localhost:5173`, proxying `/api` and `/ws` to the backend on port 8001 (see `frontend/vite.config.js`). Or from the repo root: `npm run dev` / `npm run backend` (see the root `package.json`).
-
-## Running the tests
-
-Backend (pytest, against a disposable `dcl_scoreboard_test` database on the same Mongo container — never the dev database; requires Mongo running per above):
-
-```bash
-cd backend
-./venv/bin/pip install -r requirements-dev.txt   # first time only
-./venv/bin/pytest
-```
-
-Frontend (Vitest + React Testing Library, no backend/Mongo required — the API layer is mocked):
-
-```bash
-cd frontend
-npm test
-```
-
-Or from the repo root: `npm test` (runs both).
-
-## Project layout
-
-See `reference/plan.txt` Section 4 for the folder structure and architecture as originally built, and `reference/AUDIT.md` for the current, up-to-date status of every part of the system.
+- **Architectural Analysis & Codebase Audit:** [`docs/PROJECT_ANALYSIS.md`](docs/PROJECT_ANALYSIS.md)
+- **Tournament Data Format & Importers:** [`apps/backend/data/README.md`](apps/backend/data/README.md)
