@@ -9,11 +9,12 @@ from app.core.deps import (
     get_current_admin,
     get_current_user,
 )
-from app.core.errors import ConflictError
+from app.core.errors import ConflictError, NotFoundError
 from app.core.websocket import broadcast
 from app.models import Group, Match, MatchEvent, MatchLineup, Player, Team, Tournament, User
 from app.schemas.match import (
     AssignTeamsRequest,
+    BracketTreeOut,
     GenerateGroupFixturesRequest,
     HalfTimePayload,
     MatchCreate,
@@ -29,6 +30,7 @@ from app.services.match_events import add_event, remove_event
 from app.services.matches import (
     assign_match_teams,
     assert_no_conflict,
+    build_tournament_bracket,
     cancel_match,
     compute_score,
     compute_scores_and_winners,
@@ -43,6 +45,7 @@ from app.services.matches import (
     reopen_match,
     reset_timer,
     resume_match,
+    seed_knockout_bracket,
     set_winner,
     start_match,
     uncancel_match,
@@ -131,6 +134,13 @@ async def list_live() -> list[MatchOut]:
 @router.get("/completed", response_model=list[MatchOut])
 async def list_completed() -> list[MatchOut]:
     return await _list_matches(status="full_time")
+
+
+@router.get("/bracket", response_model=BracketTreeOut)
+async def get_bracket(tournament_id: Optional[str] = Query(default=None)) -> BracketTreeOut:
+    """Returns the visual bracket tree for the active or specified tournament."""
+    tid = PydanticObjectId(tournament_id) if tournament_id else await get_active_tournament_id()
+    return await build_tournament_bracket(tid)
 
 
 @router.get("/{match_id}", response_model=MatchDetailOut)
@@ -330,11 +340,9 @@ async def generate_fixtures(
 async def do_generate_semis(admin: User = Depends(get_current_admin)) -> list[MatchOut]:
     """Seed the 2 semi-finals from final group standings: SF1 = A2 vs B1, SF2 = B2 vs A1.
     Requires both groups fully complete and no semis generated yet."""
-    tournament = await Tournament.find_one()
-    if tournament is None:
-        raise NotFoundError("Tournament not found")
-    await check_tournament_ownership(admin, tournament.id)
-    matches = await generate_semis(tournament.id)
+    tournament_id = await get_active_tournament_id()
+    await check_tournament_ownership(admin, tournament_id)
+    matches = await generate_semis(tournament_id)
     return [await _to_out(m) for m in matches]
 
 
@@ -342,12 +350,19 @@ async def do_generate_semis(admin: User = Depends(get_current_admin)) -> list[Ma
 async def do_generate_final(admin: User = Depends(get_current_admin)) -> MatchOut:
     """Seed the final from the two semi-final winners. Requires both semis
     completed with a decided winner (score or manual override)."""
-    tournament = await Tournament.find_one()
-    if tournament is None:
-        raise NotFoundError("Tournament not found")
-    await check_tournament_ownership(admin, tournament.id)
-    match = await generate_final(tournament.id)
+    tournament_id = await get_active_tournament_id()
+    await check_tournament_ownership(admin, tournament_id)
+    match = await generate_final(tournament_id)
     return await _to_out(match)
+
+
+@router.post("/seed-knockout", response_model=list[MatchOut])
+async def do_seed_knockout(admin: User = Depends(get_current_admin)) -> list[MatchOut]:
+    """Universal knockout seeder: seeds Quarters, Semis, or crowns Champion based on tournament config."""
+    tournament_id = await get_active_tournament_id()
+    await check_tournament_ownership(admin, tournament_id)
+    matches = await seed_knockout_bracket(tournament_id)
+    return [await _to_out(m) for m in matches]
 
 
 # ---- Match events ----

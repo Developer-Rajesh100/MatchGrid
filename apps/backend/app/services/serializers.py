@@ -87,6 +87,8 @@ def match_to_out(
         group_name=group_name,
         stage=match.stage,
         label=match.label,
+        bracket_slot=getattr(match, "bracket_slot", None),
+        round_order=getattr(match, "round_order", None),
         date=match.date,
         time=match.time,
         venue=match.venue,

@@ -8,7 +8,23 @@ assigned) -> final (once the final has both teams assigned) -> champions
 
 from beanie import PydanticObjectId
 
-from app.models import Match, MatchEvent, Tournament
+from app.models import Group, Match, MatchEvent, Tournament
+from app.services.standings import sorted_group_standings
+
+
+async def _determine_league_champion(tournament_id: PydanticObjectId) -> PydanticObjectId | None:
+    groups = await Group.find(Group.tournament_id == tournament_id).to_list()
+    if not groups:
+        return None
+    top_standings = []
+    for g in groups:
+        standings = await sorted_group_standings(g.id)
+        if standings:
+            top_standings.append(standings[0])
+    if not top_standings:
+        return None
+    top_standings.sort(key=lambda s: (-s.points, -s.goal_difference, -s.goals_for))
+    return top_standings[0].team_id
 
 
 async def refresh_tournament_stage(tournament_id: PydanticObjectId) -> Tournament | None:
@@ -16,16 +32,42 @@ async def refresh_tournament_stage(tournament_id: PydanticObjectId) -> Tournamen
     if tournament is None:
         return None
 
+    knockout_format = (
+        tournament.config.knockout_format
+        if getattr(tournament, "config", None)
+        else "semis_final"
+    )
+
+    if knockout_format == "none":
+        group_matches = await Match.find(
+            Match.tournament_id == tournament_id, Match.stage == "group"
+        ).to_list()
+        if group_matches and all(m.status == "full_time" for m in group_matches):
+            stage = "champions"
+            champion_team_id = await _determine_league_champion(tournament_id)
+        else:
+            stage = "group"
+            champion_team_id = None
+        tournament.stage = stage
+        tournament.champion_team_id = champion_team_id
+        await tournament.save()
+        return tournament
+
     final_match = await Match.find_one(
         Match.tournament_id == tournament_id, Match.stage == "final"
     )
     semi_matches = await Match.find(
         Match.tournament_id == tournament_id, Match.stage == "semi"
     ).to_list()
+    quarter_matches = await Match.find(
+        Match.tournament_id == tournament_id, Match.stage == "quarter"
+    ).to_list()
 
     stage = "group"
     champion_team_id = None
 
+    if quarter_matches and any(m.team1_id for m in quarter_matches):
+        stage = "quarters"
     if semi_matches and any(m.team1_id for m in semi_matches):
         stage = "semis"
     if final_match and final_match.team1_id and final_match.team2_id:

@@ -463,3 +463,178 @@ export async function teardownEntities(
     }
   }
 }
+
+export async function updateTournamentConfig(
+  request: APIRequestContext,
+  token: string,
+  config: {
+    num_groups?: number;
+    teams_per_group?: number;
+    qualifiers_per_group?: number;
+    knockout_format?: 'none' | 'semis_final' | 'quarters_semis_final';
+    points_win?: number;
+    points_draw?: number;
+    points_loss?: number;
+    half_duration_minutes?: number;
+  }
+): Promise<any> {
+  const response = await request.patch(`${API_BASE_URL}/api/tournament/config`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: config,
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Failed to update tournament config: ${response.status()} ${await response.text()}`);
+  }
+
+  return response.json();
+}
+
+export async function triggerRandomDraw(
+  request: APIRequestContext,
+  token: string
+): Promise<any> {
+  const response = await request.post(`${API_BASE_URL}/api/groups/random-draw`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Failed to trigger random draw: ${response.status()} ${await response.text()}`);
+  }
+
+  return response.json();
+}
+
+export async function generateGroupFixtures(
+  request: APIRequestContext,
+  token: string,
+  groupId: string,
+  force = true
+): Promise<any> {
+  const response = await request.post(`${API_BASE_URL}/api/matches/generate-group-fixtures`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { group_id: groupId, force },
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Failed to generate group fixtures: ${response.status()} ${await response.text()}`);
+  }
+
+  return response.json();
+}
+
+export async function seedKnockoutBracket(
+  request: APIRequestContext,
+  token: string,
+  stage?: string,
+  force = true
+): Promise<any> {
+  const response = await request.post(`${API_BASE_URL}/api/matches/seed-knockout`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { stage, force },
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Failed to seed knockout bracket: ${response.status()} ${await response.text()}`);
+  }
+
+  return response.json();
+}
+
+export async function generateFinal(
+  request: APIRequestContext,
+  token: string
+): Promise<any> {
+  const response = await request.post(`${API_BASE_URL}/api/matches/generate-final`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Failed to generate final: ${response.status()} ${await response.text()}`);
+  }
+
+  return response.json();
+}
+
+export async function recordMatchWinner(
+  request: APIRequestContext,
+  token: string,
+  matchId: string,
+  teamId: string
+): Promise<any> {
+  const response = await request.post(`${API_BASE_URL}/api/matches/${matchId}/winner`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { team_id: teamId },
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Failed to record match winner: ${response.status()} ${await response.text()}`);
+  }
+
+  return response.json();
+}
+
+export async function startMatch(
+  request: APIRequestContext,
+  token: string,
+  matchId: string
+): Promise<any> {
+  const response = await request.post(`${API_BASE_URL}/api/matches/${matchId}/start`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Failed to start match: ${response.status()} ${await response.text()}`);
+  }
+
+  return response.json();
+}
+
+export async function endMatch(
+  request: APIRequestContext,
+  token: string,
+  matchId: string
+): Promise<any> {
+  const response = await request.post(`${API_BASE_URL}/api/matches/${matchId}/end`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Failed to end match: ${response.status()} ${await response.text()}`);
+  }
+
+  return response.json();
+}
+
+export async function addMatchGoal(
+  request: APIRequestContext,
+  token: string,
+  matchId: string,
+  data: { team_id: string; player_id: string; minute?: number }
+): Promise<any> {
+  const response = await request.post(`${API_BASE_URL}/api/matches/${matchId}/events`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: {
+      team_id: data.team_id,
+      player_id: data.player_id,
+      minute: data.minute ?? 10,
+      type: 'goal',
+    },
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Failed to add match goal: ${response.status()} ${await response.text()}`);
+  }
+
+  return response.json();
+}
+
+export async function getBracketTree(request: APIRequestContext): Promise<any> {
+  const response = await request.get(`${API_BASE_URL}/api/matches/bracket`);
+
+  if (!response.ok()) {
+    throw new Error(`Failed to get bracket tree: ${response.status()} ${await response.text()}`);
+  }
+
+  return response.json();
+}

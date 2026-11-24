@@ -10,7 +10,7 @@ match-event/status endpoints in the API phase).
 
 from beanie import PydanticObjectId
 
-from app.models import GroupTeam, Match, MatchEvent, Team, TournamentStanding
+from app.models import GroupTeam, Match, MatchEvent, Team, Tournament, TournamentStanding
 
 
 async def recalculate_group_standings(group_id: PydanticObjectId) -> list[TournamentStanding]:
@@ -76,9 +76,14 @@ async def recalculate_group_standings(group_id: PydanticObjectId) -> list[Tourna
         for s in await TournamentStanding.find(TournamentStanding.group_id == group_id).to_list()
     }
 
+    tournament = await Tournament.get(tournament_id)
+    pts_win = tournament.config.points_win if tournament and getattr(tournament, "config", None) else 3
+    pts_draw = tournament.config.points_draw if tournament and getattr(tournament, "config", None) else 1
+    pts_loss = tournament.config.points_loss if tournament and getattr(tournament, "config", None) else 0
+
     results: list[TournamentStanding] = []
     for team_id, totalsRow in totals.items():
-        points = totalsRow["W"] * 3 + totalsRow["D"]
+        points = totalsRow["W"] * pts_win + totalsRow["D"] * pts_draw + totalsRow["L"] * pts_loss
         goal_difference = totalsRow["GF"] - totalsRow["GA"]
 
         standing = existing_standings.get(team_id)
