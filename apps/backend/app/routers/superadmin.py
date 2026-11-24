@@ -108,3 +108,20 @@ async def platform_stats(_admin: User = Depends(require_superadmin)) -> dict[str
         "total_tournaments": total_tournaments,
         "total_matches": total_matches,
     }
+
+
+@router.delete("/users/{user_id}", status_code=204)
+async def delete_user(user_id: str, admin: User = Depends(require_superadmin)) -> None:
+    try:
+        oid = PydanticObjectId(user_id)
+    except InvalidId:
+        raise NotFoundError("User not found")
+
+    user = await User.get(oid)
+    if not user:
+        raise NotFoundError("User not found")
+
+    if user.id == admin.id:
+        raise ValidationAppError("Cannot delete your own account")
+
+    await user.delete()

@@ -40,7 +40,7 @@ async def list_teams() -> list[TeamOut]:
 async def add_team(payload: TeamCreate, admin: User = Depends(get_current_admin)) -> TeamOut:
     """Create a team. Team names must be unique within the tournament."""
     # Wire ownership guard
-    tournament = await check_tournament_ownership(admin, None)
+    tournament = await check_tournament_ownership(admin, payload.tournament_id)
     team = await create_team(payload, tournament_id=tournament.id)
     gt = await GroupTeam.find_one(GroupTeam.team_id == team.id)
     group = await Group.get(gt.group_id) if gt else None

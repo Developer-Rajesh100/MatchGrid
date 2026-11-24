@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from app.core.deps import check_tournament_ownership, get_current_admin
 from app.core.errors import ConflictError, ForbiddenError, NotFoundError, ValidationAppError
 from app.core.security import hash_password
-from app.models import Group, Match, Tournament, User, UserRole
+from app.models import Group, Match, Player, Team, Tournament, User, UserRole
 from app.routers.matches import _to_out
 from app.schemas.auth import ScorerCreate, UserOut
 from app.schemas.match import AssignScorerRequest, MatchOut
@@ -165,3 +165,51 @@ async def remove_scorer_from_match(
         await match.save()
 
     return await _to_out(match)
+
+
+@router.delete("/tournaments/{tournament_id}", status_code=204)
+async def delete_tournament(
+    tournament_id: str, admin: User = Depends(get_current_admin)
+) -> None:
+    try:
+        tid = PydanticObjectId(tournament_id)
+    except InvalidId:
+        raise NotFoundError("Tournament not found")
+
+    t = await Tournament.get(tid)
+    if not t:
+        raise NotFoundError("Tournament not found")
+
+    await check_tournament_ownership(admin, t.id)
+
+    # Clean up associated entities
+    await Match.find(Match.tournament_id == t.id).delete()
+    await Player.find(Player.tournament_id == t.id).delete()
+    await Team.find(Team.tournament_id == t.id).delete()
+    await Group.find(Group.tournament_id == t.id).delete()
+    await t.delete()
+
+
+@router.delete("/scorers/{scorer_id}", status_code=204)
+async def delete_scorer(
+    scorer_id: str, admin: User = Depends(get_current_admin)
+) -> None:
+    try:
+        sid = PydanticObjectId(scorer_id)
+    except InvalidId:
+        raise NotFoundError("Invalid id format")
+
+    scorer = await User.get(sid)
+    if not scorer or scorer.role != UserRole.SCORER:
+        raise NotFoundError("Scorer not found")
+
+    if admin.role != UserRole.SUPER_ADMIN and scorer.created_by != admin.id:
+        raise ForbiddenError("You cannot delete this scorer")
+
+    matches = await Match.find({"assigned_scorer_ids": sid}).to_list()
+    for m in matches:
+        if sid in m.assigned_scorer_ids:
+            m.assigned_scorer_ids.remove(sid)
+            await m.save()
+
+    await scorer.delete()

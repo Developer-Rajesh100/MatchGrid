@@ -55,6 +55,7 @@ class MatchCreate(BaseModel):
     time: Optional[str] = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")  # HH:MM, 24h
     venue: Optional[str] = Field(default=None, max_length=200)
     label: Optional[str] = Field(default=None, max_length=100)
+    tournament_id: Optional[str] = Field(default=None, pattern=r"^[0-9a-fA-F]{24}$")
     duration_minutes: Optional[int] = Field(default=None, ge=1, le=240)
     notes: Optional[str] = Field(default=None, max_length=1000)
 

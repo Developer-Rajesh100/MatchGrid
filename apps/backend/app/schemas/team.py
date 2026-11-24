@@ -28,3 +28,4 @@ class TeamCreate(BaseModel):
     color: str = Field(pattern=HEX_COLOR)
     logo_url: Optional[str] = None
     group_id: Optional[str] = None
+    tournament_id: Optional[str] = None

@@ -85,7 +85,11 @@ async def check_tournament_ownership(
         except InvalidId:
             raise NotFoundError("Tournament not found")
     else:
-        tournament = await Tournament.find_one()
+        tournament = None
+        if user.role == UserRole.ORGANIZER:
+            tournament = await Tournament.find_one(Tournament.organizer_id == user.id)
+        if tournament is None:
+            tournament = await Tournament.find_one()
 
     if tournament is None:
         raise NotFoundError("Tournament not found")

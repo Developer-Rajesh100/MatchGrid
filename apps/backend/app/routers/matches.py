@@ -183,8 +183,8 @@ async def create_match(payload: MatchCreate, admin: User = Depends(get_current_a
     """Create a match between two existing teams (admin only): an additional "extra" match
     (never affects standings, the tournament stage or tournament statistics) or a real
     group-stage fixture (stage="group" + group_id)."""
-    tournament_id = await get_active_tournament_id()
-    await check_tournament_ownership(admin, tournament_id)
+    tournament = await check_tournament_ownership(admin, payload.tournament_id)
+    tournament_id = tournament.id
     match = await create_new_match(
         tournament_id,
         PydanticObjectId(payload.team1_id),
