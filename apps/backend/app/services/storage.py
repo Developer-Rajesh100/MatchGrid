@@ -10,7 +10,12 @@ from botocore.config import Config
 from PIL import Image, UnidentifiedImageError
 
 from app.core.config import Settings, get_settings
-from app.core.errors import PayloadTooLargeError, ServiceUnavailableError, ValidationAppError
+from app.core.errors import (
+    PayloadTooLargeError,
+    ServiceUnavailableError,
+    UnprocessableEntityError,
+    ValidationAppError,
+)
 from app.schemas.uploads import UploadCategory, UploadImageOut
 
 logger = logging.getLogger(__name__)
@@ -58,30 +63,30 @@ class StorageService:
             )
 
         if not file_bytes:
-            raise ValidationAppError("Image file cannot be empty")
+            raise UnprocessableEntityError("Image file cannot be empty")
 
         try:
             with Image.open(io.BytesIO(file_bytes)) as img:
                 img_format = (img.format or "").upper()
                 if img_format not in ALLOWED_FORMATS:
-                    raise ValidationAppError(
+                    raise UnprocessableEntityError(
                         f"Unsupported image format '{img_format}'. Allowed formats: JPEG, PNG, WebP"
                     )
 
                 width, height = img.size
                 if width < MIN_DIMENSION or height < MIN_DIMENSION:
-                    raise ValidationAppError(
+                    raise UnprocessableEntityError(
                         f"Image dimensions ({width}x{height}) are too small (minimum {MIN_DIMENSION}x{MIN_DIMENSION}px)"
                     )
                 if width > MAX_DIMENSION or height > MAX_DIMENSION:
-                    raise ValidationAppError(
+                    raise UnprocessableEntityError(
                         f"Image dimensions ({width}x{height}) exceed maximum allowed limit of {MAX_DIMENSION}x{MAX_DIMENSION}px"
                     )
 
                 content_type, extension = ALLOWED_FORMATS[img_format]
                 return content_type, extension, width, height
         except (UnidentifiedImageError, OSError) as exc:
-            raise ValidationAppError("Uploaded file is not a valid image or is corrupted") from exc
+            raise UnprocessableEntityError("Uploaded file is not a valid image or is corrupted") from exc
 
     def generate_key(self, tournament_id: str, category: str, extension: str) -> str:
         unique_id = uuid.uuid4().hex
@@ -133,7 +138,7 @@ class StorageService:
             raise ServiceUnavailableError("Cloudflare R2 media storage is not configured")
 
         if category not in VALID_CATEGORIES:
-            raise ValidationAppError(
+            raise UnprocessableEntityError(
                 f"Invalid category '{category}'. Allowed: {', '.join(sorted(VALID_CATEGORIES))}"
             )
 

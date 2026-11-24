@@ -14,6 +14,7 @@ export interface TestEntityTracker {
   tournamentIds: string[];
   userIds: string[];
   scorerIds: string[];
+  assetUrlsOrKeys: string[];
 }
 
 export function createEntityTracker(): TestEntityTracker {
@@ -24,6 +25,7 @@ export function createEntityTracker(): TestEntityTracker {
     tournamentIds: [],
     userIds: [],
     scorerIds: [],
+    assetUrlsOrKeys: [],
   };
 }
 
@@ -62,7 +64,14 @@ export async function loginUser(
 export async function createTestTeam(
   request: APIRequestContext,
   token: string,
-  data: { name: string; color?: string; group_name?: string; tournament_id?: string }
+  data: {
+    name: string;
+    color?: string;
+    group_name?: string;
+    tournament_id?: string;
+    crest_url?: string;
+    logo_url?: string;
+  }
 ): Promise<any> {
   const response = await request.post(`${API_BASE_URL}/api/teams`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -71,6 +80,8 @@ export async function createTestTeam(
       color: data.color || '#10B981',
       group_name: data.group_name || null,
       tournament_id: data.tournament_id || undefined,
+      crest_url: data.crest_url || undefined,
+      logo_url: data.logo_url || undefined,
     },
   });
 
@@ -81,10 +92,41 @@ export async function createTestTeam(
   return response.json();
 }
 
+export async function updateTestTeam(
+  request: APIRequestContext,
+  token: string,
+  teamId: string,
+  data: {
+    name?: string;
+    color?: string;
+    crest_url?: string | null;
+    logo_url?: string | null;
+    group_id?: string | null;
+  }
+): Promise<any> {
+  const response = await request.patch(`${API_BASE_URL}/api/teams/${teamId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data,
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Failed to update test team: ${response.status()} ${await response.text()}`);
+  }
+
+  return response.json();
+}
+
 export async function createTestPlayer(
   request: APIRequestContext,
   token: string,
-  data: { team_id: string; name: string; number: number; dcl_id?: string; is_manager?: boolean }
+  data: {
+    team_id: string;
+    name: string;
+    number: number;
+    dcl_id?: string;
+    is_manager?: boolean;
+    photo_url?: string;
+  }
 ): Promise<any> {
   const response = await request.post(`${API_BASE_URL}/api/players`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -94,11 +136,35 @@ export async function createTestPlayer(
       number: data.number,
       dcl_id: data.dcl_id || `TEST-${Date.now().toString().slice(-4)}`,
       is_manager: data.is_manager || false,
+      photo_url: data.photo_url || undefined,
     },
   });
 
   if (!response.ok()) {
     throw new Error(`Failed to create test player: ${response.status()} ${await response.text()}`);
+  }
+
+  return response.json();
+}
+
+export async function updateTestPlayer(
+  request: APIRequestContext,
+  token: string,
+  playerId: string,
+  data: {
+    name?: string;
+    number?: number;
+    is_manager?: boolean;
+    photo_url?: string | null;
+  }
+): Promise<any> {
+  const response = await request.patch(`${API_BASE_URL}/api/players/${playerId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data,
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Failed to update test player: ${response.status()} ${await response.text()}`);
   }
 
   return response.json();
@@ -275,11 +341,74 @@ export async function removeScorerFromMatch(
   return response.json();
 }
 
+export const VALID_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAY0lEQVR4nO3PQQ3AIADAQEABlpGFu4ngcVnSU9DOfc/4s6UDXjWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgfXQRAcoK2yIiAAAAAElFTkSuQmCC';
+
+export const CRIMSON_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAYklEQVR4nO3PMQ0AIADAMEAb/q1gAREcDcmqYJtn7/GzpQNeNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaBd8IsB97XQzvAAAAAASUVORK5CYII=';
+
+export function createTestPngBuffer(): Buffer {
+  return Buffer.from(VALID_PNG_BASE64, 'base64');
+}
+
+export function createCrimsonPngBuffer(): Buffer {
+  return Buffer.from(CRIMSON_PNG_BASE64, 'base64');
+}
+
+export async function uploadTestImage(
+  request: APIRequestContext,
+  token: string,
+  data: {
+    tournament_id: string;
+    category: 'crests' | 'photos' | 'logos' | 'banners' | string;
+    buffer: Buffer;
+    filename?: string;
+    contentType?: string;
+  }
+): Promise<any> {
+  const response = await request.post(`${API_BASE_URL}/api/uploads/image`, {
+    headers: { Authorization: `Bearer ${token}` },
+    multipart: {
+      tournament_id: data.tournament_id,
+      category: data.category,
+      file: {
+        name: data.filename || 'test-image.png',
+        mimeType: data.contentType || 'image/png',
+        buffer: data.buffer,
+      },
+    },
+  });
+
+  return response;
+}
+
+export async function deleteTestImage(
+  request: APIRequestContext,
+  token: string,
+  urlOrKey: string
+): Promise<any> {
+  const response = await request.delete(`${API_BASE_URL}/api/uploads/image`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { url_or_key: urlOrKey },
+  });
+
+  return response;
+}
+
 export async function teardownEntities(
   request: APIRequestContext,
   token: string,
   tracker: TestEntityTracker
 ): Promise<void> {
+  // 0. Purge any explicitly tracked R2 asset URLs or keys
+  for (const assetUrlOrKey of tracker.assetUrlsOrKeys) {
+    try {
+      await deleteTestImage(request, token, assetUrlOrKey);
+    } catch {
+      // Ignore cleanup error if already deleted
+    }
+  }
+
   // 1. Delete matches first
   for (const matchId of tracker.matchIds) {
     try {
@@ -307,7 +436,7 @@ export async function teardownEntities(
     }
   }
 
-  // 4. Delete tournaments (cascades any associated fixtures)
+  // 4. Delete tournaments (cascades any associated fixtures and R2 assets)
   for (const tournamentId of tracker.tournamentIds) {
     try {
       await deleteTournament(request, token, tournamentId);

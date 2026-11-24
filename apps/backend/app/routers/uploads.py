@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.core.deps import check_tournament_ownership, get_current_admin
-from app.core.errors import NotFoundError, ValidationAppError
+from app.core.errors import NotFoundError, UnprocessableEntityError
 from app.models import User
 from app.schemas.uploads import DeleteImageOut, DeleteImageRequest, UploadCategory, UploadImageOut
 from app.services.storage import get_storage_service
@@ -23,7 +23,7 @@ async def upload_image(
 
     file_bytes = await file.read()
     if not file_bytes:
-        raise ValidationAppError("Uploaded file cannot be empty")
+        raise UnprocessableEntityError("Uploaded file cannot be empty")
 
     storage = get_storage_service()
     return await storage.upload_image(file_bytes, tournament_id, category)

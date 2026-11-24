@@ -10,6 +10,7 @@ class TeamOut(BaseModel):
     tournament_id: str
     name: str
     color: str
+    crest_url: Optional[str] = None
     logo_url: Optional[str] = None
     group_id: Optional[str] = None
     group_name: Optional[str] = None

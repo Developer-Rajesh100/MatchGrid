@@ -32,6 +32,10 @@ class ValidationAppError(AppError):
     status_code = 400
 
 
+class UnprocessableEntityError(ValidationAppError):
+    status_code = 422
+
+
 class UnauthorizedError(AppError):
     status_code = 401
 
