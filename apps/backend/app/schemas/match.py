@@ -12,6 +12,8 @@ MatchStatus = Literal["upcoming", "live", "full_time", "cancelled"]
 class MatchOut(BaseModel):
     id: str
     tournament_id: str
+    tournament_name: Optional[str] = None
+    tournament_slug: Optional[str] = None
     match_number: int
     group_id: Optional[str] = None
     group_name: Optional[str] = None
@@ -26,8 +28,10 @@ class MatchOut(BaseModel):
     notes: Optional[str] = None
     team1_id: Optional[str] = None
     team1_name: Optional[str] = None
+    team1_crest_url: Optional[str] = None
     team2_id: Optional[str] = None
     team2_name: Optional[str] = None
+    team2_crest_url: Optional[str] = None
     status: MatchStatus
     score1: int = 0
     score2: int = 0

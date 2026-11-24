@@ -71,7 +71,7 @@ async def add_event(
     if assist_player_id:
         affected.add(assist_player_id)
     await _after_mutation(match, affected)
-    await broadcast({"type": "match_event_added", "match_id": str(match.id)})
+    await broadcast({"type": "match_event_added", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return event
 
 
@@ -86,4 +86,4 @@ async def remove_event(match: Match, event_id: PydanticObjectId) -> None:
 
     await event.delete()
     await _after_mutation(match, affected)
-    await broadcast({"type": "match_event_removed", "match_id": str(match.id)})
+    await broadcast({"type": "match_event_removed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})

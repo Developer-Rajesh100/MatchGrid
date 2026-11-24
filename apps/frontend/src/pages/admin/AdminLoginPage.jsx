@@ -15,8 +15,12 @@ export function AdminLoginPage() {
     setLoading(true);
     setError(null);
     try {
-      await authApi.login(username, password);
-      navigate('/admin');
+      const res = await authApi.login(username, password);
+      if (res?.role === 'SCORER') {
+        navigate('/scorer');
+      } else {
+        navigate('/admin');
+      }
     } catch (err) {
       setError(err.message || 'Authentication failed. Please verify credentials.');
     } finally {

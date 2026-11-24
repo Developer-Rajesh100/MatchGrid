@@ -2,11 +2,12 @@ import { useEffect, useRef } from 'react';
 import { useWebSocket } from '../context/WebSocketContext';
 
 /**
- * Hook to subscribe to tournament-wide live WebSocket notifications.
+ * Hook to subscribe to tournament-wide or global live WebSocket notifications.
  * @param {Function} onMessage - Callback function called when a message arrives: (message) => void
+ * @param {string|null} tournamentId - Optional tournament ID to scope WebSocket traffic
  */
-export function useLiveSocket(onMessage) {
-  const { connected, subscribe } = useWebSocket();
+export function useLiveSocket(onMessage, tournamentId = null) {
+  const { connected, isConnected, subscribe } = useWebSocket();
   const savedHandler = useRef(onMessage);
 
   useEffect(() => {
@@ -19,9 +20,10 @@ export function useLiveSocket(onMessage) {
       if (savedHandler.current) {
         savedHandler.current(msg);
       }
-    });
+    }, tournamentId);
     return unsubscribe;
-  }, [subscribe]);
+  }, [subscribe, tournamentId]);
 
-  return { connected };
+  return { connected: connected ?? isConnected, isConnected: connected ?? isConnected };
 }
+

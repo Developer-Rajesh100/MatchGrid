@@ -36,5 +36,5 @@ async def set_lineup(match: Match, player_ids: list[str]) -> list[MatchLineup]:
     for player_id in affected:
         await recalculate_player_statistics(player_id)
 
-    await broadcast({"type": "match_updated", "match_id": str(match.id)})
+    await broadcast({"type": "match_updated", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return new_entries

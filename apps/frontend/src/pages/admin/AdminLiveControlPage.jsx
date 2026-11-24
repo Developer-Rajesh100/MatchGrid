@@ -230,7 +230,7 @@ export function AdminLiveControlPage() {
     if (!msg.match_id || msg.match_id === matchId) {
       loadMatchDetails(false);
     }
-  });
+  }, match?.tournament_id);
 
   const showSuccess = (msg) => {
     setSuccessMsg(msg);
@@ -463,11 +463,37 @@ export function AdminLiveControlPage() {
         </div>
       )}
 
-      {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '6px', background: 'rgba(209, 88, 90, 0.15)', border: '1px solid var(--red)', color: 'var(--red)', fontSize: '13px', marginBottom: '16px' }}>
-          <AlertTriangle size={16} /> <span>{error}</span>
-        </div>
-      )}
+      {error && (() => {
+        const isForbidden = (
+          error.toLowerCase().includes('not assigned') ||
+          error.toLowerCase().includes('not own') ||
+          error.toLowerCase().includes('forbidden') ||
+          error.toLowerCase().includes('unauthorized') ||
+          error.toLowerCase().includes('permission') ||
+          error.toLowerCase().includes('403')
+        );
+        return (
+          <div
+            data-testid={isForbidden ? 'access-denied-banner' : 'live-control-error'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: isForbidden ? '14px 18px' : '10px 16px',
+              borderRadius: '8px',
+              background: 'rgba(209, 88, 90, 0.15)',
+              border: '1px solid var(--red)',
+              color: 'var(--red)',
+              fontSize: isForbidden ? '14px' : '13px',
+              fontWeight: isForbidden ? 600 : 'normal',
+              marginBottom: '16px',
+            }}
+          >
+            <AlertTriangle size={isForbidden ? 20 : 16} />
+            <span>{isForbidden && !error.toLowerCase().includes('access denied') ? `Access Denied: ${error}` : error}</span>
+          </div>
+        );
+      })()}
 
       {/* Match Control Header */}
       <div className="card" style={{ marginBottom: '24px', padding: '24px' }}>
