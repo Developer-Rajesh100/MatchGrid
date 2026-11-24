@@ -7,8 +7,14 @@ export const authApi = {
       body: { username, password },
     });
     if (res?.access_token) {
+      const role = res.role || 'SUPER_ADMIN';
+      const userId = res.user_id || '';
+
       localStorage.setItem('matchgrid_admin_token', res.access_token);
       localStorage.setItem('matchgrid_admin_username', username);
+      localStorage.setItem('matchgrid_role', role);
+      localStorage.setItem('matchgrid_user_id', userId);
+
       // Compatibility aliases
       localStorage.setItem('dcl_admin_token', res.access_token);
       localStorage.setItem('dcl_admin_username', username);
@@ -21,6 +27,8 @@ export const authApi = {
   logout: () => {
     localStorage.removeItem('matchgrid_admin_token');
     localStorage.removeItem('matchgrid_admin_username');
+    localStorage.removeItem('matchgrid_role');
+    localStorage.removeItem('matchgrid_user_id');
     localStorage.removeItem('dcl_admin_token');
     localStorage.removeItem('dcl_admin_username');
 
@@ -31,6 +39,17 @@ export const authApi = {
     localStorage.getItem('matchgrid_admin_username') ||
     localStorage.getItem('dcl_admin_username') ||
     'Admin',
+  getRole: () =>
+    localStorage.getItem('matchgrid_role') || 'SUPER_ADMIN',
+  getUserId: () =>
+    localStorage.getItem('matchgrid_user_id') || '',
+  hasRole: (allowedRoles) => {
+    const role = authApi.getRole();
+    return Array.isArray(allowedRoles) ? allowedRoles.includes(role) : role === allowedRoles;
+  },
+  isSuperAdmin: () => authApi.getRole() === 'SUPER_ADMIN',
+  isOrganizer: () => authApi.getRole() === 'ORGANIZER',
+  isScorer: () => authApi.getRole() === 'SCORER',
   isAuthenticated: () =>
     Boolean(
       localStorage.getItem('matchgrid_admin_token') ||

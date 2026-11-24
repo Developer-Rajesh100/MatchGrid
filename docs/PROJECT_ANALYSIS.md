@@ -5,6 +5,15 @@
 > **Repository:** `Stadia-India/DCL_score_board`  
 > **Status:** Production-Ready (Single-instance deployment)
 
+> [!NOTE]
+> **Historical Baseline Architecture Record:**
+> This document serves as the authoritative architectural audit and operational analysis of the legacy single-tenant *DCL Season 5 Digital Scoreboard* prototype from which **MatchGrid** evolved.
+> 
+> For the target multi-tenant SaaS architecture, refer to:
+> - **Master Phased Plan & Roadmap:** [`docs/plan.md`](file:///home/rajesh/Placement_Project/DCL_score_board/docs/plan.md)
+> - **System & Software Architecture Blueprint:** [`docs/system_architecture.md`](file:///home/rajesh/Placement_Project/DCL_score_board/docs/system_architecture.md)
+> - **Development Lifecycle & Quality Gates:** [`docs/DEVELOPMENT_WORKFLOW.md`](file:///home/rajesh/Placement_Project/DCL_score_board/docs/DEVELOPMENT_WORKFLOW.md)
+
 ---
 
 ## Table of Contents

@@ -36,6 +36,10 @@ class UnauthorizedError(AppError):
     status_code = 401
 
 
+class ForbiddenError(AppError):
+    status_code = 403
+
+
 class TooManyRequestsError(AppError):
     status_code = 429
 

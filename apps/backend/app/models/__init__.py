@@ -9,9 +9,11 @@ from app.models.player_statistics import PlayerStatistics
 from app.models.team import Team
 from app.models.tournament import Tournament
 from app.models.tournament_standing import TournamentStanding
+from app.models.user import User, UserRole
 
 DOCUMENT_MODELS = [
     Admin,
+    User,
     Tournament,
     Team,
     Group,
@@ -26,6 +28,8 @@ DOCUMENT_MODELS = [
 
 __all__ = [
     "Admin",
+    "User",
+    "UserRole",
     "Tournament",
     "Team",
     "Group",

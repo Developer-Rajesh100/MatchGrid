@@ -13,21 +13,27 @@ def _name_pattern(name: str) -> re.Pattern:
     return re.compile(f"^{re.escape(name.strip())}$", re.IGNORECASE)
 
 
-async def _assert_name_available(name: str, exclude_id: PydanticObjectId | None = None) -> None:
-    existing = await Team.find_one(Team.name == _name_pattern(name))
+async def _assert_name_available(
+    tournament_id: PydanticObjectId, name: str, exclude_id: PydanticObjectId | None = None
+) -> None:
+    existing = await Team.find_one(
+        Team.tournament_id == tournament_id, Team.name == _name_pattern(name)
+    )
     if existing is not None and existing.id != exclude_id:
-        raise ConflictError(f"A team named '{name}' already exists")
+        raise ConflictError(f"A team named '{name}' already exists in this tournament")
 
 
-async def create_team(payload: TeamCreate) -> Team:
-    await _assert_name_available(payload.name)
+async def create_team(payload: TeamCreate, tournament_id: PydanticObjectId | None = None) -> Team:
+    if tournament_id is None:
+        tournament = await Tournament.find_one()
+        if tournament is None:
+            raise NotFoundError("Tournament has not been created yet — run migrations first")
+        tournament_id = tournament.id
 
-    tournament = await Tournament.find_one()
-    if tournament is None:
-        raise NotFoundError("Tournament has not been created yet — run migrations first")
+    await _assert_name_available(tournament_id, payload.name)
 
     team = Team(
-        tournament_id=tournament.id,
+        tournament_id=tournament_id,
         name=payload.name.strip(),
         color=payload.color,
         logo_url=payload.logo_url,
@@ -35,7 +41,7 @@ async def create_team(payload: TeamCreate) -> Team:
     try:
         await team.insert()
     except DuplicateKeyError as exc:
-        raise ConflictError(f"A team named '{payload.name}' already exists") from exc
+        raise ConflictError(f"A team named '{payload.name}' already exists in this tournament") from exc
 
     if payload.group_id:
         await assign_team_group(team.id, PydanticObjectId(payload.group_id))
@@ -44,7 +50,7 @@ async def create_team(payload: TeamCreate) -> Team:
 
 
 async def rename_team_checked(team: Team, new_name: str) -> None:
-    await _assert_name_available(new_name, exclude_id=team.id)
+    await _assert_name_available(team.tournament_id, new_name, exclude_id=team.id)
 
 
 async def delete_team(team: Team) -> None:

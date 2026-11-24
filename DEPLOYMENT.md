@@ -1,77 +1,99 @@
-# Production Deployment: DigitalOcean App Platform
+# MatchGrid Production Deployment Guide
 
-Live site: https://dcl-j3clh.ondigitalocean.app
+MatchGrid is engineered for a **zero-cost, split-cloud production topology** combining high availability, sub-millisecond edge CDN delivery for the React SPA, and low-latency WebSocket connection handling for live telemetry:
 
-Migrations and data seeding run automatically at backend startup (`backend/app/core/bootstrap.py`), before the server accepts requests. Seeding is create-only: it never overwrites or duplicates existing data.
-
-## Step 1: Check the environment variables (before pushing)
-
-In DigitalOcean go to **Apps → your app → Settings → backend → Environment Variables**. Make sure these exist:
-
-| Variable | Value |
-|---|---|
-| `ENVIRONMENT` | `production` |
-| `DEBUG` | `false` |
-| `MONGO_URI` | your DigitalOcean MongoDB connection string (secret) |
-| `MONGO_DB_NAME` | `dcl_scoreboard` |
-| `JWT_SECRET` | a random string of 32+ characters (secret) |
-| `ADMIN_BOOTSTRAP_PASSWORD` | a strong password, not a placeholder (secret) |
-| `CORS_ORIGINS` | `https://dcl-j3clh.ondigitalocean.app` |
-
-Generate a JWT secret:
-
-```bash
-python3 -c "import secrets; print(secrets.token_hex(32))"
+```mermaid
+flowchart LR
+    Users["🌍 End Users\n(Web & Mobile)"] -->|HTTPS / Edge CDN| Vercel["▲ Vercel / Cloudflare Pages\n(React 18 Static SPA)"]
+    Users <-->|HTTPS REST & WSS| Render["⚡ Render / Koyeb\n(FastAPI + Uvicorn ASGI)"]
+    Render <-->|TLS mongodb+srv://| Atlas["🍃 MongoDB Atlas (M0)\n(Persistent Cluster + Compound Indexes)"]
 ```
 
-## Step 2: Confirm auto-deploy
+---
 
-**Settings → App-Level → GitHub**: the repo should be `Stadia-India/DCL_score_board`, the branch `main`, and Autodeploy **on**.
+## 1. Cloud Infrastructure Overview
 
-## Step 3: Push
+| Tier | Recommended Host | Free-Tier Specs | Target Responsibilities |
+|---|---|---|---|
+| **Frontend SPA** | [Vercel](https://vercel.com) / [Cloudflare Pages](https://pages.cloudflare.com) | Unlimited Bandwidth, Global Edge CDN | Hosts compiled Vite SPA bundle (`apps/frontend/dist`), client-side routing fallback (`/* -> /index.html`). |
+| **Backend & WS** | [Render](https://render.com) / [Koyeb](https://koyeb.com) | 512 MB RAM, 0.1 vCPU, Native WSS | Runs FastAPI ASGI server (`uvicorn app.main:app`), room-scoped WebSocket hub (`/ws/live`), automated startup migrations. |
+| **Database** | [MongoDB Atlas (M0)](https://www.mongodb.com/atlas) | 512 MB Storage, Shared RAM, Automated Backups | Persistent database cluster with `tz_aware=True` UTC storage and compound indexes. |
 
-```bash
-git push origin main
-```
+---
 
-## Step 4: Watch the deployment
+## 2. Environment Variables Specification
 
-**Activity tab → latest deployment → Build / Deploy logs.** Look for:
+### Backend Environment Variables (`apps/backend`)
 
-- `Applying 0001…0004` and `Tournament seed: {...}`, which mean the migrations and seed ran.
-- The deployment status switching to **Active**.
+| Variable | Recommended Production Value | Description |
+|---|---|---|
+| `ENVIRONMENT` | `production` | Enables fail-fast production security assertions (`production_safety.py`). |
+| `DEBUG` | `false` | Disables debug logs and development traceback exposure. |
+| `MONGO_URI` | `mongodb+srv://<user>:<password>@cluster0.xxx.mongodb.net/?retryWrites=true&w=majority` | Secure TLS connection string to MongoDB Atlas. |
+| `MONGO_DB_NAME` | `matchgrid` | Production database name. |
+| `JWT_SECRET` | 64-char hex string (`python3 -c "import secrets; print(secrets.token_hex(32))"`) | Secret HMAC-SHA256 key for signing JWT auth tokens. Must be $\ge 32$ chars. |
+| `ADMIN_BOOTSTRAP_USERNAME` | `superadmin` | Initial Superadmin account username. |
+| `ADMIN_BOOTSTRAP_PASSWORD` | Strong password ($\ge 12$ chars) | Initial Superadmin password. Refuses startup if default placeholder is used. |
+| `CORS_ORIGINS` | `https://your-matchgrid-app.vercel.app` | Comma-separated list of allowed frontend origins (no wildcards allowed in production). |
+| `TRUSTED_PROXY_HOPS` | `1` | Number of trusted edge reverse-proxy hops for IP extraction in login rate limiting. |
+| `AUTO_MIGRATE` | `true` | Automatically executes sequential Beanie schema migrations on container boot. |
+| `AUTO_SEED` | `false` | Set to `false` in production to prevent inserting dummy development records. |
 
-## Step 5: Verify
+### Frontend Environment Variables (`apps/frontend`)
 
-```bash
-curl https://dcl-j3clh.ondigitalocean.app/health
-curl https://dcl-j3clh.ondigitalocean.app/health/db
-curl https://dcl-j3clh.ondigitalocean.app/api/matches
-```
+| Variable | Value | Description |
+|---|---|---|
+| `VITE_API_URL` | `https://your-matchgrid-api.onrender.com` | Base URL for FastAPI REST endpoints. |
+| `VITE_WS_URL` | `wss://your-matchgrid-api.onrender.com` | WebSocket base URL for `/ws/live`. |
 
-`/health/db` should report `teams: 6`, `players: 44` and `matches: 9`. Then open `/matches` in the browser.
+---
 
-## Step 6 (optional): Apply the app spec
+## 3. Step-by-Step Deployment Runbook
 
-This adds a pre-deploy migration job and explicit routes. The site works without it. Review `.do/app.yaml` against your app first (region and instance sizes are guesses):
+### Step 1: Provision MongoDB Atlas (M0 Free Cluster)
+1. Log in to [MongoDB Atlas](https://cloud.mongodb.com/) and create a free M0 cluster (e.g. AWS `eu-west-1` or `us-east-1`).
+2. Under **Security → Database Access**, create a user `matchgrid_user` with a strong password.
+3. Under **Security → Network Access**, add `0.0.0.0/0` (allow access from anywhere) since Render/Koyeb egress IPs are dynamic.
+4. Copy the connection string format: `mongodb+srv://matchgrid_user:<password>@cluster.mongodb.net/?retryWrites=true&w=majority`.
 
-```bash
-doctl apps update <APP_ID> --spec .do/app.yaml
-```
+### Step 2: Deploy Backend to Render or Koyeb
+1. Connect your GitHub repository to Render/Koyeb.
+2. Select **Web Service** with runtime **Python 3.12+** or **Docker**:
+   - **Root Directory:** `apps/backend`
+   - **Build Command:** `pip install --upgrade pip && pip install -r requirements.txt`
+   - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port 10000 --proxy-headers`
+3. Configure the **Backend Environment Variables** listed in Section 2.
+4. Verify deployment health:
+   ```bash
+   curl https://<your-render-url>/health
+   curl https://<your-render-url>/health/db
+   ```
+   Both endpoints must return `{"status": "ok"}`.
 
-## If it fails
+### Step 3: Deploy Frontend to Vercel
+1. In Vercel, import the repository and configure project settings:
+   - **Root Directory:** `apps/frontend`
+   - **Framework Preset:** Vite
+   - **Build Command:** `bun run build` (or `npm run build`)
+   - **Output Directory:** `dist`
+2. Add environment variables:
+   - `VITE_API_URL`: `https://<your-render-url>`
+   - `VITE_WS_URL`: `wss://<your-render-url>`
+3. Add a single-page app rewrite rule in `apps/frontend/vercel.json`:
+   ```json
+   {
+     "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+   }
+   ```
+4. Deploy and verify that the Public Tournament Hub loads cleanly.
 
-| Symptom | Fix |
-|---|---|
-| `Refusing to start… insecure config` | `JWT_SECRET` or `CORS_ORIGINS` is wrong (Step 1) |
-| `Refusing to bootstrap the production admin…` | `ADMIN_BOOTSTRAP_PASSWORD` is a placeholder |
-| Mongo authentication error | `MONGO_URI` is wrong |
-| Deployment fails | The old version keeps running. Fix the cause and push again. |
-| Site loads but the data is empty | Check the backend runtime logs for seed errors |
+---
 
-Every later `git push origin main` redeploys automatically. Migrations and seeding are idempotent, so redeploying never duplicates or overwrites data.
+## 4. Production Smoke Verification Checklist
 
-## Switches
-
-- `AUTO_MIGRATE=false` disables migrations and seeding at startup.
-- `AUTO_SEED=false` runs migrations only.
+After initial deployment, verify these 5 critical workflows:
+1. **Health Probes:** `GET /health` and `GET /health/db` return 200 OK with valid database connection status.
+2. **Superadmin Bootstrap:** Log in to `/login` using `ADMIN_BOOTSTRAP_USERNAME` and `ADMIN_BOOTSTRAP_PASSWORD`. Verify redirect to `/superadmin`.
+3. **Security Assertions:** Confirm that `docs/` or OpenAPI `/docs` are disabled in production mode.
+4. **Rate Limiting:** Send 6 consecutive bad-password login requests and confirm HTTP 429 throttling response.
+5. **Real-Time Telemetry:** Open a live match on two separate browser windows (one Scorer, one Spectator); log a goal and confirm instant sub-second score update via WSS.

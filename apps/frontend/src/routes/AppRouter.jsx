@@ -13,6 +13,7 @@ import { AdminLoginPage } from '../pages/admin/AdminLoginPage';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { AdminLiveControlPage } from '../pages/admin/AdminLiveControlPage';
 import { RequireAdmin } from '../components/common/RequireAdmin';
+import { RoleGuard } from '../components/common/RoleGuard';
 
 export function AppRouter() {
   return (
@@ -30,17 +31,17 @@ export function AppRouter() {
       <Route
         path="/admin"
         element={
-          <RequireAdmin>
+          <RoleGuard allowedRoles={['SUPER_ADMIN', 'ORGANIZER']}>
             <AdminDashboardPage />
-          </RequireAdmin>
+          </RoleGuard>
         }
       />
       <Route
         path="/admin/matches/:matchId/live"
         element={
-          <RequireAdmin>
+          <RoleGuard allowedRoles={['SUPER_ADMIN', 'ORGANIZER', 'SCORER']}>
             <AdminLiveControlPage />
-          </RequireAdmin>
+          </RoleGuard>
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />

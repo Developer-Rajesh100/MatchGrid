@@ -107,4 +107,5 @@ def match_to_out(
         # pre-Timer-feature match documents during the Timer/Half-Time audit).
         is_half_time=match.is_half_time,
         elapsed_seconds=match.elapsed_seconds,
+        assigned_scorer_ids=[str(sid) for sid in (getattr(match, "assigned_scorer_ids", None) or [])],
     )

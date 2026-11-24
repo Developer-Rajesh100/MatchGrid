@@ -19,6 +19,7 @@ from app.migrations import (
     m0002_tournament_and_groups,
     m0003_bootstrap_admin,
     m0004_knockout_match_slots,
+    m0005_multi_tenant_rbac,
 )
 
 MIGRATIONS = [
@@ -26,6 +27,7 @@ MIGRATIONS = [
     m0002_tournament_and_groups,
     m0003_bootstrap_admin,
     m0004_knockout_match_slots,
+    m0005_multi_tenant_rbac,
 ]
 
 

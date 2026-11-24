@@ -4,6 +4,7 @@
 **Target Path:** `docs/plan.md`  
 **Project Name:** MatchGrid (Evolved from DCL Season 5 Digital Scoreboard)  
 **Architecture:** Multi-Tenant, Multi-Tournament Live Football Management & Real-Time Scoreboard Platform  
+**Implementation Blueprint:** [`docs/IMPLEMENTATION_ROADMAP.md`](file:///home/rajesh/Placement_Project/DCL_score_board/docs/IMPLEMENTATION_ROADMAP.md) (7-Phase Execution Matrix with 7-Stage Lifecycle)
 
 ---
 
@@ -107,6 +108,9 @@ flowchart LR
 
 ## 3. Entire Project Plan (Phased Roadmap)
 
+> [!TIP]
+> For the actionable, stage-by-stage engineering blueprint covering every deliverable across DB, Backend, Frontend, and Playwright E2E with Cloudflare R2 media hosting, see [`docs/IMPLEMENTATION_ROADMAP.md`](file:///home/rajesh/Placement_Project/DCL_score_board/docs/IMPLEMENTATION_ROADMAP.md).
+
 ### Phase 0: Foundation, Monorepo, Rebranding & Clean Slate *(Completed)*
 * [x] Restructure repository into a **Bun workspace monorepo** (`apps/backend`, `apps/frontend`, `e2e`, `docs`).
 * [x] Configure **Docker** exclusively for `mongo:7` (`docker-compose.yml`), running FastAPI (`:8001`) and Vite (`:5173`) natively via `bun run dev`.
@@ -119,13 +123,18 @@ flowchart LR
   * Replace the single `admins` collection with a unified `users` collection supporting roles: `SUPER_ADMIN`, `ORGANIZER`, and `SCORER`.
   * Add `organizer_id` and `slug` (unique, indexed) to `Tournament`.
   * Add `tournament_id` (indexed) across all child collections (`Group`, `GroupTeam`, `Team`, `Player`, `Match`, `MatchEvent`, `MatchLineup`, `TournamentStanding`, `PlayerStatistics`) with compound indexes `(tournament_id, group_id, points)`.
-  * Add `assigned_scorer_ids: list[PydanticObjectId]` to `Match` so Organizers can assign one or more Scorers to specific matches.
+  * Update `Team` index from globally unique `name` to compound `(tournament_id, name)` so different tournaments can use the same team names.
+  * Update `Player` to include `tournament_id`, replacing legacy globally unique `dcl_id` with compound `(tournament_id, team_id, number)` unique index.
+  * Update `Match` model: retain existing `team1_id` / `team2_id` and `winner_override_id` (with Pydantic schema aliases for home/away), and add `assigned_scorer_ids: list[PydanticObjectId]` so Organizers can delegate matches to Scorers.
   * Write forward migration `m0005_multi_tenant_rbac.py` and bootstrap the default `SUPER_ADMIN` account via environment variables.
-* **Backend Layer:**
+* **Test Suite Backward Compatibility Strategy:**
+  * Preserve the existing 253 backend Pytests by maintaining a default tournament bootstrap in `apps/backend/tests/conftest.py` and fallback active tournament resolution during router upgrades so test regressions are completely avoided.
+* **Backend Layer & Acceptance Criteria:**
   * Implement FastAPI dependency guards in `app/core/deps.py`:
-    * `require_superadmin`: Restricts access to `SUPER_ADMIN`.
-    * `require_tournament_owner(tournament_id)`: Allows `SUPER_ADMIN` or the `ORGANIZER` who owns the tournament.
-    * `require_match_operator(match_id)`: Allows `SUPER_ADMIN`, the parent tournament's `ORGANIZER`, or a `SCORER` in `match.assigned_scorer_ids`.
+    * `get_current_user`: Extracts and validates JWT, ensuring `user.is_active == True`.
+    * `require_superadmin`: Restricts access to `SUPER_ADMIN` (403 on failure).
+    * `require_tournament_owner(tournament_id)`: Allows `SUPER_ADMIN` or the `ORGANIZER` matching `tournament.organizer_id` (403 on failure).
+    * `require_match_operator(match_id)`: Allows `SUPER_ADMIN`, the parent tournament's `ORGANIZER`, or an assigned `SCORER` in `match.assigned_scorer_ids` (403 on failure).
   * Build `/api/superadmin/*` endpoints for platform-wide user management (creating/suspending Organizers & Scorers), global tournament oversight, and platform metrics.
   * Build `/api/organizer/scorers` endpoints allowing Organizers to create Scorer accounts and assign/unassign them to matches.
 

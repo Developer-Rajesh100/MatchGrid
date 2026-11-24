@@ -33,6 +33,7 @@ class Match(Document):
     ended_at: Optional[datetime] = None
     is_half_time: bool = False
     elapsed_seconds: Optional[int] = None
+    assigned_scorer_ids: list[PydanticObjectId] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -43,4 +44,6 @@ class Match(Document):
             IndexModel("status"),
             IndexModel("date"),
             IndexModel([("tournament_id", 1), ("match_number", 1)], unique=True),
+            IndexModel("tournament_id"),
+            IndexModel("assigned_scorer_ids"),
         ]

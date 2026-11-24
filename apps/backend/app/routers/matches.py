@@ -3,10 +3,15 @@ from typing import Optional
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, Query
 
-from app.core.deps import get_current_admin
+from app.core.deps import (
+    check_match_operator,
+    check_tournament_ownership,
+    get_current_admin,
+    get_current_user,
+)
 from app.core.errors import ConflictError
 from app.core.websocket import broadcast
-from app.models import Admin, Group, Match, MatchEvent, MatchLineup, Player, Team, Tournament
+from app.models import Group, Match, MatchEvent, MatchLineup, Player, Team, Tournament, User
 from app.schemas.match import (
     AssignTeamsRequest,
     GenerateGroupFixturesRequest,
@@ -76,13 +81,6 @@ async def _list_matches(
     status: Optional[str] = None,
     date: Optional[str] = None,
 ) -> list[MatchOut]:
-    """Plain-Python filtering helper, shared by the general list endpoint and
-    the /upcoming, /live, /completed shortcuts below. Deliberately NOT the
-    route handler itself — FastAPI's Query(default=...) sentinels only get
-    resolved to real values when a route runs through the ASGI request
-    pipeline, so calling a `Query(...)`-decorated function directly (e.g.
-    `list_matches(status="upcoming")`) leaves the *other* parameters bound to
-    the Query object itself, not None, which breaks filtering downstream."""
     filters: dict = {"tournament_id": await get_active_tournament_id()}
     if team_id:
         tid = PydanticObjectId(team_id)
@@ -111,31 +109,27 @@ async def _list_matches(
 
 @router.get("", response_model=list[MatchOut])
 async def list_matches(
-    team_id: Optional[str] = Query(default=None, description="Filter to matches involving this team"),
-    stage: Optional[str] = Query(default=None, description="group | semi | final"),
+    team_id: Optional[str] = Query(default=None),
+    stage: Optional[str] = Query(default=None),
     group_id: Optional[str] = Query(default=None),
-    status: Optional[str] = Query(default=None, description="upcoming | live | full_time | cancelled"),
-    date: Optional[str] = Query(default=None, description="Exact match date, YYYY-MM-DD"),
+    status: Optional[str] = Query(default=None),
+    date: Optional[str] = Query(default=None),
 ) -> list[MatchOut]:
-    """List matches, optionally filtered by team, stage, group, status, and/or date."""
     return await _list_matches(team_id, stage, group_id, status, date)
 
 
 @router.get("/upcoming", response_model=list[MatchOut])
 async def list_upcoming() -> list[MatchOut]:
-    """Scheduled matches that haven't started yet, soonest first."""
     return await _list_matches(status="upcoming")
 
 
 @router.get("/live", response_model=list[MatchOut])
 async def list_live() -> list[MatchOut]:
-    """Matches currently in progress."""
     return await _list_matches(status="live")
 
 
 @router.get("/completed", response_model=list[MatchOut])
 async def list_completed() -> list[MatchOut]:
-    """Matches that have finished (full time)."""
     return await _list_matches(status="full_time")
 
 
@@ -156,10 +150,10 @@ async def get_match(match_id: str) -> MatchDetailOut:
 
 @router.patch("/{match_id}", response_model=MatchOut)
 async def update_match(
-    match_id: str, payload: MatchUpdate, _admin: Admin = Depends(get_current_admin)
+    match_id: str, payload: MatchUpdate, user: User = Depends(get_current_user)
 ) -> MatchOut:
     """Update a match's match number and scheduled date/time/venue/duration/notes. Does not change status or score."""
-    match = await get_match_or_404(PydanticObjectId(match_id))
+    match = await check_match_operator(user, match_id)
     changes = payload.model_dump(exclude_unset=True)
     if "match_number" in changes:
         new_number = changes.pop("match_number")
@@ -185,12 +179,14 @@ async def update_match(
 
 
 @router.post("", response_model=MatchOut, status_code=201)
-async def create_match(payload: MatchCreate, _admin: Admin = Depends(get_current_admin)) -> MatchOut:
+async def create_match(payload: MatchCreate, admin: User = Depends(get_current_admin)) -> MatchOut:
     """Create a match between two existing teams (admin only): an additional "extra" match
     (never affects standings, the tournament stage or tournament statistics) or a real
     group-stage fixture (stage="group" + group_id)."""
+    tournament = await check_tournament_ownership(admin, payload.tournament_id)
+    tournament_id = tournament.id
     match = await create_new_match(
-        await get_active_tournament_id(),
+        tournament_id,
         PydanticObjectId(payload.team1_id),
         PydanticObjectId(payload.team2_id),
         stage=payload.stage,
@@ -207,18 +203,21 @@ async def create_match(payload: MatchCreate, _admin: Admin = Depends(get_current
 
 
 @router.delete("/{match_id}", status_code=204)
-async def remove_match(match_id: str, _admin: Admin = Depends(get_current_admin)) -> None:
+async def remove_match(match_id: str, admin: User = Depends(get_current_admin)) -> None:
     """Permanently delete any match (admin only), including its events and lineup, and recompute
     standings, player statistics and the tournament stage."""
-    await delete_match(await get_match_or_404(PydanticObjectId(match_id)))
+    match = await get_match_or_404(PydanticObjectId(match_id))
+    await check_tournament_ownership(admin, match.tournament_id)
+    await delete_match(match)
 
 
 @router.put("/{match_id}/teams", response_model=MatchOut)
 async def assign_teams(
-    match_id: str, payload: AssignTeamsRequest, _admin: Admin = Depends(get_current_admin)
+    match_id: str, payload: AssignTeamsRequest, admin: User = Depends(get_current_admin)
 ) -> MatchOut:
     """Manually assign the two teams of an upcoming match — group, semi-final or final (admin only)."""
     match = await get_match_or_404(PydanticObjectId(match_id))
+    await check_tournament_ownership(admin, match.tournament_id)
     await assign_match_teams(
         match, PydanticObjectId(payload.team1_id), PydanticObjectId(payload.team2_id)
     )
@@ -226,25 +225,25 @@ async def assign_teams(
 
 
 @router.post("/{match_id}/start", response_model=MatchOut)
-async def start(match_id: str, _admin: Admin = Depends(get_current_admin)) -> MatchOut:
+async def start(match_id: str, user: User = Depends(get_current_user)) -> MatchOut:
     """upcoming -> live. Requires both teams to already be assigned."""
-    match = await get_match_or_404(PydanticObjectId(match_id))
+    match = await check_match_operator(user, match_id)
     match = await start_match(match)
     return await _to_out(match)
 
 
 @router.post("/{match_id}/end", response_model=MatchOut)
-async def end(match_id: str, _admin: Admin = Depends(get_current_admin)) -> MatchOut:
+async def end(match_id: str, user: User = Depends(get_current_user)) -> MatchOut:
     """live -> full_time. Triggers a standings/statistics/tournament-stage refresh."""
-    match = await get_match_or_404(PydanticObjectId(match_id))
+    match = await check_match_operator(user, match_id)
     match = await end_match(match)
     return await _to_out(match)
 
 
 @router.post("/{match_id}/reopen", response_model=MatchOut)
-async def reopen(match_id: str, _admin: Admin = Depends(get_current_admin)) -> MatchOut:
+async def reopen(match_id: str, user: User = Depends(get_current_user)) -> MatchOut:
     """full_time -> live, to correct a mis-recorded event. Also refreshes standings/stage."""
-    match = await get_match_or_404(PydanticObjectId(match_id))
+    match = await check_match_operator(user, match_id)
     match = await reopen_match(match)
     return await _to_out(match)
 
@@ -253,66 +252,71 @@ async def reopen(match_id: str, _admin: Admin = Depends(get_current_admin)) -> M
 async def half_time(
     match_id: str,
     payload: Optional[HalfTimePayload] = None,
-    _admin: Admin = Depends(get_current_admin),
+    user: User = Depends(get_current_user),
 ) -> MatchOut:
-    """Pause live match for Half Time. Admin only."""
-    match = await get_match_or_404(PydanticObjectId(match_id))
+    """Pause live match for Half Time. Authorized match operator only."""
+    match = await check_match_operator(user, match_id)
     elapsed = payload.elapsed_seconds if payload else None
     match = await pause_half_time(match, elapsed_seconds=elapsed)
     return await _to_out(match)
 
 
 @router.post("/{match_id}/resume", response_model=MatchOut)
-async def resume(match_id: str, _admin: Admin = Depends(get_current_admin)) -> MatchOut:
-    """Resume match from Half Time. Admin only."""
-    match = await get_match_or_404(PydanticObjectId(match_id))
+async def resume(match_id: str, user: User = Depends(get_current_user)) -> MatchOut:
+    """Resume match from Half Time. Authorized match operator only."""
+    match = await check_match_operator(user, match_id)
     match = await resume_match(match)
     return await _to_out(match)
 
 
 @router.post("/{match_id}/reset-timer", response_model=MatchOut)
 async def reset_match_timer(
-    match_id: str, _admin: Admin = Depends(get_current_admin)
+    match_id: str, user: User = Depends(get_current_user)
 ) -> MatchOut:
-    """Reset match timer to 00:00. Admin only."""
-    match = await get_match_or_404(PydanticObjectId(match_id))
+    """Reset match timer to 00:00. Authorized match operator only."""
+    match = await check_match_operator(user, match_id)
     match = await reset_timer(match)
     return await _to_out(match)
 
 
 @router.post("/{match_id}/cancel", response_model=MatchOut)
-async def cancel(match_id: str, _admin: Admin = Depends(get_current_admin)) -> MatchOut:
+async def cancel(match_id: str, admin: User = Depends(get_current_admin)) -> MatchOut:
     """Cancel a not-yet-started match. Only valid while status is 'upcoming'."""
     match = await get_match_or_404(PydanticObjectId(match_id))
+    await check_tournament_ownership(admin, match.tournament_id)
     match = await cancel_match(match)
     return await _to_out(match)
 
 
 @router.post("/{match_id}/uncancel", response_model=MatchOut)
-async def uncancel(match_id: str, _admin: Admin = Depends(get_current_admin)) -> MatchOut:
+async def uncancel(match_id: str, admin: User = Depends(get_current_admin)) -> MatchOut:
     """Revert a cancelled match back to 'upcoming'."""
     match = await get_match_or_404(PydanticObjectId(match_id))
+    await check_tournament_ownership(admin, match.tournament_id)
     match = await uncancel_match(match)
     return await _to_out(match)
 
 
 @router.post("/{match_id}/winner", response_model=MatchOut)
 async def winner(
-    match_id: str, payload: WinnerRequest, _admin: Admin = Depends(get_current_admin)
+    match_id: str, payload: WinnerRequest, user: User = Depends(get_current_user)
 ) -> MatchOut:
     """Manually record the winner of a drawn knockout match (e.g. on penalties).
     Only valid for a completed, tied, non-group match."""
-    match = await get_match_or_404(PydanticObjectId(match_id))
+    match = await check_match_operator(user, match_id)
     match = await set_winner(match, PydanticObjectId(payload.team_id))
     return await _to_out(match)
 
 
 @router.post("/generate-group-fixtures", response_model=list[MatchOut])
 async def generate_fixtures(
-    payload: GenerateGroupFixturesRequest, _admin: Admin = Depends(get_current_admin)
+    payload: GenerateGroupFixturesRequest, admin: User = Depends(get_current_admin)
 ) -> list[MatchOut]:
     """(Re)generate a group's 3 round-robin matches from its 3 assigned teams.
     If the group already has recorded results, pass force=true to erase and regenerate."""
+    group = await Group.get(PydanticObjectId(payload.group_id))
+    if group:
+        await check_tournament_ownership(admin, group.tournament_id)
     matches = await generate_group_fixtures(PydanticObjectId(payload.group_id), payload.force)
     teams = await _teams_map(*matches)
     groups = await _groups_map()
@@ -323,19 +327,25 @@ async def generate_fixtures(
 
 
 @router.post("/generate-semis", response_model=list[MatchOut])
-async def do_generate_semis(_admin: Admin = Depends(get_current_admin)) -> list[MatchOut]:
+async def do_generate_semis(admin: User = Depends(get_current_admin)) -> list[MatchOut]:
     """Seed the 2 semi-finals from final group standings: SF1 = A2 vs B1, SF2 = B2 vs A1.
     Requires both groups fully complete and no semis generated yet."""
     tournament = await Tournament.find_one()
+    if tournament is None:
+        raise NotFoundError("Tournament not found")
+    await check_tournament_ownership(admin, tournament.id)
     matches = await generate_semis(tournament.id)
     return [await _to_out(m) for m in matches]
 
 
 @router.post("/generate-final", response_model=MatchOut)
-async def do_generate_final(_admin: Admin = Depends(get_current_admin)) -> MatchOut:
+async def do_generate_final(admin: User = Depends(get_current_admin)) -> MatchOut:
     """Seed the final from the two semi-final winners. Requires both semis
     completed with a decided winner (score or manual override)."""
     tournament = await Tournament.find_one()
+    if tournament is None:
+        raise NotFoundError("Tournament not found")
+    await check_tournament_ownership(admin, tournament.id)
     match = await generate_final(tournament.id)
     return await _to_out(match)
 
@@ -353,22 +363,22 @@ async def list_events(match_id: str) -> list[MatchEventOut]:
 
 @router.post("/{match_id}/events", response_model=MatchEventOut, status_code=201)
 async def create_event(
-    match_id: str, payload: MatchEventCreate, admin: Admin = Depends(get_current_admin)
+    match_id: str, payload: MatchEventCreate, user: User = Depends(get_current_user)
 ) -> MatchEventOut:
     """Record a goal/yellow/red/player-of-the-match event. Recording a new potm
     replaces any existing one for this match (max one per match). Not allowed
     while the match is still 'upcoming'. Recalculates standings/statistics."""
-    match = await get_match_or_404(PydanticObjectId(match_id))
-    event = await add_event(match, payload, admin.id)
+    match = await check_match_operator(user, match_id)
+    event = await add_event(match, payload, user.id)
     players = {p.id: p for p in await Player.find_all().to_list()}
     return match_event_to_out(event, players)
 
 
 @router.delete("/{match_id}/events/{event_id}", status_code=204)
 async def delete_event(
-    match_id: str, event_id: str, _admin: Admin = Depends(get_current_admin)
+    match_id: str, event_id: str, user: User = Depends(get_current_user)
 ) -> None:
-    match = await get_match_or_404(PydanticObjectId(match_id))
+    match = await check_match_operator(user, match_id)
     await remove_event(match, PydanticObjectId(event_id))
 
 
@@ -393,11 +403,11 @@ async def get_lineup(match_id: str) -> list[LineupEntryOut]:
 
 @router.put("/{match_id}/lineup", response_model=list[LineupEntryOut])
 async def put_lineup(
-    match_id: str, payload: LineupSetRequest, _admin: Admin = Depends(get_current_admin)
+    match_id: str, payload: LineupSetRequest, user: User = Depends(get_current_user)
 ) -> list[LineupEntryOut]:
     """Replace this match's full lineup with the given player list — this is
     what appearance statistics are computed from, not team roster membership."""
-    match = await get_match_or_404(PydanticObjectId(match_id))
+    match = await check_match_operator(user, match_id)
     entries = await set_lineup(match, payload.player_ids)
     players = {p.id: p for p in await Player.find_all().to_list()}
     return [

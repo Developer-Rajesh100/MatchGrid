@@ -19,7 +19,9 @@ from pymongo.errors import DuplicateKeyError
 
 from app.core.config import get_settings
 from app.core.database import get_client
+from app.core.security import hash_password
 from app.migrations.runner import apply_migrations
+from app.models import Admin, User, UserRole
 from app.scripts.import_match_schedule import (
     DEFAULT_PATH as SCHEDULE_PATH,
     import_schedule,
@@ -76,6 +78,21 @@ async def _seed() -> None:
         logger.info("Schedule seed: %s", await import_schedule(schedule, False, update_existing=False))
 
 
+async def _sync_bootstrap_user(settings) -> None:
+    """Ensure SUPER_ADMIN record exists in users collection alongside admins."""
+    user = await User.find_one(User.username == settings.admin_bootstrap_username)
+    if user is None:
+        admin = await Admin.find_one(Admin.username == settings.admin_bootstrap_username)
+        password_hash = admin.password_hash if admin else hash_password(settings.admin_bootstrap_password)
+        await User(
+            username=settings.admin_bootstrap_username,
+            password_hash=password_hash,
+            role=UserRole.SUPER_ADMIN,
+            is_active=True,
+        ).insert()
+        logger.info("Bootstrap SUPER_ADMIN synced in users collection")
+
+
 async def run_startup_tasks() -> None:
     settings = get_settings()
     if not settings.auto_migrate:
@@ -87,6 +104,7 @@ async def run_startup_tasks() -> None:
     try:
         applied = await apply_migrations()
         logger.info("Migrations applied: %s", applied or "none (up to date)")
+        await _sync_bootstrap_user(settings)
         if settings.auto_seed:
             # Seed once per database. Without this marker a fixture (or team) the admin
             # deliberately deleted would be re-created from the JSON files on the next deploy.
