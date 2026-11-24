@@ -8,11 +8,14 @@ import React, { useState } from 'react';
 export function Avatar({
   name = '',
   photoUrl = null,
+  crestUrl = null,
   color = '#10B981',
   size = 36,
   shape = 'square',
+  className = '',
 }) {
   const [imgError, setImgError] = useState(false);
+  const effectiveUrl = photoUrl || crestUrl;
 
   // Compute clean initials (up to 2 characters)
   const initials = name
@@ -28,10 +31,10 @@ export function Avatar({
   const borderRadius = shape === 'circle' ? '50%' : '8px';
   const cleanColor = color && color.startsWith('#') ? color : '#10B981';
 
-  if (photoUrl && !imgError) {
+  if (effectiveUrl && !imgError) {
     return (
       <div
-        className="avatar"
+        className={`avatar ${className}`}
         style={{
           width: size,
           height: size,
@@ -42,8 +45,9 @@ export function Avatar({
         }}
       >
         <img
-          src={photoUrl}
+          src={effectiveUrl}
           alt={name}
+          loading="lazy"
           onError={() => setImgError(true)}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
@@ -53,7 +57,7 @@ export function Avatar({
 
   return (
     <div
-      className="avatar"
+      className={`avatar ${className}`}
       title={name}
       style={{
         width: size,
