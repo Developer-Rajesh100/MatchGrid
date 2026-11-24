@@ -8,6 +8,8 @@ export const matchesApi = {
     if (params.stage) query.append('stage', params.stage);
     if (params.group_id) query.append('group_id', params.group_id);
     if (params.date) query.append('date', params.date);
+    if (params.tournament_id) query.append('tournament_id', params.tournament_id);
+    if (params.tournament_slug || params.slug) query.append('tournament_slug', params.tournament_slug || params.slug);
     const qs = query.toString();
     return apiClient(`/api/matches${qs ? `?${qs}` : ''}`);
   },
@@ -48,14 +50,33 @@ export const matchesApi = {
     apiClient('/api/matches/generate-semis', { method: 'POST' }),
   generateFinal: () =>
     apiClient('/api/matches/generate-final', { method: 'POST' }),
-  getGroups: () =>
-    apiClient('/api/groups'),
+  getGroups: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params?.tournament_id) q.append('tournament_id', params.tournament_id);
+    if (params?.tournament_slug || params?.slug) q.append('tournament_slug', params.tournament_slug || params.slug);
+    const qs = q.toString();
+    return apiClient(`/api/groups${qs ? `?${qs}` : ''}`);
+  },
   randomGroupDraw: () =>
     apiClient('/api/groups/random-draw', { method: 'POST' }),
   seedKnockout: () =>
     apiClient('/api/matches/seed-knockout', { method: 'POST' }),
-  getBracket: (tournamentId) =>
-    apiClient(`/api/matches/bracket${tournamentId ? `?tournament_id=${tournamentId}` : ''}`),
+  getBracket: (tournamentIdOrParams, maybeSlug = null) => {
+    let tId = null;
+    let tSlug = null;
+    if (typeof tournamentIdOrParams === 'object' && tournamentIdOrParams !== null) {
+      tId = tournamentIdOrParams.tournament_id || tournamentIdOrParams.id;
+      tSlug = tournamentIdOrParams.tournament_slug || tournamentIdOrParams.slug;
+    } else {
+      tId = tournamentIdOrParams;
+      tSlug = maybeSlug;
+    }
+    const q = new URLSearchParams();
+    if (tId) q.append('tournament_id', tId);
+    if (tSlug) q.append('tournament_slug', tSlug);
+    const qs = q.toString();
+    return apiClient(`/api/matches/bracket${qs ? `?${qs}` : ''}`);
+  },
   getAssignedMatches: () =>
     apiClient('/api/scorer/matches'),
 };

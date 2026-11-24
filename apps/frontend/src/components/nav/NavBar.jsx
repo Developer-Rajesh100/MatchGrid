@@ -3,6 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Trophy, Shield, Calendar, Users, BarChart3, LogOut, Lock, Menu, X, Activity } from 'lucide-react';
 import { authApi } from '../../api/auth';
 import { useWebSocket } from '../../context/WebSocketContext';
+import { TournamentSwitcher } from './TournamentSwitcher';
 
 export function NavBar() {
   const [isAdmin, setIsAdmin] = useState(authApi.isAuthenticated());
@@ -64,6 +65,9 @@ export function NavBar() {
               <span className="brand-wordmark-tag">Live Tournament Center</span>
             </div>
           </NavLink>
+
+          {/* Quick Tournament Switcher Dropdown */}
+          <TournamentSwitcher />
 
           {/* Desktop Navigation Tabs */}
           <nav className="brand-nav-tabs" aria-label="Main navigation">
@@ -158,6 +162,9 @@ export function NavBar() {
         </div>
 
         <nav className="mobile-drawer-links">
+          <div style={{ marginBottom: '12px' }}>
+            <TournamentSwitcher />
+          </div>
           {navLinks.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}

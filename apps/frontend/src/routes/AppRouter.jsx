@@ -1,5 +1,9 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { PublicHubPage } from '../pages/hub/PublicHubPage';
+import { TournamentLayout } from '../pages/tournament/TournamentLayout';
+import { TournamentOverviewPage } from '../pages/tournament/TournamentOverviewPage';
+import { BracketPage } from '../pages/tournament/BracketPage';
 import { HomePage } from '../pages/HomePage';
 import { MatchesPage } from '../pages/MatchesPage';
 import { MatchDetailPage } from '../pages/MatchDetailPage';
@@ -19,7 +23,20 @@ import { RoleGuard } from '../components/common/RoleGuard';
 export function AppRouter() {
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
+      {/* Tier 1 Public Tournament Hub */}
+      <Route path="/" element={<PublicHubPage />} />
+
+      {/* Tier 2 Tournament Center Shell */}
+      <Route path="/t/:slug" element={<TournamentLayout />}>
+        <Route index element={<TournamentOverviewPage />} />
+        <Route path="matches" element={<MatchesPage />} />
+        <Route path="standings" element={<StandingsPage />} />
+        <Route path="bracket" element={<BracketPage />} />
+        <Route path="teams" element={<TeamsPage />} />
+        <Route path="stats" element={<StatsPage />} />
+      </Route>
+
+      {/* Top-Level Public Legacy Routes (Default Tournament Scoped) */}
       <Route path="/matches" element={<MatchesPage />} />
       <Route path="/matches/:matchId" element={<MatchDetailPage />} />
       <Route path="/standings" element={<StandingsPage />} />

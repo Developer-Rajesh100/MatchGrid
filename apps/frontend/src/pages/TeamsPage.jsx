@@ -4,20 +4,26 @@ import { teamsApi } from '../api/teams';
 import { Avatar } from '../components/common/Avatar';
 import { LoadingState, ErrorState, EmptyState } from '../components/common/Common';
 import { Shield, Users, ArrowRight } from 'lucide-react';
+import { useTournament } from '../context/TournamentContext';
 
 export function TeamsPage() {
+  const { tournamentId, slug } = useTournament();
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
+    setLoading(true);
+    const query = {};
+    if (tournamentId) query.tournament_id = tournamentId;
+    if (slug) query.tournament_slug = slug;
     teamsApi
-      .getTeams()
+      .getTeams(query)
       .then((data) => setTeams(data || []))
       .catch((err) => setError(err.message || 'Failed to load teams'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [tournamentId, slug]);
 
   if (loading) return <LoadingState message="Loading competing clubs..." />;
   if (error) return <ErrorState message={error} />;

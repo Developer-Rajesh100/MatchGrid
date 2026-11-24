@@ -4,8 +4,10 @@ import { LeaderCard } from '../components/stats/LeaderCard';
 import { LoadingState, ErrorState } from '../components/common/Common';
 import { Trophy, Flame, Zap, Award, Activity, RefreshCw } from 'lucide-react';
 import { useLiveSocket } from '../hooks/useLiveSocket';
+import { useTournament } from '../context/TournamentContext';
 
 export function StatsPage() {
+  const { tournamentId, slug } = useTournament();
   const [leaderboards, setLeaderboards] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -14,7 +16,10 @@ export function StatsPage() {
     try {
       if (showLoading) setLoading(true);
       setError(null);
-      const data = await statisticsApi.getLeaderboards();
+      const query = {};
+      if (tournamentId) query.tournament_id = tournamentId;
+      if (slug) query.tournament_slug = slug;
+      const data = await statisticsApi.getLeaderboards(query);
       setLeaderboards(data);
     } catch (err) {
       if (showLoading) setError(err.message || 'Failed to load leaderboards');
@@ -25,11 +30,11 @@ export function StatsPage() {
 
   useEffect(() => {
     fetchStats(true);
-  }, []);
+  }, [tournamentId, slug]);
 
   useLiveSocket(() => {
     fetchStats(false);
-  });
+  }, tournamentId);
 
   return (
     <div>

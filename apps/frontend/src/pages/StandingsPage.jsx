@@ -4,8 +4,10 @@ import { StandingsTable } from '../components/standings/StandingsTable';
 import { LoadingState, ErrorState } from '../components/common/Common';
 import { BarChart3, Info, RefreshCw, Trophy } from 'lucide-react';
 import { useLiveSocket } from '../hooks/useLiveSocket';
+import { useTournament } from '../context/TournamentContext';
 
 export function StandingsPage() {
+  const { tournamentId, slug } = useTournament();
   const [standings, setStandings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -14,7 +16,10 @@ export function StandingsPage() {
     try {
       if (showLoading) setLoading(true);
       setError(null);
-      const data = await standingsApi.getStandings();
+      const query = {};
+      if (tournamentId) query.tournament_id = tournamentId;
+      if (slug) query.tournament_slug = slug;
+      const data = await standingsApi.getStandings(query);
       setStandings(data || []);
     } catch (err) {
       if (showLoading) setError(err.message || 'Failed to load tournament standings');
@@ -25,11 +30,11 @@ export function StandingsPage() {
 
   useEffect(() => {
     fetchStandings(true);
-  }, []);
+  }, [tournamentId, slug]);
 
   useLiveSocket(() => {
     fetchStandings(false);
-  });
+  }, tournamentId);
 
   return (
     <div>

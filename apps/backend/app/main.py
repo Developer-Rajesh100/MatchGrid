@@ -108,4 +108,5 @@ for router in (
     uploads,
 ):
     api_router.include_router(router.router)
+api_router.include_router(tournament.tournaments_router)
 app.include_router(api_router)

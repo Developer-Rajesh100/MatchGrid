@@ -5,8 +5,10 @@ import { MatchRow } from '../components/match/MatchRow';
 import { LoadingState, ErrorState, EmptyState } from '../components/common/Common';
 import { useLiveSocket } from '../hooks/useLiveSocket';
 import TournamentBracket from '../components/bracket/TournamentBracket';
+import { useTournament } from '../context/TournamentContext';
 
 export function MatchesPage() {
+  const { tournamentId, slug } = useTournament();
   const [matches, setMatches] = useState([]);
   const [filterStage, setFilterStage] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -17,7 +19,10 @@ export function MatchesPage() {
     try {
       if (showLoading) setLoading(true);
       setError(null);
-      const data = await matchesApi.getMatches();
+      const query = {};
+      if (tournamentId) query.tournament_id = tournamentId;
+      if (slug) query.tournament_slug = slug;
+      const data = await matchesApi.getMatches(query);
       setMatches(data || []);
     } catch (err) {
       if (showLoading) setError(err.message || 'Failed to load matches');
@@ -28,11 +33,11 @@ export function MatchesPage() {
 
   useEffect(() => {
     fetchMatches(true);
-  }, []);
+  }, [tournamentId, slug]);
 
   useLiveSocket(() => {
     fetchMatches(false);
-  });
+  }, tournamentId);
 
   const filteredMatches = matches.filter((m) => {
     if (filterStage !== 'all' && m.stage !== filterStage) return false;
@@ -117,7 +122,7 @@ export function MatchesPage() {
       ) : error ? (
         <ErrorState message={error} onRetry={fetchMatches} />
       ) : filterStage === 'bracket' ? (
-        <TournamentBracket refreshTrigger={matches.length} />
+        <TournamentBracket tournamentId={tournamentId} refreshTrigger={matches.length} />
       ) : filterStage === 'all' && filterStatus === 'all' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '26px' }}>
           {/* Group A */}

@@ -1,5 +1,6 @@
+from typing import Optional
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import check_tournament_ownership, get_current_admin
 from app.core.errors import NotFoundError
@@ -8,7 +9,7 @@ from app.schemas.team import TeamCreate, TeamOut, TeamUpdate
 from app.services.groups import assign_team_group
 from app.services.serializers import team_to_out
 from app.services.teams import create_team, delete_team, rename_team_checked
-from app.services.tournament_scope import get_active_tournament_id
+from app.services.tournament_scope import get_active_tournament_id, resolve_tournament_id
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -21,9 +22,12 @@ async def _team_or_404(team_id: str) -> Team:
 
 
 @router.get("", response_model=list[TeamOut])
-async def list_teams() -> list[TeamOut]:
-    tournament_id = await get_active_tournament_id()
-    teams = await Team.find(Team.tournament_id == tournament_id).to_list()
+async def list_teams(
+    tournament_id: Optional[str] = Query(default=None),
+    tournament_slug: Optional[str] = Query(default=None),
+) -> list[TeamOut]:
+    resolved_tid = await resolve_tournament_id(tournament_id, tournament_slug)
+    teams = await Team.find(Team.tournament_id == resolved_tid).to_list()
     group_teams = {gt.team_id: gt for gt in await GroupTeam.find_all().to_list()}
     groups = {g.id: g for g in await Group.find_all().to_list()}
 

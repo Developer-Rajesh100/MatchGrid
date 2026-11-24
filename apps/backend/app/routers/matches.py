@@ -51,7 +51,7 @@ from app.services.matches import (
     uncancel_match,
 )
 from app.services.serializers import match_event_to_out, match_to_out
-from app.services.tournament_scope import get_active_tournament_id
+from app.services.tournament_scope import get_active_tournament_id, resolve_tournament_id
 from app.services.tournament_stage import get_match_winner
 
 router = APIRouter(prefix="/matches", tags=["matches"])
@@ -95,8 +95,11 @@ async def _list_matches(
     group_id: Optional[str] = None,
     status: Optional[str] = None,
     date: Optional[str] = None,
+    tournament_id: Optional[str] = None,
+    tournament_slug: Optional[str] = None,
 ) -> list[MatchOut]:
-    filters: dict = {"tournament_id": await get_active_tournament_id()}
+    resolved_tid = await resolve_tournament_id(tournament_id, tournament_slug)
+    filters: dict = {"tournament_id": resolved_tid}
     if team_id:
         tid = PydanticObjectId(team_id)
         filters["$or"] = [{"team1_id": tid}, {"team2_id": tid}]
@@ -143,29 +146,43 @@ async def list_matches(
     group_id: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
     date: Optional[str] = Query(default=None),
+    tournament_id: Optional[str] = Query(default=None),
+    tournament_slug: Optional[str] = Query(default=None),
 ) -> list[MatchOut]:
-    return await _list_matches(team_id, stage, group_id, status, date)
+    return await _list_matches(team_id, stage, group_id, status, date, tournament_id, tournament_slug)
 
 
 @router.get("/upcoming", response_model=list[MatchOut])
-async def list_upcoming() -> list[MatchOut]:
-    return await _list_matches(status="upcoming")
+async def list_upcoming(
+    tournament_id: Optional[str] = Query(default=None),
+    tournament_slug: Optional[str] = Query(default=None),
+) -> list[MatchOut]:
+    return await _list_matches(status="upcoming", tournament_id=tournament_id, tournament_slug=tournament_slug)
 
 
 @router.get("/live", response_model=list[MatchOut])
-async def list_live() -> list[MatchOut]:
-    return await _list_matches(status="live")
+async def list_live(
+    tournament_id: Optional[str] = Query(default=None),
+    tournament_slug: Optional[str] = Query(default=None),
+) -> list[MatchOut]:
+    return await _list_matches(status="live", tournament_id=tournament_id, tournament_slug=tournament_slug)
 
 
 @router.get("/completed", response_model=list[MatchOut])
-async def list_completed() -> list[MatchOut]:
-    return await _list_matches(status="full_time")
+async def list_completed(
+    tournament_id: Optional[str] = Query(default=None),
+    tournament_slug: Optional[str] = Query(default=None),
+) -> list[MatchOut]:
+    return await _list_matches(status="full_time", tournament_id=tournament_id, tournament_slug=tournament_slug)
 
 
 @router.get("/bracket", response_model=BracketTreeOut)
-async def get_bracket(tournament_id: Optional[str] = Query(default=None)) -> BracketTreeOut:
+async def get_bracket(
+    tournament_id: Optional[str] = Query(default=None),
+    tournament_slug: Optional[str] = Query(default=None),
+) -> BracketTreeOut:
     """Returns the visual bracket tree for the active or specified tournament."""
-    tid = PydanticObjectId(tournament_id) if tournament_id else await get_active_tournament_id()
+    tid = await resolve_tournament_id(tournament_id, tournament_slug)
     return await build_tournament_bracket(tid)
 
 

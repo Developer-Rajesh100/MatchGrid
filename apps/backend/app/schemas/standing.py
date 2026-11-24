@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel
 
 
@@ -13,6 +14,7 @@ class StandingOut(BaseModel):
     goals_against: int
     goal_difference: int
     points: int
+    crest_url: Optional[str] = None
 
 
 class GroupStandingsOut(BaseModel):
