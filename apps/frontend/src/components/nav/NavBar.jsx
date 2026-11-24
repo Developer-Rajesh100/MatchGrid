@@ -6,6 +6,7 @@ import { useWebSocket } from '../../context/WebSocketContext';
 
 export function NavBar() {
   const [isAdmin, setIsAdmin] = useState(authApi.isAuthenticated());
+  const [role, setRole] = useState(authApi.getRole());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isConnected } = useWebSocket();
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export function NavBar() {
   useEffect(() => {
     const handleAuthChange = () => {
       setIsAdmin(authApi.isAuthenticated());
+      setRole(authApi.getRole());
     };
     window.addEventListener('matchgrid-auth-changed', handleAuthChange);
     window.addEventListener('dcl-auth-changed', handleAuthChange);
@@ -91,12 +93,12 @@ export function NavBar() {
             {isAdmin ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <NavLink
-                  to="/admin"
+                  to={role === 'SCORER' ? '/scorer' : '/admin'}
                   className={({ isActive }) =>
                     `btn btn-sm ${isActive ? 'btn-primary' : 'btn-outline'}`
                   }
                 >
-                  <Lock size={12} /> Admin
+                  <Lock size={12} /> {role === 'SCORER' ? 'Scorer' : 'Admin'}
                 </NavLink>
                 <button
                   onClick={handleLogout}
@@ -172,12 +174,12 @@ export function NavBar() {
             {isAdmin ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <NavLink
-                  to="/admin"
+                  to={role === 'SCORER' ? '/scorer' : '/admin'}
                   className="btn btn-primary"
                   style={{ width: '100%' }}
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  <Lock size={14} /> Admin Dashboard
+                  <Lock size={14} /> {role === 'SCORER' ? 'Scorer Cockpit' : 'Admin Dashboard'}
                 </NavLink>
                 <button
                   onClick={handleLogout}

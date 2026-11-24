@@ -94,7 +94,7 @@ async def start_match(match: Match) -> Match:
     match.ended_at = None
     match.updated_at = datetime.now(timezone.utc)
     await match.save()
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id)})
+    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
 
@@ -132,7 +132,7 @@ async def advance_knockout_winner(match: Match) -> None:
         if downstream:
             setattr(downstream, target_field, winner_id)
             await downstream.save()
-            await broadcast({"type": "match_updated", "match_id": str(downstream.id)})
+            await broadcast({"type": "match_updated", "match_id": str(downstream.id), "tournament_id": str(downstream.tournament_id)})
 
 
 async def end_match(match: Match) -> Match:
@@ -152,7 +152,7 @@ async def end_match(match: Match) -> Match:
     if match.stage in ("quarter", "semi"):
         await advance_knockout_winner(match)
     await refresh_tournament_stage(match.tournament_id)
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id)})
+    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
 
@@ -169,7 +169,7 @@ async def pause_half_time(match: Match, elapsed_seconds: Optional[int] = None) -
         match.elapsed_seconds = 0
     match.updated_at = datetime.now(timezone.utc)
     await match.save()
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id)})
+    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
 
@@ -181,7 +181,7 @@ async def resume_match(match: Match) -> Match:
     match.started_at = datetime.now(timezone.utc) - timedelta(seconds=elapsed)
     match.updated_at = datetime.now(timezone.utc)
     await match.save()
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id)})
+    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
 
@@ -191,7 +191,7 @@ async def reset_timer(match: Match) -> Match:
         match.elapsed_seconds = 0
         match.updated_at = datetime.now(timezone.utc)
         await match.save()
-        await broadcast({"type": "match_status_changed", "match_id": str(match.id)})
+        await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
 
@@ -213,7 +213,7 @@ async def reopen_match(match: Match) -> Match:
     if match.stage == "group" and match.group_id:
         await recalculate_group_standings(match.group_id)
     await refresh_tournament_stage(match.tournament_id)
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id)})
+    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
 
@@ -225,7 +225,7 @@ async def cancel_match(match: Match) -> Match:
         raise ConflictError("Only an upcoming match can be cancelled")
     match.status = "cancelled"
     await match.save()
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id)})
+    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
 
@@ -234,7 +234,7 @@ async def uncancel_match(match: Match) -> Match:
         raise ConflictError("Match is not cancelled")
     match.status = "upcoming"
     await match.save()
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id)})
+    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
 
@@ -251,7 +251,7 @@ async def set_winner(match: Match, team_id: PydanticObjectId) -> Match:
     if match.stage in ("quarter", "semi"):
         await advance_knockout_winner(match)
     await refresh_tournament_stage(match.tournament_id)
-    await broadcast({"type": "match_updated", "match_id": str(match.id)})
+    await broadcast({"type": "match_updated", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
 
@@ -375,7 +375,7 @@ async def generate_group_fixtures(group_id: PydanticObjectId, force: bool) -> li
     refreshed = await Match.find({"_id": {"$in": [m.id for m in new_matches]}}).to_list()
     refreshed.sort(key=lambda m: m.match_number)
     for m in refreshed:
-        await broadcast({"type": "match_updated", "match_id": str(m.id)})
+        await broadcast({"type": "match_updated", "match_id": str(m.id), "tournament_id": str(m.tournament_id)})
     return refreshed
 
 
@@ -408,7 +408,7 @@ async def generate_semis(tournament_id: PydanticObjectId) -> list[Match]:
     await semis[1].save()
     await refresh_tournament_stage(tournament_id)
     for m in semis:
-        await broadcast({"type": "match_updated", "match_id": str(m.id)})
+        await broadcast({"type": "match_updated", "match_id": str(m.id), "tournament_id": str(m.tournament_id)})
     return semis
 
 
@@ -519,7 +519,7 @@ async def create_new_match(
             continue
     else:
         raise ConflictError("Could not allocate a match number — please try again")
-    await broadcast({"type": "match_updated", "match_id": str(match.id)})
+    await broadcast({"type": "match_updated", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
 
@@ -551,7 +551,7 @@ async def delete_match(match: Match) -> None:
     if stage == "group" and group_id:
         await recalculate_group_standings(group_id)
     await refresh_tournament_stage(tournament_id)
-    await broadcast({"type": "match_updated", "match_id": match_id})
+    await broadcast({"type": "match_updated", "match_id": match_id, "tournament_id": str(tournament_id)})
 
 
 _QUARTER_SLOTS = (
@@ -741,7 +741,7 @@ async def generate_final(tournament_id: PydanticObjectId) -> Match:
     final.round_order = 3 if getattr(tournament, "config", None) and tournament.config.knockout_format == "quarters_semis_final" else 2
     await final.save()
     await refresh_tournament_stage(tournament_id)
-    await broadcast({"type": "match_updated", "match_id": str(final.id)})
+    await broadcast({"type": "match_updated", "match_id": str(final.id), "tournament_id": str(final.tournament_id)})
     return final
 
 
@@ -805,7 +805,7 @@ async def seed_knockout_bracket(tournament_id: PydanticObjectId) -> list[Match]:
 
         for q in quarters:
             await q.save()
-            await broadcast({"type": "match_updated", "match_id": str(q.id)})
+            await broadcast({"type": "match_updated", "match_id": str(q.id), "tournament_id": str(q.tournament_id)})
         await refresh_tournament_stage(tournament_id)
         return quarters
     return []

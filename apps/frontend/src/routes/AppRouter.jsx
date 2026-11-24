@@ -12,6 +12,7 @@ import { PlayerDetailPage } from '../pages/PlayerDetailPage';
 import { AdminLoginPage } from '../pages/admin/AdminLoginPage';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { AdminLiveControlPage } from '../pages/admin/AdminLiveControlPage';
+import { ScorerDashboardPage } from '../pages/scorer/ScorerDashboardPage';
 import { RequireAdmin } from '../components/common/RequireAdmin';
 import { RoleGuard } from '../components/common/RoleGuard';
 
@@ -28,6 +29,14 @@ export function AppRouter() {
       <Route path="/players" element={<PlayersPage />} />
       <Route path="/players/:playerId" element={<PlayerDetailPage />} />
       <Route path="/admin/login" element={<AdminLoginPage />} />
+      <Route
+        path="/scorer"
+        element={
+          <RoleGuard allowedRoles={['SUPER_ADMIN', 'ORGANIZER', 'SCORER']}>
+            <ScorerDashboardPage />
+          </RoleGuard>
+        }
+      />
       <Route
         path="/admin"
         element={

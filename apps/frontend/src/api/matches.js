@@ -56,5 +56,7 @@ export const matchesApi = {
     apiClient('/api/matches/seed-knockout', { method: 'POST' }),
   getBracket: (tournamentId) =>
     apiClient(`/api/matches/bracket${tournamentId ? `?tournament_id=${tournamentId}` : ''}`),
+  getAssignedMatches: () =>
+    apiClient('/api/scorer/matches'),
 };
 

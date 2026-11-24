@@ -74,7 +74,19 @@ async def _to_out(match: Match) -> MatchOut:
     score1, score2 = await compute_score(match)
     winner_id = await get_match_winner(match) if match.status == "full_time" else None
     group_name = groups[match.group_id].name if match.group_id in groups else None
-    return match_to_out(match, teams, score1, score2, winner_id, group_name)
+    tournament = await Tournament.get(match.tournament_id) if match.tournament_id else None
+    t_name = tournament.name if tournament else None
+    t_slug = tournament.slug if tournament else None
+    return match_to_out(
+        match,
+        teams,
+        score1,
+        score2,
+        winner_id,
+        group_name,
+        tournament_name=t_name,
+        tournament_slug=t_slug,
+    )
 
 
 async def _list_matches(
@@ -101,12 +113,26 @@ async def _list_matches(
     teams = await _teams_map(*matches)
     groups = await _groups_map()
     scores_and_winners = await compute_scores_and_winners(matches)
+    tournament_ids = {m.tournament_id for m in matches if m.tournament_id}
+    tournaments = {t.id: t for t in await Tournament.find({"_id": {"$in": list(tournament_ids)}}).to_list()}
 
     out = []
     for m in matches:
         score1, score2, winner_id = scores_and_winners[m.id]
         group_name = groups[m.group_id].name if m.group_id in groups else None
-        out.append(match_to_out(m, teams, score1, score2, winner_id, group_name))
+        t = tournaments.get(m.tournament_id)
+        out.append(
+            match_to_out(
+                m,
+                teams,
+                score1,
+                score2,
+                winner_id,
+                group_name,
+                tournament_name=t.name if t else None,
+                tournament_slug=t.slug if t else None,
+            )
+        )
     return out
 
 
@@ -184,7 +210,7 @@ async def update_match(
     for field, value in changes.items():
         setattr(match, field, value)
     await match.save()
-    await broadcast({"type": "match_updated", "match_id": str(match.id)})
+    await broadcast({"type": "match_updated", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return await _to_out(match)
 
 
@@ -290,19 +316,17 @@ async def reset_match_timer(
 
 
 @router.post("/{match_id}/cancel", response_model=MatchOut)
-async def cancel(match_id: str, admin: User = Depends(get_current_admin)) -> MatchOut:
-    """Cancel a not-yet-started match. Only valid while status is 'upcoming'."""
-    match = await get_match_or_404(PydanticObjectId(match_id))
-    await check_tournament_ownership(admin, match.tournament_id)
+async def cancel(match_id: str, user: User = Depends(get_current_user)) -> MatchOut:
+    """Cancel a not-yet-started match. Only valid while status is 'upcoming'. Authorized match operator only."""
+    match = await check_match_operator(user, match_id)
     match = await cancel_match(match)
     return await _to_out(match)
 
 
 @router.post("/{match_id}/uncancel", response_model=MatchOut)
-async def uncancel(match_id: str, admin: User = Depends(get_current_admin)) -> MatchOut:
-    """Revert a cancelled match back to 'upcoming'."""
-    match = await get_match_or_404(PydanticObjectId(match_id))
-    await check_tournament_ownership(admin, match.tournament_id)
+async def uncancel(match_id: str, user: User = Depends(get_current_user)) -> MatchOut:
+    """Revert a cancelled match back to 'upcoming'. Authorized match operator only."""
+    match = await check_match_operator(user, match_id)
     match = await uncancel_match(match)
     return await _to_out(match)
 

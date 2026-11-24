@@ -76,12 +76,16 @@ def match_to_out(
     score2: int,
     winner_id=None,
     group_name: Optional[str] = None,
+    tournament_name: Optional[str] = None,
+    tournament_slug: Optional[str] = None,
 ) -> MatchOut:
     team1 = teams.get(match.team1_id)
     team2 = teams.get(match.team2_id)
     return MatchOut(
         id=str(match.id),
         tournament_id=str(match.tournament_id),
+        tournament_name=tournament_name,
+        tournament_slug=tournament_slug,
         match_number=match.match_number,
         group_id=str(match.group_id) if match.group_id else None,
         group_name=group_name,
@@ -96,19 +100,16 @@ def match_to_out(
         notes=match.notes,
         team1_id=str(match.team1_id) if match.team1_id else None,
         team1_name=team1.name if team1 else None,
+        team1_crest_url=(team1.crest_url or team1.logo_url) if team1 else None,
         team2_id=str(match.team2_id) if match.team2_id else None,
         team2_name=team2.name if team2 else None,
+        team2_crest_url=(team2.crest_url or team2.logo_url) if team2 else None,
         status=match.status,
         score1=score1,
         score2=score2,
         winner_id=str(winner_id) if winner_id else None,
         started_at=match.started_at,
         ended_at=match.ended_at,
-        # Plain attribute access, not getattr(..., default) — Beanie/Pydantic
-        # already apply the model's field defaults (False / None) when loading
-        # a document saved before these fields existed, so the defensive
-        # getattr was redundant (verified against the dev database's
-        # pre-Timer-feature match documents during the Timer/Half-Time audit).
         is_half_time=match.is_half_time,
         elapsed_seconds=match.elapsed_seconds,
         assigned_scorer_ids=[str(sid) for sid in (getattr(match, "assigned_scorer_ids", None) or [])],
