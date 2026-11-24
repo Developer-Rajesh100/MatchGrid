@@ -7,6 +7,7 @@ from app.core.deps import check_tournament_ownership, get_current_admin
 from app.core.errors import ConflictError, ForbiddenError, NotFoundError, ValidationAppError
 from app.core.security import hash_password
 from app.models import Group, Match, Player, Team, Tournament, User, UserRole
+from app.models.tournament import TournamentConfig
 from app.routers.matches import _to_out
 from app.schemas.auth import ScorerCreate, UserOut
 from app.schemas.match import AssignScorerRequest, MatchOut
@@ -45,6 +46,8 @@ def _to_tournament_out(t: Tournament) -> TournamentOut:
         slug=t.slug,
         status=t.status,
         logo_url=t.logo_url,
+        banner_url=t.banner_url,
+        config=t.config,
     )
 
 
@@ -69,19 +72,25 @@ async def create_tournament(
         slug = f"{base_slug}-{counter}"
         counter += 1
 
+    config = payload.config or TournamentConfig()
+
     t = Tournament(
         name=payload.name,
         season=payload.season,
-        format_description=payload.format_description or "2 groups of 3 teams, top 2 advance to semi-finals",
+        format_description=payload.format_description or f"{config.num_groups} groups of {config.teams_per_group} teams",
         organizer_id=admin.id,
         slug=slug,
         status="ACTIVE",
         logo_url=payload.logo_url,
+        banner_url=payload.banner_url,
+        config=config,
     )
     await t.insert()
 
-    # Pre-create Groups A and B
-    for gname in ("A", "B"):
+    # Pre-create Groups dynamically based on config.num_groups (A, B, C, D...)
+    num_groups = config.num_groups if config else 2
+    for i in range(num_groups):
+        gname = chr(ord("A") + i)
         await Group(tournament_id=t.id, name=gname).insert()
 
     return _to_tournament_out(t)

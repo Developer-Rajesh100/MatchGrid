@@ -97,12 +97,35 @@ export function NavBar() {
             {isAdmin ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <NavLink
-                  to={role === 'SCORER' ? '/scorer' : '/admin'}
+                  to={
+                    role === 'SUPER_ADMIN'
+                      ? '/superadmin'
+                      : role === 'ORGANIZER'
+                      ? '/organizer'
+                      : role === 'SCORER'
+                      ? '/scorer'
+                      : '/admin'
+                  }
                   className={({ isActive }) =>
                     `btn btn-sm ${isActive ? 'btn-primary' : 'btn-outline'}`
                   }
                 >
-                  <Lock size={12} /> {role === 'SCORER' ? 'Scorer' : 'Admin'}
+                  {role === 'SUPER_ADMIN' ? (
+                    <Shield size={12} />
+                  ) : role === 'ORGANIZER' ? (
+                    <Trophy size={12} />
+                  ) : role === 'SCORER' ? (
+                    <Activity size={12} />
+                  ) : (
+                    <Lock size={12} />
+                  )}{' '}
+                  {role === 'SUPER_ADMIN'
+                    ? 'Superadmin'
+                    : role === 'ORGANIZER'
+                    ? 'Organizer'
+                    : role === 'SCORER'
+                    ? 'Scorer'
+                    : 'Admin'}
                 </NavLink>
                 <button
                   onClick={handleLogout}
@@ -115,11 +138,11 @@ export function NavBar() {
               </div>
             ) : (
               <NavLink
-                to="/admin/login"
+                to="/login"
                 className="btn btn-sm btn-outline"
                 style={{ fontSize: '12px', padding: '5px 12px' }}
               >
-                <Lock size={12} /> Admin
+                <Lock size={12} /> Portal Login
               </NavLink>
             )}
 
@@ -181,12 +204,35 @@ export function NavBar() {
             {isAdmin ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <NavLink
-                  to={role === 'SCORER' ? '/scorer' : '/admin'}
+                  to={
+                    role === 'SUPER_ADMIN'
+                      ? '/superadmin'
+                      : role === 'ORGANIZER'
+                      ? '/organizer'
+                      : role === 'SCORER'
+                      ? '/scorer'
+                      : '/admin'
+                  }
                   className="btn btn-primary"
-                  style={{ width: '100%' }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  <Lock size={14} /> {role === 'SCORER' ? 'Scorer Cockpit' : 'Admin Dashboard'}
+                  {role === 'SUPER_ADMIN' ? (
+                    <Shield size={14} />
+                  ) : role === 'ORGANIZER' ? (
+                    <Trophy size={14} />
+                  ) : role === 'SCORER' ? (
+                    <Activity size={14} />
+                  ) : (
+                    <Lock size={14} />
+                  )}{' '}
+                  {role === 'SUPER_ADMIN'
+                    ? 'Superadmin Console'
+                    : role === 'ORGANIZER'
+                    ? 'Organizer Workspace'
+                    : role === 'SCORER'
+                    ? 'Scorer Cockpit'
+                    : 'Admin Dashboard'}
                 </NavLink>
                 <button
                   onClick={handleLogout}
@@ -198,12 +244,12 @@ export function NavBar() {
               </div>
             ) : (
               <NavLink
-                to="/admin/login"
+                to="/login"
                 className="btn btn-outline"
                 style={{ width: '100%' }}
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <Lock size={14} /> Admin Portal Login
+                <Lock size={14} /> Portal Login
               </NavLink>
             )}
           </div>

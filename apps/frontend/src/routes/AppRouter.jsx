@@ -14,6 +14,9 @@ import { TeamDetailPage } from '../pages/TeamDetailPage';
 import { PlayersPage } from '../pages/PlayersPage';
 import { PlayerDetailPage } from '../pages/PlayerDetailPage';
 import { AdminLoginPage } from '../pages/admin/AdminLoginPage';
+import { UnifiedLoginPage } from '../pages/auth/UnifiedLoginPage';
+import { SuperadminDashboardPage } from '../pages/superadmin/SuperadminDashboardPage';
+import { OrganizerWorkspacePage } from '../pages/organizer/OrganizerWorkspacePage';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { AdminLiveControlPage } from '../pages/admin/AdminLiveControlPage';
 import { ScorerDashboardPage } from '../pages/scorer/ScorerDashboardPage';
@@ -45,7 +48,28 @@ export function AppRouter() {
       <Route path="/teams/:teamId" element={<TeamDetailPage />} />
       <Route path="/players" element={<PlayersPage />} />
       <Route path="/players/:playerId" element={<PlayerDetailPage />} />
+
+      {/* Authentication */}
+      <Route path="/login" element={<UnifiedLoginPage />} />
       <Route path="/admin/login" element={<AdminLoginPage />} />
+
+      {/* Role-Based Portals */}
+      <Route
+        path="/superadmin"
+        element={
+          <RoleGuard allowedRoles={['SUPER_ADMIN']}>
+            <SuperadminDashboardPage />
+          </RoleGuard>
+        }
+      />
+      <Route
+        path="/organizer"
+        element={
+          <RoleGuard allowedRoles={['SUPER_ADMIN', 'ORGANIZER']}>
+            <OrganizerWorkspacePage />
+          </RoleGuard>
+        }
+      />
       <Route
         path="/scorer"
         element={
@@ -54,6 +78,16 @@ export function AppRouter() {
           </RoleGuard>
         }
       />
+      <Route
+        path="/scorer/matches/:matchId/live"
+        element={
+          <RoleGuard allowedRoles={['SUPER_ADMIN', 'ORGANIZER', 'SCORER']}>
+            <AdminLiveControlPage />
+          </RoleGuard>
+        }
+      />
+
+      {/* Legacy Admin Routes (Maintained for Backward Compatibility) */}
       <Route
         path="/admin"
         element={

@@ -32,6 +32,9 @@ async def list_users(_admin: User = Depends(require_superadmin)) -> list[UserOut
     return [_to_user_out(u) for u in users]
 
 
+from pymongo.errors import DuplicateKeyError
+
+
 @router.post("/organizers", response_model=UserOut, status_code=201)
 async def create_organizer(
     payload: OrganizerCreate, admin: User = Depends(require_superadmin)
@@ -40,16 +43,22 @@ async def create_organizer(
     if existing:
         raise ConflictError(f"Username '{payload.username}' is already in use")
 
+    clean_email = payload.email.strip() if payload.email and payload.email.strip() else None
+    clean_org = payload.organization_name.strip() if payload.organization_name and payload.organization_name.strip() else None
+
     user = User(
         username=payload.username,
-        email=payload.email,
+        email=clean_email,
         password_hash=hash_password(payload.password),
         role=UserRole.ORGANIZER,
-        organization_name=payload.organization_name,
+        organization_name=clean_org,
         created_by=admin.id,
         is_active=True,
     )
-    await user.insert()
+    try:
+        await user.insert()
+    except DuplicateKeyError as exc:
+        raise ConflictError(f"A user with username '{payload.username}' or email already exists") from exc
     return _to_user_out(user)
 
 
@@ -125,3 +134,14 @@ async def delete_user(user_id: str, admin: User = Depends(require_superadmin)) -
         raise ValidationAppError("Cannot delete your own account")
 
     await user.delete()
+
+
+@router.delete("/tournaments/{tournament_id}", status_code=204)
+async def delete_any_tournament(
+    tournament_id: str, admin: User = Depends(require_superadmin)
+) -> None:
+    """Superadmin can permanently delete any tournament on the platform with cascade cleanup."""
+    from app.routers.organizer import delete_tournament as org_delete_tournament
+
+    await org_delete_tournament(tournament_id, admin)
+

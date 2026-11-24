@@ -9,7 +9,7 @@ from app.models import Player, Team, User
 from app.schemas.player import PlayerCreate, PlayerDetailOut, PlayerOut, PlayerUpdate
 from app.services.players import create_player, delete_player, get_player_detail, update_player
 from app.services.serializers import player_to_out
-from app.services.tournament_scope import get_active_tournament_id
+from app.services.tournament_scope import get_active_tournament_id, resolve_tournament_id
 
 router = APIRouter(prefix="/players", tags=["players"])
 
@@ -29,9 +29,13 @@ async def _resolve_player_tournament_id(player: Player) -> Optional[PydanticObje
 
 
 @router.get("", response_model=list[PlayerOut])
-async def list_players(team_id: Optional[str] = Query(default=None)) -> list[PlayerOut]:
-    tournament_id = await get_active_tournament_id()
-    teams = {t.id: t for t in await Team.find(Team.tournament_id == tournament_id).to_list()}
+async def list_players(
+    team_id: Optional[str] = Query(default=None),
+    tournament_id: Optional[str] = Query(default=None),
+    tournament_slug: Optional[str] = Query(default=None),
+) -> list[PlayerOut]:
+    resolved_tid = await resolve_tournament_id(tournament_id, tournament_slug)
+    teams = {t.id: t for t in await Team.find(Team.tournament_id == resolved_tid).to_list()}
 
     if team_id:
         tid = PydanticObjectId(team_id)

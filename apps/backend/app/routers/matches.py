@@ -378,31 +378,40 @@ async def generate_fixtures(
 
 
 @router.post("/generate-semis", response_model=list[MatchOut])
-async def do_generate_semis(admin: User = Depends(get_current_admin)) -> list[MatchOut]:
+async def do_generate_semis(
+    tournament_id: Optional[str] = Query(default=None),
+    admin: User = Depends(get_current_admin),
+) -> list[MatchOut]:
     """Seed the 2 semi-finals from final group standings: SF1 = A2 vs B1, SF2 = B2 vs A1.
     Requires both groups fully complete and no semis generated yet."""
-    tournament_id = await get_active_tournament_id()
-    await check_tournament_ownership(admin, tournament_id)
-    matches = await generate_semis(tournament_id)
+    tid = await resolve_tournament_id(tournament_id)
+    await check_tournament_ownership(admin, tid)
+    matches = await generate_semis(tid)
     return [await _to_out(m) for m in matches]
 
 
 @router.post("/generate-final", response_model=MatchOut)
-async def do_generate_final(admin: User = Depends(get_current_admin)) -> MatchOut:
+async def do_generate_final(
+    tournament_id: Optional[str] = Query(default=None),
+    admin: User = Depends(get_current_admin),
+) -> MatchOut:
     """Seed the final from the two semi-final winners. Requires both semis
     completed with a decided winner (score or manual override)."""
-    tournament_id = await get_active_tournament_id()
-    await check_tournament_ownership(admin, tournament_id)
-    match = await generate_final(tournament_id)
+    tid = await resolve_tournament_id(tournament_id)
+    await check_tournament_ownership(admin, tid)
+    match = await generate_final(tid)
     return await _to_out(match)
 
 
 @router.post("/seed-knockout", response_model=list[MatchOut])
-async def do_seed_knockout(admin: User = Depends(get_current_admin)) -> list[MatchOut]:
+async def do_seed_knockout(
+    tournament_id: Optional[str] = Query(default=None),
+    admin: User = Depends(get_current_admin),
+) -> list[MatchOut]:
     """Universal knockout seeder: seeds Quarters, Semis, or crowns Champion based on tournament config."""
-    tournament_id = await get_active_tournament_id()
-    await check_tournament_ownership(admin, tournament_id)
-    matches = await seed_knockout_bracket(tournament_id)
+    tid = await resolve_tournament_id(tournament_id)
+    await check_tournament_ownership(admin, tid)
+    matches = await seed_knockout_bracket(tid)
     return [await _to_out(m) for m in matches]
 
 

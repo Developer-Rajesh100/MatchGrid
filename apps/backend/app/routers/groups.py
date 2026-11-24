@@ -38,9 +38,13 @@ async def list_groups(
 
 
 @router.post("/random-draw", response_model=list[GroupWithTeamsOut])
-async def do_random_draw(admin: User = Depends(get_current_admin)) -> list[GroupWithTeamsOut]:
-    """Shuffle all teams randomly into Group A / Group B (3 each)."""
-    tournament_id = await get_active_tournament_id()
-    await check_tournament_ownership(admin, tournament_id)
-    await random_draw(tournament_id)
-    return await _groups_with_teams()
+async def do_random_draw(
+    tournament_id: Optional[str] = Query(default=None),
+    admin: User = Depends(get_current_admin),
+) -> list[GroupWithTeamsOut]:
+    """Shuffle all teams randomly into groups."""
+    tid = await resolve_tournament_id(tournament_id)
+    await check_tournament_ownership(admin, tid)
+    await random_draw(tid)
+    return await _groups_with_teams(str(tid))
+
