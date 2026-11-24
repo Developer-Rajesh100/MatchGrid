@@ -15,8 +15,8 @@
 | :---: | :--- | :--- | :--- | :---: |
 | **Phase 0** | **Monorepo, Docker & Rebranding** | Bun workspace monorepo, MongoDB 7 Docker, MatchGrid brand tokens (`index.css`), Playwright setup, empty DB seed slate. | Pytest (253) + Vitest (34) + Build + E2E (7) | **COMPLETED** |
 | **Phase 1** | **4-Tier RBAC & Multi-Tenancy** | Unified `User` model (`SUPER_ADMIN`, `ORGANIZER`, `SCORER`), `Tournament.organizer_id` & `slug`, compound indexes, `Match.assigned_scorer_ids`, migration `m0005`, FastAPI RBAC guards. | Pytest (259) + Vitest (38) + Build + Playwright (8) | **COMPLETED** |
-| **Phase 2** | **Cloudflare R2 Media Storage** | S3-compatible `boto3` R2 client, MIME/size validation, upload & cleanup API (`/api/uploads/image`), R2 image rendering for Tournaments, Teams & Players, React upload UI. | Pytest R2 mocks + Vitest uploader + Playwright image flow | **READY TO START** |
-| **Phase 3** | **Dynamic Tournament Engine** | Configurable `TournamentConfig`, circle-method round-robin scheduler, dynamic knockout seeding (Semis/Quarters/R16), penalty shootout winner overrides. | Pytest tournament matrix + Vitest bracket + E2E engine | **PLANNED** |
+| **Phase 2** | **Cloudflare R2 Media Storage** | S3-compatible `boto3` R2 client, MIME/size validation, upload & cleanup API (`/api/uploads/image`), R2 image rendering for Tournaments, Teams & Players, React upload UI. | Pytest (272) + Vitest (45) + Build + Playwright (9) | **COMPLETED** |
+| **Phase 3** | **Dynamic Tournament Engine** | Configurable `TournamentConfig`, circle-method round-robin scheduler, dynamic knockout seeding (Semis/Quarters/R16), penalty shootout winner overrides. | Pytest tournament matrix + Vitest bracket + E2E engine | **READY TO START** |
 | **Phase 4** | **Room WebSockets & Scorer Console** | Room-partitioned `ConnectionManager` (`/ws/live?tournament_id=...`), scorer match scoping (`GET /api/scorer/matches`), `require_match_operator` live clock & event locks. | Pytest WS rooms + Vitest ticker + Playwright multi-tab live sync | **PLANNED** |
 | **Phase 5** | **Public Two-Tier UI & Bracket Tree** | Global Discovery Header + `/t/:slug/*` Context Sub-Navbar + mobile drawer, Tournament Hub (`/`), Match Center, Standings, Visual Knockout Bracket Tree, R2 Media squads. | Vitest components + Playwright public browsing | **PLANNED** |
 | **Phase 6** | **Dedicated Role Portals** | Superadmin Command Center (`/superadmin`), Organizer Workspace (`/organizer`), Scorer Cockpit (`/scorer`) + Live Match Console, unified role-based `/login`. | Vitest portals + Playwright multi-role full lifecycle | **PLANNED** |
@@ -140,7 +140,7 @@ flowchart TD
 
 ---
 
-### Phase 2: Cloudflare R2 Media Storage & Asset Upload Pipeline
+### Phase 2: Cloudflare R2 Media Storage & Asset Upload Pipeline (COMPLETED)
 
 #### Objective
 Integrate an industry-standard, zero-cost cloud asset hosting pipeline using Cloudflare R2 (S3-compatible API) to support image uploads, thumbnail generation/fallbacks, and automatic deletion of replaced or orphaned media.
@@ -221,7 +221,7 @@ flowchart LR
 
 ---
 
-### Phase 3: Dynamic Tournament, Group Draw & Knockout Bracket Engine
+### Phase 3: Dynamic Tournament, Group Draw & Knockout Bracket Engine (READY TO START)
 
 #### Objective
 Replace hardcoded 6-team / 2-group logic with a generalized tournament engine supporting configurable group sizes, circle-method round-robin fixture generation, customizable points rules, and dynamic knockout bracket progression (Quarter-Finals $\to$ Semi-Finals $\to$ Final).
