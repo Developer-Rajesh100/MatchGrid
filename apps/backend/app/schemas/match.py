@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.match_event import MatchEventOut
 
-Stage = Literal["group", "semi", "final", "extra"]
+Stage = Literal["group", "quarter", "semi", "final", "extra"]
 MatchStatus = Literal["upcoming", "live", "full_time", "cancelled"]
 
 
@@ -17,6 +17,8 @@ class MatchOut(BaseModel):
     group_name: Optional[str] = None
     stage: Stage
     label: Optional[str] = None
+    bracket_slot: Optional[str] = None
+    round_order: Optional[int] = None
     date: Optional[str] = None
     time: Optional[str] = None
     venue: Optional[str] = None
@@ -109,4 +111,50 @@ class MatchDetailOut(MatchOut):
 
 class AssignScorerRequest(BaseModel):
     scorer_id: str = Field(pattern=r"^[0-9a-fA-F]{24}$")
+
+
+class BracketTeamNode(BaseModel):
+    id: str
+    name: str
+    crest_url: Optional[str] = None
+    seed: Optional[str] = None
+
+
+class BracketMatchNode(BaseModel):
+    bracket_slot: str  # "QF1", "SF1", "FINAL"
+    match_id: Optional[str] = None
+    match_number: Optional[int] = None
+    stage: str
+    label: Optional[str] = None
+    team1: Optional[BracketTeamNode] = None
+    team2: Optional[BracketTeamNode] = None
+    score1: int = 0
+    score2: int = 0
+    winner_id: Optional[str] = None
+    status: MatchStatus = "upcoming"
+    notes: Optional[str] = None
+
+
+class BracketRoundNode(BaseModel):
+    round_order: int
+    round_name: str  # "Quarter-finals", "Semi-finals", "Final"
+    matches: list[BracketMatchNode] = []
+
+
+class BracketChampionNode(BaseModel):
+    team_id: str
+    name: str
+    crest_url: Optional[str] = None
+
+
+class BracketTreeOut(BaseModel):
+    tournament_id: str
+    knockout_format: str
+    rounds: list[BracketRoundNode] = []
+    champion: Optional[BracketChampionNode] = None
+
+
+class SeedKnockoutRequest(BaseModel):
+    target_stage: Optional[Literal["quarter", "semi", "final"]] = None
+
 

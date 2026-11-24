@@ -7,7 +7,7 @@ from pymongo import IndexModel
 
 # "extra" = admin-created additional match (e.g. a friendly). It never affects group
 # standings, the tournament stage, or the tournament player statistics.
-Stage = Literal["group", "semi", "final", "extra"]
+Stage = Literal["group", "quarter", "semi", "final", "extra"]
 # "upcoming"/"full_time" are the reference prototype's terms for "scheduled"/"completed"
 # (see docs/PROJECT_ANALYSIS.md §6) — kept as-is rather than renamed, to avoid a disruptive
 # rename across code/docs already built on them. "cancelled" is new in Part 5.
@@ -20,6 +20,8 @@ class Match(Document):
     group_id: Optional[PydanticObjectId] = None  # set for stage="group", null for knockouts
     stage: Stage
     label: Optional[str] = None  # e.g. "Semi-final 1", "Final"; null for group matches
+    bracket_slot: Optional[str] = None  # e.g. "QF1", "QF2", "QF3", "QF4", "SF1", "SF2", "FINAL"
+    round_order: Optional[int] = None  # 1 for quarter, 2 for semi, 3 for final (or 1 for semi, 2 for final)
     date: Optional[str] = None  # "YYYY-MM-DD"
     time: Optional[str] = None  # "HH:MM"
     venue: Optional[str] = None

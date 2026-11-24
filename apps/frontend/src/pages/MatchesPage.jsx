@@ -4,6 +4,7 @@ import { matchesApi } from '../api/matches';
 import { MatchRow } from '../components/match/MatchRow';
 import { LoadingState, ErrorState, EmptyState } from '../components/common/Common';
 import { useLiveSocket } from '../hooks/useLiveSocket';
+import TournamentBracket from '../components/bracket/TournamentBracket';
 
 export function MatchesPage() {
   const [matches, setMatches] = useState([]);
@@ -88,6 +89,13 @@ export function MatchesPage() {
         >
           Final
         </button>
+        <button
+          className={`sub-tab ${filterStage === 'bracket' ? 'active' : ''}`}
+          onClick={() => { setFilterStage('bracket'); setFilterStatus('all'); }}
+          data-testid="tab-bracket"
+        >
+          🏆 Bracket
+        </button>
         {matches.some((m) => m.stage === 'extra') && (
           <button
             className={`sub-tab ${filterStage === 'extra' && filterStatus === 'all' ? 'active' : ''}`}
@@ -108,6 +116,8 @@ export function MatchesPage() {
         <LoadingState message="Loading match schedule..." />
       ) : error ? (
         <ErrorState message={error} onRetry={fetchMatches} />
+      ) : filterStage === 'bracket' ? (
+        <TournamentBracket refreshTrigger={matches.length} />
       ) : filterStage === 'all' && filterStatus === 'all' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '26px' }}>
           {/* Group A */}

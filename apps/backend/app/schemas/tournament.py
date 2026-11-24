@@ -2,6 +2,19 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from app.models.tournament import KnockoutFormat, TournamentConfig
+
+
+class TournamentConfigUpdate(BaseModel):
+    num_groups: Optional[int] = Field(default=None, ge=1, le=16)
+    teams_per_group: Optional[int] = Field(default=None, ge=2, le=32)
+    qualifiers_per_group: Optional[int] = Field(default=None, ge=0, le=16)
+    knockout_format: Optional[KnockoutFormat] = None
+    points_win: Optional[int] = Field(default=None, ge=0, le=10)
+    points_draw: Optional[int] = Field(default=None, ge=0, le=10)
+    points_loss: Optional[int] = Field(default=None, ge=0, le=10)
+    half_duration_minutes: Optional[int] = Field(default=None, ge=5, le=90)
+
 
 class TournamentOut(BaseModel):
     id: str
@@ -14,6 +27,7 @@ class TournamentOut(BaseModel):
     slug: Optional[str] = None
     status: Optional[str] = "ACTIVE"
     logo_url: Optional[str] = None
+    config: Optional[TournamentConfig] = None
 
 
 class TournamentCreate(BaseModel):
@@ -22,6 +36,7 @@ class TournamentCreate(BaseModel):
     format_description: Optional[str] = "2 groups of 3 teams, top 2 advance to semi-finals"
     slug: Optional[str] = None
     logo_url: Optional[str] = None
+    config: Optional[TournamentConfig] = None
 
 
 class TournamentUpdate(BaseModel):
@@ -30,3 +45,5 @@ class TournamentUpdate(BaseModel):
     format_description: Optional[str] = None
     status: Optional[str] = None
     logo_url: Optional[str] = None
+    config: Optional[TournamentConfig] = None
+

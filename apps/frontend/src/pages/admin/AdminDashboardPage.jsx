@@ -410,6 +410,20 @@ export function AdminDashboardPage() {
     }
   };
 
+  const handleSeedKnockout = async () => {
+    if (!window.confirm('Seed knockout stage based on tournament format?')) return;
+    try {
+      setActionLoading(true);
+      await matchesApi.seedKnockout();
+      showSuccess('Knockout bracket matches seeded successfully!');
+      await loadAll();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleRandomDraw = async () => {
     if (!window.confirm('Perform random draw across groups? This alters group rosters!')) return;
     try {
@@ -914,6 +928,16 @@ export function AdminDashboardPage() {
                 </p>
                 <button className="btn btn-success btn-sm" onClick={handleGenerateFinal} disabled={actionLoading}>
                   Seed Final Match
+                </button>
+              </div>
+
+              <div style={{ padding: '14px', borderRadius: '8px', background: 'var(--panel-alt)', border: '1px solid var(--line)' }}>
+                <div style={{ fontWeight: 600, marginBottom: '4px' }}>3. Dynamic Knockout Seeder</div>
+                <p style={{ fontSize: '12.5px', color: 'var(--chalk-dim)', marginBottom: '10px' }}>
+                  Seeds Quarter-finals, Semi-finals, or crowns League Champion based on configured tournament format.
+                </p>
+                <button className="btn btn-warning btn-sm" onClick={handleSeedKnockout} disabled={actionLoading} data-testid="btn-seed-knockout">
+                  ⚡ Seed Knockout Stage
                 </button>
               </div>
             </div>

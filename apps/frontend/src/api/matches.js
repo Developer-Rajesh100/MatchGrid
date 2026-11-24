@@ -52,4 +52,9 @@ export const matchesApi = {
     apiClient('/api/groups'),
   randomGroupDraw: () =>
     apiClient('/api/groups/random-draw', { method: 'POST' }),
+  seedKnockout: () =>
+    apiClient('/api/matches/seed-knockout', { method: 'POST' }),
+  getBracket: (tournamentId) =>
+    apiClient(`/api/matches/bracket${tournamentId ? `?tournament_id=${tournamentId}` : ''}`),
 };
+

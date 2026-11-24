@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
 from app.core.deps import check_tournament_ownership, get_current_admin
-from app.models import Tournament, User
-from app.schemas.tournament import TournamentOut, TournamentUpdate
+from app.models import Tournament, TournamentConfig, User
+from app.schemas.tournament import TournamentConfigUpdate, TournamentOut, TournamentUpdate
 from app.services.tournament_scope import get_active_tournament
 
 router = APIRouter(prefix="/tournament", tags=["tournament"])
@@ -20,6 +20,7 @@ def _to_out(t: Tournament) -> TournamentOut:
         slug=t.slug,
         status=t.status,
         logo_url=t.logo_url,
+        config=getattr(t, "config", None) or TournamentConfig(),
     )
 
 
@@ -35,6 +36,26 @@ async def update_tournament(
     tournament = await get_active_tournament()
     await check_tournament_ownership(admin, tournament.id)
     for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(tournament, field, value)
+        if field == "config" and value is not None:
+            tournament.config = TournamentConfig(**value)
+        else:
+            setattr(tournament, field, value)
     await tournament.save()
     return _to_out(tournament)
+
+
+@router.patch("/config", response_model=TournamentOut)
+async def update_tournament_config(
+    payload: TournamentConfigUpdate, admin: User = Depends(get_current_admin)
+) -> TournamentOut:
+    tournament = await get_active_tournament()
+    await check_tournament_ownership(admin, tournament.id)
+    current_config = getattr(tournament, "config", None) or TournamentConfig()
+    config_dict = current_config.model_dump()
+    for field, val in payload.model_dump(exclude_unset=True).items():
+        if val is not None:
+            config_dict[field] = val
+    tournament.config = TournamentConfig(**config_dict)
+    await tournament.save()
+    return _to_out(tournament)
+

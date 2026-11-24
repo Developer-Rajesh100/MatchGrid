@@ -7,7 +7,7 @@ from app.models.match_lineup import MatchLineup
 from app.models.player import Player
 from app.models.player_statistics import PlayerStatistics
 from app.models.team import Team
-from app.models.tournament import Tournament
+from app.models.tournament import Tournament, TournamentConfig
 from app.models.tournament_standing import TournamentStanding
 from app.models.user import User, UserRole
 
@@ -31,6 +31,7 @@ __all__ = [
     "User",
     "UserRole",
     "Tournament",
+    "TournamentConfig",
     "Team",
     "Group",
     "GroupTeam",
