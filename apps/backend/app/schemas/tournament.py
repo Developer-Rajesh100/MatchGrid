@@ -27,6 +27,7 @@ class TournamentOut(BaseModel):
     slug: Optional[str] = None
     status: Optional[str] = "ACTIVE"
     logo_url: Optional[str] = None
+    banner_url: Optional[str] = None
     config: Optional[TournamentConfig] = None
 
 
@@ -39,6 +40,7 @@ class TournamentSummaryOut(BaseModel):
     stage: str
     status: str = "ACTIVE"
     logo_url: Optional[str] = None
+    banner_url: Optional[str] = None
     organizer_id: Optional[str] = None
     organizer_name: Optional[str] = None
     organization_name: Optional[str] = None
@@ -57,6 +59,7 @@ class TournamentCreate(BaseModel):
     format_description: Optional[str] = "2 groups of 3 teams, top 2 advance to semi-finals"
     slug: Optional[str] = None
     logo_url: Optional[str] = None
+    banner_url: Optional[str] = None
     config: Optional[TournamentConfig] = None
 
 
@@ -66,5 +69,7 @@ class TournamentUpdate(BaseModel):
     format_description: Optional[str] = None
     status: Optional[str] = None
     logo_url: Optional[str] = None
+    banner_url: Optional[str] = None
     config: Optional[TournamentConfig] = None
+
 

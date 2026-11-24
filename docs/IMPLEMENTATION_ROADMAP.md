@@ -18,8 +18,8 @@
 | **Phase 2** | **Cloudflare R2 Media Storage** | S3-compatible `boto3` R2 client, MIME/size validation, upload & cleanup API (`/api/uploads/image`), R2 image rendering for Tournaments, Teams & Players, React upload UI. | Pytest (272) + Vitest (45) + Build + Playwright (9) | **COMPLETED** |
 | **Phase 3** | **Dynamic Tournament Engine** | Configurable `TournamentConfig`, circle-method round-robin scheduler, dynamic knockout seeding (Semis/Quarters/R16), penalty shootout winner overrides. | Pytest (284) + Vitest (50) + Build + Playwright (10) | **COMPLETED** |
 | **Phase 4** | **Room WebSockets & Scorer Console** | Room-partitioned `ConnectionManager` (`/ws/live?tournament_id=...`), scorer match scoping (`GET /api/scorer/matches`), 12-endpoint mutation lock matrix, Scorer Cockpit UI. | Pytest (289) + Vitest (58) + Build + Playwright (11) | **COMPLETED** |
-| **Phase 5** | **Public Two-Tier UI & Bracket Tree** | Global Discovery Header + `/t/:slug/*` Context Sub-Navbar + mobile drawer, Tournament Hub (`/`), Match Center, Standings, Visual Knockout Bracket Tree, R2 Media squads. | Vitest components + Playwright public browsing | **READY TO START** |
-| **Phase 6** | **Dedicated Role Portals** | Superadmin Command Center (`/superadmin`), Organizer Workspace (`/organizer`), Scorer Cockpit (`/scorer`) + Live Match Console, unified role-based `/login`. | Vitest portals + Playwright multi-role full lifecycle | **PLANNED** |
+| **Phase 5** | **Public Two-Tier UI & Bracket Tree** | Global Discovery Header + `/t/:slug/*` Context Sub-Navbar + mobile drawer, Tournament Hub (`/`), Match Center, Standings, Visual Knockout Bracket Tree, R2 Media squads. | Pytest (292) + Vitest (69) + Build + Playwright (12) | **COMPLETED** |
+| **Phase 6** | **Dedicated Role Portals** | Superadmin Command Center (`/superadmin`), Organizer Workspace (`/organizer`), Scorer Cockpit (`/scorer`) + Live Match Console, unified role-based `/login`. | Pytest (296) + Vitest (79) + Build + Playwright (13) | **COMPLETED** |
 | **Phase 7** | **CI/CD Hardening & Cloud Launch** | Complete E2E regression suite, GitHub Actions CI matrix, production safety checks (`production_safety.py`), deployment to Atlas (M0) + Render + Vercel + R2. | `bun run test:all` (100% pass) + Cloud smoke checks | **PLANNED** |
 
 ---
@@ -304,7 +304,7 @@ flowchart TD
 
 ---
 
-### Phase 4: Room-Scoped WebSockets & Scoped Live Match Console
+### Phase 4: Room-Scoped WebSockets & Scoped Live Match Console (COMPLETED)
 
 #### Objective
 Partition real-time WebSocket traffic by `tournament_id` so live match updates, clock ticks, and standings changes broadcast strictly to clients viewing that tournament. Lock down live match scoring so Scorers can only operate their assigned fixtures.
@@ -468,7 +468,7 @@ Build the public-facing user interface featuring a global discovery directory, a
 
 ---
 
-### Phase 6: Role-Based Portals (`/superadmin`, `/organizer`, `/scorer`)
+### Phase 6: Role-Based Portals (`/superadmin`, `/organizer`, `/scorer`) (COMPLETED)
 
 #### Objective
 Build the authenticated operational interfaces tailored to each role's distinct workflow: **Superadmin Command Center**, **Organizer Tournament Workspace**, and **Scorer Matchday Cockpit**.

@@ -46,10 +46,10 @@ export const matchesApi = {
       method: 'POST',
       body: { group_id: groupId, force },
     }),
-  generateSemis: () =>
-    apiClient('/api/matches/generate-semis', { method: 'POST' }),
-  generateFinal: () =>
-    apiClient('/api/matches/generate-final', { method: 'POST' }),
+  generateSemis: (tournamentId = null) =>
+    apiClient(`/api/matches/generate-semis${tournamentId ? `?tournament_id=${tournamentId}` : ''}`, { method: 'POST' }),
+  generateFinal: (tournamentId = null) =>
+    apiClient(`/api/matches/generate-final${tournamentId ? `?tournament_id=${tournamentId}` : ''}`, { method: 'POST' }),
   getGroups: (params = {}) => {
     const q = new URLSearchParams();
     if (params?.tournament_id) q.append('tournament_id', params.tournament_id);
@@ -57,10 +57,10 @@ export const matchesApi = {
     const qs = q.toString();
     return apiClient(`/api/groups${qs ? `?${qs}` : ''}`);
   },
-  randomGroupDraw: () =>
-    apiClient('/api/groups/random-draw', { method: 'POST' }),
-  seedKnockout: () =>
-    apiClient('/api/matches/seed-knockout', { method: 'POST' }),
+  randomGroupDraw: (tournamentId = null) =>
+    apiClient(`/api/groups/random-draw${tournamentId ? `?tournament_id=${tournamentId}` : ''}`, { method: 'POST' }),
+  seedKnockout: (tournamentId = null) =>
+    apiClient(`/api/matches/seed-knockout${tournamentId ? `?tournament_id=${tournamentId}` : ''}`, { method: 'POST' }),
   getBracket: (tournamentIdOrParams, maybeSlug = null) => {
     let tId = null;
     let tSlug = null;
