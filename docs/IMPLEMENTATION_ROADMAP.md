@@ -14,8 +14,8 @@
 | Phase # | Phase Title | Core Scope & Deliverables | Quality Gates & Verification | Status |
 | :---: | :--- | :--- | :--- | :---: |
 | **Phase 0** | **Monorepo, Docker & Rebranding** | Bun workspace monorepo, MongoDB 7 Docker, MatchGrid brand tokens (`index.css`), Playwright setup, empty DB seed slate. | Pytest (253) + Vitest (34) + Build + E2E (7) | **COMPLETED** |
-| **Phase 1** | **4-Tier RBAC & Multi-Tenancy** | Unified `User` model (`SUPER_ADMIN`, `ORGANIZER`, `SCORER`), `Tournament.organizer_id` & `slug`, compound indexes, `Match.assigned_scorer_ids`, migration `m0005`, FastAPI RBAC guards. | Pytest isolation tests + Vitest + Playwright RBAC suite | **READY TO START** |
-| **Phase 2** | **Cloudflare R2 Media Storage** | S3-compatible `boto3` R2 client, MIME/size validation, upload & cleanup API (`/api/uploads/image`), R2 image rendering for Tournaments, Teams & Players, React upload UI. | Pytest R2 mocks + Vitest uploader + Playwright image flow | **PLANNED** |
+| **Phase 1** | **4-Tier RBAC & Multi-Tenancy** | Unified `User` model (`SUPER_ADMIN`, `ORGANIZER`, `SCORER`), `Tournament.organizer_id` & `slug`, compound indexes, `Match.assigned_scorer_ids`, migration `m0005`, FastAPI RBAC guards. | Pytest (259) + Vitest (38) + Build + Playwright (8) | **COMPLETED** |
+| **Phase 2** | **Cloudflare R2 Media Storage** | S3-compatible `boto3` R2 client, MIME/size validation, upload & cleanup API (`/api/uploads/image`), R2 image rendering for Tournaments, Teams & Players, React upload UI. | Pytest R2 mocks + Vitest uploader + Playwright image flow | **READY TO START** |
 | **Phase 3** | **Dynamic Tournament Engine** | Configurable `TournamentConfig`, circle-method round-robin scheduler, dynamic knockout seeding (Semis/Quarters/R16), penalty shootout winner overrides. | Pytest tournament matrix + Vitest bracket + E2E engine | **PLANNED** |
 | **Phase 4** | **Room WebSockets & Scorer Console** | Room-partitioned `ConnectionManager` (`/ws/live?tournament_id=...`), scorer match scoping (`GET /api/scorer/matches`), `require_match_operator` live clock & event locks. | Pytest WS rooms + Vitest ticker + Playwright multi-tab live sync | **PLANNED** |
 | **Phase 5** | **Public Two-Tier UI & Bracket Tree** | Global Discovery Header + `/t/:slug/*` Context Sub-Navbar + mobile drawer, Tournament Hub (`/`), Match Center, Standings, Visual Knockout Bracket Tree, R2 Media squads. | Vitest components + Playwright public browsing | **PLANNED** |
@@ -53,7 +53,7 @@ Every phase detailed below is an autonomous, incremental milestone that executes
 
 ---
 
-### Phase 1: Four-Tier RBAC & Multi-Tenant Data Isolation
+### Phase 1: Four-Tier RBAC & Multi-Tenant Data Isolation (COMPLETED)
 
 #### Objective
 Transition the database and API from a single-admin singleton tournament into a multi-tenant platform with four distinct operational tiers: **Superadmin** (platform governance), **Tournament Organizer** (tenant owner), **Match Scorer** (matchday operator), and **Public Spectator** (read-only).
