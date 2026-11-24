@@ -73,6 +73,11 @@ jobs:
           echo "CORS_ORIGINS=http://localhost:5173" >> apps/backend/.env
           echo "TOURNAMENT_NAME=MatchGrid" >> apps/backend/.env
           echo "TOURNAMENT_SEASON=1" >> apps/backend/.env
+          echo "R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID || 'f5a3df3ac05690c8057e5f3dc9b7f4b6' }}" >> apps/backend/.env
+          echo "R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID || '81260b516f4641856bb53a39ed6bdeb7' }}" >> apps/backend/.env
+          echo "R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY || '85ea42145a5ff2dd46c21d57899ad5810178f7c311925680546395acd0c0f4c6' }}" >> apps/backend/.env
+          echo "R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME || 'matchgrid-media' }}" >> apps/backend/.env
+          echo "R2_PUBLIC_BASE_URL=${{ secrets.R2_PUBLIC_BASE_URL || 'https://pub-239d2266634d484385c78d5a82166938.r2.dev' }}" >> apps/backend/.env
 
       - name: Run Full-Stack Regression Gate (Pytest, Vitest, Build, Playwright)
         run: bun run test:all

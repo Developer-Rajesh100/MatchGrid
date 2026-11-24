@@ -43,11 +43,11 @@ class Settings(BaseSettings):
     tournament_season: str = "1"
 
     # Cloudflare R2 Media Storage
-    r2_account_id: str = ""
-    r2_access_key_id: str = ""
-    r2_secret_access_key: str = ""
-    r2_bucket_name: str = ""
-    r2_public_base_url: str = ""
+    r2_account_id: str = "f5a3df3ac05690c8057e5f3dc9b7f4b6"
+    r2_access_key_id: str = "81260b516f4641856bb53a39ed6bdeb7"
+    r2_secret_access_key: str = "85ea42145a5ff2dd46c21d57899ad5810178f7c311925680546395acd0c0f4c6"
+    r2_bucket_name: str = "matchgrid-media"
+    r2_public_base_url: str = "https://pub-239d2266634d484385c78d5a82166938.r2.dev"
 
     @property
     def r2_endpoint_url(self) -> str:
