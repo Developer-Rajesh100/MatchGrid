@@ -1,11 +1,12 @@
+from typing import Optional
 from beanie import PydanticObjectId
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.core.errors import NotFoundError
 from app.models import Group, Team
 from app.schemas.standing import GroupStandingsOut, StandingOut
 from app.services.standings import sorted_group_standings
-from app.services.tournament_scope import get_active_tournament_id
+from app.services.tournament_scope import get_active_tournament_id, resolve_tournament_id
 
 router = APIRouter(prefix="/standings", tags=["standings"])
 
@@ -29,6 +30,7 @@ async def _group_standings_out(group: Group) -> GroupStandingsOut:
                 goals_against=r.goals_against,
                 goal_difference=r.goal_difference,
                 points=r.points,
+                crest_url=teams[r.team_id].crest_url or teams[r.team_id].logo_url if r.team_id in teams else None,
             )
             for r in rows
         ],
@@ -36,9 +38,12 @@ async def _group_standings_out(group: Group) -> GroupStandingsOut:
 
 
 @router.get("", response_model=list[GroupStandingsOut])
-async def list_standings() -> list[GroupStandingsOut]:
-    tournament_id = await get_active_tournament_id()
-    groups = await Group.find(Group.tournament_id == tournament_id).sort("name").to_list()
+async def list_standings(
+    tournament_id: Optional[str] = Query(default=None),
+    tournament_slug: Optional[str] = Query(default=None),
+) -> list[GroupStandingsOut]:
+    tid = await resolve_tournament_id(tournament_id, tournament_slug)
+    groups = await Group.find(Group.tournament_id == tid).sort("name").to_list()
     return [await _group_standings_out(g) for g in groups]
 
 

@@ -1,20 +1,21 @@
-from fastapi import APIRouter, Depends
+from typing import Optional
+from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import check_tournament_ownership, get_current_admin
 from app.models import Group, GroupTeam, Team, User
 from app.schemas.group import GroupWithTeamsOut
 from app.services.groups import random_draw
 from app.services.serializers import group_to_out, team_to_out
-from app.services.tournament_scope import get_active_tournament_id
+from app.services.tournament_scope import get_active_tournament_id, resolve_tournament_id
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
 
-async def _groups_with_teams() -> list[GroupWithTeamsOut]:
-    tournament_id = await get_active_tournament_id()
-    groups = await Group.find(Group.tournament_id == tournament_id).sort("name").to_list()
-    group_teams = await GroupTeam.find(GroupTeam.tournament_id == tournament_id).to_list()
-    teams = {t.id: t for t in await Team.find(Team.tournament_id == tournament_id).to_list()}
+async def _groups_with_teams(tournament_id: Optional[str] = None, tournament_slug: Optional[str] = None) -> list[GroupWithTeamsOut]:
+    resolved_tid = await resolve_tournament_id(tournament_id, tournament_slug)
+    groups = await Group.find(Group.tournament_id == resolved_tid).sort("name").to_list()
+    group_teams = await GroupTeam.find(GroupTeam.tournament_id == resolved_tid).to_list()
+    teams = {t.id: t for t in await Team.find(Team.tournament_id == resolved_tid).to_list()}
 
     out = []
     for group in groups:
@@ -29,8 +30,11 @@ async def _groups_with_teams() -> list[GroupWithTeamsOut]:
 
 
 @router.get("", response_model=list[GroupWithTeamsOut])
-async def list_groups() -> list[GroupWithTeamsOut]:
-    return await _groups_with_teams()
+async def list_groups(
+    tournament_id: Optional[str] = Query(default=None),
+    tournament_slug: Optional[str] = Query(default=None),
+) -> list[GroupWithTeamsOut]:
+    return await _groups_with_teams(tournament_id, tournament_slug)
 
 
 @router.post("/random-draw", response_model=list[GroupWithTeamsOut])

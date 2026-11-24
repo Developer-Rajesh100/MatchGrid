@@ -11,6 +11,7 @@ public site). Found and fixed as part of that audit's Medium-severity
 follow-up (M-4 / ARCH-1: "no tournament-scoping enforcement").
 """
 
+from typing import Optional
 from beanie import PydanticObjectId
 
 from app.core.errors import NotFoundError
@@ -33,3 +34,22 @@ async def get_active_tournament() -> Tournament:
 
 async def get_active_tournament_id() -> PydanticObjectId:
     return (await get_active_tournament()).id
+
+
+async def resolve_tournament_id(
+    tournament_id: Optional[str] = None,
+    tournament_slug: Optional[str] = None,
+) -> PydanticObjectId:
+    """Resolves target tournament ID by explicit ID, slug, or active singleton fallback."""
+    if tournament_id:
+        try:
+            return PydanticObjectId(tournament_id)
+        except Exception:
+            raise NotFoundError("Invalid tournament ID")
+    if tournament_slug:
+        t = await Tournament.find_one(Tournament.slug == tournament_slug)
+        if not t:
+            raise NotFoundError(f"Tournament with slug '{tournament_slug}' not found")
+        return t.id
+    return await get_active_tournament_id()
+

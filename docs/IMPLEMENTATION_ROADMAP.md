@@ -398,7 +398,7 @@ sequenceDiagram
 
 ---
 
-### Phase 5: Public Two-Tier UI, Tournament Hub & Visual Bracket Tree
+### Phase 5: Public Two-Tier UI, Tournament Hub & Visual Bracket Tree (COMPLETED)
 
 #### Objective
 Build the public-facing user interface featuring a global discovery directory, a two-tier tournament navigation layout (`/t/:slug/...`), responsive mobile drawer, and an interactive Knockout Bracket Tree component displaying R2-hosted team crests.

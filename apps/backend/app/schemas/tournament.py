@@ -30,6 +30,27 @@ class TournamentOut(BaseModel):
     config: Optional[TournamentConfig] = None
 
 
+class TournamentSummaryOut(BaseModel):
+    id: str
+    name: str
+    season: str
+    slug: str
+    format_description: str
+    stage: str
+    status: str = "ACTIVE"
+    logo_url: Optional[str] = None
+    organizer_id: Optional[str] = None
+    organizer_name: Optional[str] = None
+    organization_name: Optional[str] = None
+    teams_count: int = 0
+    matches_count: int = 0
+    live_matches_count: int = 0
+    champion_team_id: Optional[str] = None
+    champion_team_name: Optional[str] = None
+    champion_crest_url: Optional[str] = None
+
+
+
 class TournamentCreate(BaseModel):
     name: str = Field(min_length=1)
     season: str = Field(min_length=1)
