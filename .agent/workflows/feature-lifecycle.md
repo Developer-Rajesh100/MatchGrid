@@ -9,7 +9,7 @@ Execute this workflow systematically whenever introducing a new feature, enhance
 ---
 
 ## Stage 1 — Feature Planning
-- **Scope & Objectives**: Clearly outline the feature's purpose, target users (Tournament Organizer, Match Scorer, Public Spectator), and boundaries.
+- **Scope & Objectives**: Clearly outline the feature's purpose, target users (**Superadmin**, **Tournament Organizer**, **Match Scorer**, **Public Spectator**), and boundaries.
 - **Acceptance Criteria**: Formulate verifiable criteria in Given-When-Then format.
 - **Edge Cases & Failure Modes**: Identify concurrency risks, database contention, network drops, or invalid states.
 - **Gate 1**: Present the structured **Feature Plan** to the user and pause for approval before writing design specifications or code.
@@ -22,7 +22,7 @@ Execute this workflow systematically whenever introducing a new feature, enhance
   - New forward migration module name (e.g., `m0005_<description>.py`).
 - **Backend API & Real-Time Contracts (FastAPI)**:
   - Pydantic request/response schemas.
-  - Router paths, HTTP methods, status codes, and role permissions.
+  - Router paths, HTTP methods, status codes, and 4-tier role permissions (`get_current_user`, `require_superadmin`, `require_tournament_owner`, `require_match_operator`).
   - WebSocket broadcast payload types (e.g., `match_updated`, `standing_updated`).
 - **Frontend Component Hierarchy (React 18 / Vite)**:
   - Component tree, hooks, routing paths, responsive breakpoints, and token styling.

@@ -1,6 +1,6 @@
-# DCL Season 5 — Digital Scoreboard (Bun Workspace Monorepo)
+# MatchGrid — Live Football Tournament Platform (Bun Workspace Monorepo)
 
-A full-stack live digital scoreboard and tournament management platform built for a single football tournament (6 teams, 2 groups, semi-finals, and final).
+A high-performance, multi-tenant live digital scoreboard and tournament management SaaS platform with 4-tier RBAC, drift-free UTC match clocks, room-scoped WebSockets, and dynamic knockout bracket progression.
 
 This project is organized as a **Bun workspace monorepo**:
 - **MongoDB 7** runs containerized in Docker with persistent volume storage and healthchecks.
@@ -11,7 +11,7 @@ This project is organized as a **Bun workspace monorepo**:
 ## Architecture & Directory Layout
 
 ```
-DCL_score_board/
+MatchGrid/
 ├── apps/
 │   ├── backend/            # FastAPI async REST API & WebSocket server
 │   │   ├── .venv/          # Isolated Python virtual environment
@@ -22,10 +22,13 @@ DCL_score_board/
 │   └── frontend/           # React 18 + Vite SPA (named "frontend" in workspace)
 │       ├── src/            # Components, pages, router, hooks, CSS tokens
 │       └── package.json    # Frontend dependencies and test scripts
+├── e2e/                    # Playwright end-to-end multi-role test suite
+│   ├── fixtures/           # API authentication helpers & teardown
+│   └── tests/              # E2E test specifications
 ├── infra/
 │   └── mongo/              # MongoDB Docker setup & init scripts
 │       └── init/
-├── docs/                   # Architecture audit & onboarding documentation
+├── docs/                   # Master roadmap, system architecture & workflows
 ├── scripts/
 │   ├── setup.sh            # Complete one-time bootstrap script
 │   └── db-up.sh            # Starts MongoDB in Docker and waits until healthy
@@ -93,9 +96,11 @@ This automatically:
 | `bun run dev` | Starts MongoDB (Docker) + Backend (`:8001`) + Frontend (`:5173`) with unified live logs. |
 | `bun run db:up` | Starts MongoDB container in Docker and waits until healthy. |
 | `bun run db:down` | Stops the MongoDB container (`docker compose down`). |
-| `bun run test` | Runs the full test suite: Backend (Pytest) + Frontend (Vitest). |
+| `bun run test` | Runs local test suite: Backend (Pytest) + Frontend (Vitest). |
 | `bun run test:backend` | Runs the backend Pytest suite (`apps/backend/.venv/bin/pytest`). |
 | `bun run test:frontend`| Runs the frontend Vitest suite (`bun --filter frontend test`). |
+| `bun run test:e2e` | Runs headless Playwright end-to-end multi-role test suite. |
+| `bun run test:all` | **Mandatory Full-Stack Quality Gate**: Pytest + Vitest + Build + Playwright. |
 | `bun run build` | Builds the production Vite bundle in `apps/frontend/dist`. |
 | `bun run lint` | Validates frontend build without errors. |
 
@@ -103,9 +108,9 @@ This automatically:
 
 ## Database & Port Details
 
-- **MongoDB Container Name:** `dcl_mongo`
+- **MongoDB Container Name:** `matchgrid_mongo`
 - **Host Port:** `${MONGO_PORT:-27018}` (mapped to container port `27017` to prevent collisions with other local databases).
-- **Volume:** `dcl_score_board_mongo_data` (persists tournament state across container restarts).
+- **Volume:** `mongo_data` (persists tournament state across container restarts).
 - **Backend Port:** `8001` (FastAPI + Uvicorn)
 - **Frontend Port:** `5173` (Vite, proxies `/api` and `/ws` to `8001`)
 
@@ -113,5 +118,9 @@ This automatically:
 
 ## Documentation
 
-- **Architectural Analysis & Codebase Audit:** [`docs/PROJECT_ANALYSIS.md`](docs/PROJECT_ANALYSIS.md)
+- **Master Project Plan & Overview:** [`docs/plan.md`](docs/plan.md)
+- **Implementation Blueprint & Phased Roadmap:** [`docs/IMPLEMENTATION_ROADMAP.md`](docs/IMPLEMENTATION_ROADMAP.md)
+- **System & Software Architecture Design:** [`docs/system_architecture.md`](docs/system_architecture.md)
+- **Development Workflow & Quality Gates:** [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md)
+- **Historical Baseline Codebase Audit:** [`docs/PROJECT_ANALYSIS.md`](docs/PROJECT_ANALYSIS.md)
 - **Tournament Data Format & Importers:** [`apps/backend/data/README.md`](apps/backend/data/README.md)

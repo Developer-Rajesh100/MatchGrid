@@ -42,7 +42,7 @@ flowchart TD
 ---
 
 ### Stage 1: Feature Planning
-1. **Define Objective & Scope**: Clarify who the feature serves (Tournament Organizer, Match Scorer, or Spectator).
+1. **Define Objective & Scope**: Clarify who the feature serves (**Superadmin**, **Tournament Organizer**, **Match Scorer**, or **Public Spectator**).
 2. **Formulate Acceptance Criteria**: Concrete Given-When-Then rules.
 3. **Analyze Edge Cases**: Address race conditions, network failures, empty database states, and permission boundaries.
 4. **Interactive Gate**: Present the Feature Plan artifact and pause for user approval before drafting technical designs.
@@ -53,7 +53,7 @@ flowchart TD
    - Design forward migrations in `apps/backend/app/migrations/mXXXX_<description>.py`.
 2. **Backend API & WebSocket Contracts**:
    - Pydantic models in `apps/backend/app/schemas/`.
-   - Endpoints in `apps/backend/app/routers/` with appropriate auth boundaries (`get_current_admin`).
+   - Endpoints in `apps/backend/app/routers/` with appropriate 4-tier auth boundaries (`get_current_user`, `require_superadmin`, `require_tournament_owner`, `require_match_operator`).
    - Real-time broadcast messages in `apps/backend/app/core/websocket.py`.
 3. **Frontend Component Tree & Styling**:
    - React components in `apps/frontend/src/components/` and routes in `apps/frontend/src/pages/`.
