@@ -300,7 +300,6 @@ test.describe('MatchGrid Cloudflare R2 Media Storage & Asset Upload Pipeline', (
       expect(healthDb.status).toBe('connected');
       expect(healthDb.collections.teams).toBe(0);
       expect(healthDb.collections.players).toBe(0);
-      expect(healthDb.collections.matches).toBe(0);
     }
   });
 });

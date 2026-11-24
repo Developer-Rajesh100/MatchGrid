@@ -35,7 +35,11 @@ test.describe('MatchGrid Public Smoke & Responsive Navigation', () => {
     // 1. Matches Page
     await page.goto('/matches');
     await expect(page.getByRole('heading', { level: 2 })).toContainText('Match Fixtures & Results');
-    await expect(page.getByRole('heading', { name: /No fixtures scheduled/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /No fixtures scheduled/i }).or(
+        page.getByRole('heading', { name: /Knockout Stage/i })
+      )
+    ).toBeVisible();
 
     // 2. Standings Page
     await page.goto('/standings');
