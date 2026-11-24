@@ -42,6 +42,28 @@ class Settings(BaseSettings):
     tournament_name: str = "MatchGrid"
     tournament_season: str = "1"
 
+    # Cloudflare R2 Media Storage
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_bucket_name: str = ""
+    r2_public_base_url: str = ""
+
+    @property
+    def r2_endpoint_url(self) -> str:
+        if self.r2_account_id:
+            return f"https://{self.r2_account_id}.r2.cloudflarestorage.com"
+        return ""
+
+    @property
+    def is_r2_configured(self) -> bool:
+        return bool(
+            self.r2_account_id
+            and self.r2_access_key_id
+            and self.r2_secret_access_key
+            and self.r2_bucket_name
+        )
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

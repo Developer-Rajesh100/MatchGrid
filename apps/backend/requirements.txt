@@ -7,4 +7,6 @@ pydantic-settings==2.15.0
 PyJWT==2.15.1
 bcrypt==5.0.0
 python-dotenv==1.2.3
-
+boto3==1.37.38
+pillow==11.3.0
+python-multipart==0.0.34

@@ -10,6 +10,7 @@ class TeamOut(BaseModel):
     tournament_id: str
     name: str
     color: str
+    crest_url: Optional[str] = None
     logo_url: Optional[str] = None
     group_id: Optional[str] = None
     group_name: Optional[str] = None
@@ -19,6 +20,7 @@ class TeamOut(BaseModel):
 class TeamUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1)
     color: Optional[str] = Field(default=None, pattern=HEX_COLOR)
+    crest_url: Optional[str] = None
     logo_url: Optional[str] = None
     group_id: Optional[str] = None
 
@@ -26,6 +28,7 @@ class TeamUpdate(BaseModel):
 class TeamCreate(BaseModel):
     name: str = Field(min_length=1)
     color: str = Field(pattern=HEX_COLOR)
+    crest_url: Optional[str] = None
     logo_url: Optional[str] = None
     group_id: Optional[str] = None
     tournament_id: Optional[str] = None

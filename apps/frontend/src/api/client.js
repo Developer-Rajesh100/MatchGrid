@@ -4,8 +4,9 @@ export async function apiClient(endpoint, options = {}) {
   const token =
     localStorage.getItem('matchgrid_admin_token') ||
     localStorage.getItem('dcl_admin_token');
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };

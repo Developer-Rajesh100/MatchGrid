@@ -32,11 +32,13 @@ async def create_team(payload: TeamCreate, tournament_id: PydanticObjectId | Non
 
     await _assert_name_available(tournament_id, payload.name)
 
+    crest_url = payload.crest_url or payload.logo_url
     team = Team(
         tournament_id=tournament_id,
         name=payload.name.strip(),
         color=payload.color,
-        logo_url=payload.logo_url,
+        crest_url=crest_url,
+        logo_url=crest_url,
     )
     try:
         await team.insert()
@@ -62,5 +64,9 @@ async def delete_team(team: Team) -> None:
         raise ConflictError(
             "Cannot remove a team that already has players and/or scheduled matches"
         )
+    old_crest = team.crest_url or team.logo_url
     await GroupTeam.find(GroupTeam.team_id == team.id).delete()
     await team.delete()
+    if old_crest:
+        from app.services.storage import get_storage_service
+        await get_storage_service().delete_image(old_crest)

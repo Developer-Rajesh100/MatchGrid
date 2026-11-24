@@ -25,12 +25,14 @@ def team_to_out(
     group: Optional[Group] = None,
     player_count: Optional[int] = None,
 ) -> TeamOut:
+    crest = team.crest_url or team.logo_url
     return TeamOut(
         id=str(team.id),
         tournament_id=str(team.tournament_id),
         name=team.name,
         color=team.color,
-        logo_url=team.logo_url,
+        crest_url=crest,
+        logo_url=crest,
         group_id=str(group_team.group_id) if group_team else None,
         group_name=group.name if group else None,
         player_count=player_count,

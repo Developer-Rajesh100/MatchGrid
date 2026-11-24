@@ -182,6 +182,20 @@ async def delete_tournament(
 
     await check_tournament_ownership(admin, t.id)
 
+    # Clean up associated media from R2
+    from app.services.storage import get_storage_service
+    storage = get_storage_service()
+    if t.logo_url:
+        await storage.delete_image(t.logo_url)
+    if t.banner_url:
+        await storage.delete_image(t.banner_url)
+    for team in await Team.find(Team.tournament_id == t.id).to_list():
+        if team.crest_url or team.logo_url:
+            await storage.delete_image(team.crest_url or team.logo_url)
+    for player in await Player.find(Player.tournament_id == t.id).to_list():
+        if player.photo_url:
+            await storage.delete_image(player.photo_url)
+
     # Clean up associated entities
     await Match.find(Match.tournament_id == t.id).delete()
     await Player.find(Player.tournament_id == t.id).delete()

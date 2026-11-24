@@ -6,6 +6,7 @@ import { teamsApi } from '../../api/teams';
 import { playersApi } from '../../api/players';
 import { StatusPill } from '../../components/common/StatusPill';
 import { Avatar } from '../../components/common/Avatar';
+import { ImageUploader } from '../../components/common/ImageUploader';
 import { LoadingState } from '../../components/common/Common';
 import { useLiveSocket } from '../../hooks/useLiveSocket';
 import {
@@ -70,6 +71,7 @@ export function AdminDashboardPage() {
     number: '',
     is_manager: false,
     dcl_id: '',
+    photo_url: '',
   });
 
   useEffect(() => {
@@ -434,9 +436,10 @@ export function AdminDashboardPage() {
         number: parseInt(newPlayer.number, 10),
         is_manager: newPlayer.is_manager,
         dcl_id: newPlayer.dcl_id.trim() || undefined,
+        photo_url: newPlayer.photo_url || undefined,
       });
       showSuccess(`Player "${newPlayer.name}" added to squad!`);
-      setNewPlayer({ name: '', number: '', is_manager: false, dcl_id: '' });
+      setNewPlayer({ name: '', number: '', is_manager: false, dcl_id: '', photo_url: '' });
       const updated = await playersApi.getPlayers({ team_id: selectedTeamId });
       setTeamPlayers(updated || []);
     } catch (err) {
@@ -703,24 +706,53 @@ export function AdminDashboardPage() {
             </div>
 
             {currentTeam && (
-              <div className="field" style={{ marginTop: '14px' }}>
-                <label>Assigned Group</label>
-                <select
-                  className="select"
-                  value={groups.find((g) => g.name === currentTeam.group_name)?.id || ''}
-                  onChange={(e) => handleReassignGroup(currentTeam.id, e.target.value)}
-                  disabled={actionLoading || groups.length === 0}
-                >
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      Group {g.name}
-                    </option>
-                  ))}
-                </select>
-                <div style={{ fontSize: '11px', color: 'var(--chalk-dim)', marginTop: '4px' }}>
-                  Changes {currentTeam.name}&apos;s group assignment for standings and tournament fixtures.
+              <>
+                <div className="field" style={{ marginTop: '14px' }}>
+                  <label>Assigned Group</label>
+                  <select
+                    className="select"
+                    value={groups.find((g) => g.name === currentTeam.group_name)?.id || ''}
+                    onChange={(e) => handleReassignGroup(currentTeam.id, e.target.value)}
+                    disabled={actionLoading || groups.length === 0}
+                  >
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        Group {g.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: '11px', color: 'var(--chalk-dim)', marginTop: '4px' }}>
+                    Changes {currentTeam.name}&apos;s group assignment for standings and tournament fixtures.
+                  </div>
                 </div>
-              </div>
+
+                <div className="field" style={{ marginTop: '14px' }}>
+                  <ImageUploader
+                    tournamentId={currentTeam.tournament_id}
+                    category="crests"
+                    currentUrl={currentTeam.crest_url || currentTeam.logo_url}
+                    label={`${currentTeam.name} Crest`}
+                    onUploadSuccess={async (url) => {
+                      try {
+                        await teamsApi.updateTeam(currentTeam.id, { crest_url: url });
+                        showSuccess(`${currentTeam.name} crest updated!`);
+                        await loadAll(false);
+                      } catch (err) {
+                        setError(err.message);
+                      }
+                    }}
+                    onRemove={async () => {
+                      try {
+                        await teamsApi.updateTeam(currentTeam.id, { crest_url: null, logo_url: null });
+                        showSuccess(`${currentTeam.name} crest removed`);
+                        await loadAll(false);
+                      } catch (err) {
+                        setError(err.message);
+                      }
+                    }}
+                  />
+                </div>
+              </>
             )}
 
 
@@ -765,6 +797,17 @@ export function AdminDashboardPage() {
                     placeholder="e.g. MG-045"
                     value={newPlayer.dcl_id}
                     onChange={(e) => setNewPlayer({ ...newPlayer, dcl_id: e.target.value })}
+                  />
+                </div>
+
+                <div className="field" style={{ marginTop: '8px', marginBottom: '10px' }}>
+                  <ImageUploader
+                    tournamentId={currentTeam?.tournament_id}
+                    category="photos"
+                    currentUrl={newPlayer.photo_url}
+                    label="Player Photo (optional)"
+                    onUploadSuccess={(url) => setNewPlayer({ ...newPlayer, photo_url: url })}
+                    onRemove={() => setNewPlayer({ ...newPlayer, photo_url: '' })}
                   />
                 </div>
 

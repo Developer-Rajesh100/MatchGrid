@@ -25,6 +25,7 @@ from app.routers import (
     superadmin,
     teams,
     tournament,
+    uploads,
     websocket,
 )
 
@@ -104,6 +105,7 @@ for router in (
     matches,
     standings,
     statistics,
+    uploads,
 ):
     api_router.include_router(router.router)
 app.include_router(api_router)

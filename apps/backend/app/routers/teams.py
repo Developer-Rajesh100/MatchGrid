@@ -70,10 +70,23 @@ async def update_team(
     if "name" in data:
         await rename_team_checked(team, data["name"])
 
+    old_crest = team.crest_url or team.logo_url
     for field, value in data.items():
         setattr(team, field, value)
+
+    # Sync crest_url and logo_url
+    if "crest_url" in data and "logo_url" not in data:
+        team.logo_url = data["crest_url"]
+    elif "logo_url" in data and "crest_url" not in data:
+        team.crest_url = data["logo_url"]
+
     if data:
         await team.save()
+
+    new_crest = team.crest_url or team.logo_url
+    if old_crest and new_crest != old_crest:
+        from app.services.storage import get_storage_service
+        await get_storage_service().delete_image(old_crest)
 
     if group_id is not None:
         await assign_team_group(team.id, PydanticObjectId(group_id))

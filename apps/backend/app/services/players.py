@@ -76,10 +76,16 @@ async def update_player(player: Player, payload: PlayerUpdate) -> Player:
         if conflict is not None:
             raise ConflictError(f"Jersey number {new_number} is already used on this team")
 
+    old_photo = player.photo_url
     for field, value in data.items():
         setattr(player, field, value)
 
     await player.save()
+
+    new_photo = player.photo_url
+    if old_photo and new_photo != old_photo:
+        from app.services.storage import get_storage_service
+        await get_storage_service().delete_image(old_photo)
 
     if make_manager is True:
         await _unset_other_managers(player.team_id, player.id)
@@ -98,7 +104,11 @@ async def delete_player(player: Player) -> None:
         raise ConflictError(
             "Cannot remove a player who already has recorded match events or lineup entries"
         )
+    old_photo = player.photo_url
     await player.delete()
+    if old_photo:
+        from app.services.storage import get_storage_service
+        await get_storage_service().delete_image(old_photo)
 
 
 async def get_player_detail(player: Player) -> PlayerDetailOut:
