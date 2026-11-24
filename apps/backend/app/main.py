@@ -17,9 +17,12 @@ from app.routers import (
     groups,
     health,
     matches,
+    organizer,
     players,
+    scorer,
     standings,
     statistics,
+    superadmin,
     teams,
     tournament,
     websocket,
@@ -89,6 +92,18 @@ app.include_router(health.router)
 app.include_router(websocket.router)
 
 api_router = APIRouter(prefix="/api")
-for router in (auth, tournament, teams, groups, players, matches, standings, statistics):
+for router in (
+    auth,
+    superadmin,
+    organizer,
+    scorer,
+    tournament,
+    teams,
+    groups,
+    players,
+    matches,
+    standings,
+    statistics,
+):
     api_router.include_router(router.router)
 app.include_router(api_router)

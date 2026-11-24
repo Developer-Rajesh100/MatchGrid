@@ -9,11 +9,16 @@ from pymongo import IndexModel
 class Team(Document):
     tournament_id: PydanticObjectId
     name: str
+    short_name: Optional[str] = None  # e.g. "RDG"
     color: str  # hex color, e.g. "#d0483f"
-    logo_url: Optional[str] = None  # e.g. "/assets/teams/red-dragons.png"
+    crest_url: Optional[str] = None  # R2 cloud URL or local fallback
+    logo_url: Optional[str] = None  # Backward compatibility alias
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Settings:
         name = "teams"
-        indexes = [IndexModel("name", unique=True)]
+        indexes = [
+            IndexModel([("tournament_id", 1), ("name", 1)], unique=True),
+            IndexModel("tournament_id"),
+        ]

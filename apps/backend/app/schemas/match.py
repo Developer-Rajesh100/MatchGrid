@@ -34,6 +34,7 @@ class MatchOut(BaseModel):
     ended_at: Optional[datetime] = None
     is_half_time: bool = False
     elapsed_seconds: Optional[int] = None
+    assigned_scorer_ids: list[str] = Field(default_factory=list)
 
 
 class HalfTimePayload(BaseModel):
@@ -103,3 +104,8 @@ class GenerateGroupFixturesRequest(BaseModel):
 class MatchDetailOut(MatchOut):
     events: list[MatchEventOut] = []
     lineup: list[str] = []  # player ids
+
+
+class AssignScorerRequest(BaseModel):
+    scorer_id: str = Field(pattern=r"^[0-9a-fA-F]{24}$")
+

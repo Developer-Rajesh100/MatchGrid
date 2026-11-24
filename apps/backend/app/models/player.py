@@ -7,8 +7,10 @@ from pymongo import IndexModel
 
 
 class Player(Document):
+    tournament_id: Optional[PydanticObjectId] = None
     team_id: PydanticObjectId
-    dcl_id: str  # e.g. "DCL-001"
+    dcl_id: Optional[str] = None  # e.g. "DCL-001" (legacy identifier)
+    player_code: Optional[str] = None  # tournament-scoped code e.g. "PLY-01"
     name: str
     number: int
     is_manager: bool = False
@@ -20,6 +22,12 @@ class Player(Document):
         name = "players"
         indexes = [
             IndexModel([("team_id", 1), ("number", 1)], unique=True),
-            IndexModel("dcl_id", unique=True),
+            IndexModel("tournament_id"),
             IndexModel("team_id"),
+            IndexModel(
+                [("tournament_id", 1), ("player_code", 1)],
+                unique=True,
+                partialFilterExpression={"player_code": {"$type": "string"}},
+            ),
+            IndexModel("dcl_id"),
         ]

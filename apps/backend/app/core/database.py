@@ -30,7 +30,7 @@ def get_client() -> AsyncIOMotorClient:
 async def init_db() -> None:
     client = get_client()
     database = client[settings.mongo_db_name]
-    await init_beanie(database=database, document_models=DOCUMENT_MODELS)
+    await init_beanie(database=database, document_models=DOCUMENT_MODELS, allow_index_dropping=True)
 
 
 async def close_db() -> None:

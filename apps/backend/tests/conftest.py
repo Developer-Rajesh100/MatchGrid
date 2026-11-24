@@ -30,6 +30,8 @@ from app.models import (
     Player,
     Team,
     Tournament,
+    User,
+    UserRole,
 )
 
 
@@ -122,6 +124,14 @@ async def players(teams) -> dict[str, list[Player]]:
 async def admin(clean_db) -> Admin:
     a = Admin(username="testadmin", password_hash=hash_password("testpass123"))
     await a.insert()
+    u = User(
+        id=a.id,
+        username="testadmin",
+        password_hash=a.password_hash,
+        role=UserRole.SUPER_ADMIN,
+        is_active=True,
+    )
+    await u.insert()
     return a
 
 

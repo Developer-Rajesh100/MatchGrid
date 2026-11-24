@@ -3,9 +3,9 @@ from typing import Optional
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, Query
 
-from app.core.deps import get_current_admin
+from app.core.deps import check_tournament_ownership, get_current_admin
 from app.core.errors import NotFoundError
-from app.models import Admin, Player, Team
+from app.models import Player, Team, User
 from app.schemas.player import PlayerCreate, PlayerDetailOut, PlayerOut, PlayerUpdate
 from app.services.players import create_player, delete_player, get_player_detail, update_player
 from app.services.serializers import player_to_out
@@ -19,6 +19,13 @@ async def _player_or_404(player_id: str) -> Player:
     if player is None:
         raise NotFoundError("Player not found")
     return player
+
+
+async def _resolve_player_tournament_id(player: Player) -> Optional[PydanticObjectId]:
+    if getattr(player, "tournament_id", None):
+        return player.tournament_id
+    team = await Team.get(player.team_id)
+    return team.tournament_id if team else None
 
 
 @router.get("", response_model=list[PlayerOut])
@@ -45,26 +52,35 @@ async def get_player(player_id: str) -> PlayerDetailOut:
 
 
 @router.post("", response_model=PlayerOut, status_code=201)
-async def add_player(payload: PlayerCreate, _admin: Admin = Depends(get_current_admin)) -> PlayerOut:
+async def add_player(payload: PlayerCreate, admin: User = Depends(get_current_admin)) -> PlayerOut:
     """Add a player to a team. DCL ID is auto-assigned; jersey number must be unique on the team."""
+    team = await Team.get(PydanticObjectId(payload.team_id))
+    if team is None:
+        raise NotFoundError("Team not found")
+    await check_tournament_ownership(admin, team.tournament_id)
+
     player = await create_player(payload)
-    team = await Team.get(player.team_id)
     return player_to_out(player, team)
 
 
 @router.patch("/{player_id}", response_model=PlayerOut)
 async def edit_player(
-    player_id: str, payload: PlayerUpdate, _admin: Admin = Depends(get_current_admin)
+    player_id: str, payload: PlayerUpdate, admin: User = Depends(get_current_admin)
 ) -> PlayerOut:
     """Update player fields. Setting is_manager=true unsets any other manager on the same team."""
     player = await _player_or_404(player_id)
+    tid = await _resolve_player_tournament_id(player)
+    await check_tournament_ownership(admin, tid)
+
     player = await update_player(player, payload)
     team = await Team.get(player.team_id)
     return player_to_out(player, team)
 
 
 @router.delete("/{player_id}", status_code=204)
-async def remove_player(player_id: str, _admin: Admin = Depends(get_current_admin)) -> None:
+async def remove_player(player_id: str, admin: User = Depends(get_current_admin)) -> None:
     """Remove a player. Blocked if the player already has recorded match events or lineup entries."""
     player = await _player_or_404(player_id)
+    tid = await _resolve_player_tournament_id(player)
+    await check_tournament_ownership(admin, tid)
     await delete_player(player)

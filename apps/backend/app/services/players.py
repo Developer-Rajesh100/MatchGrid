@@ -31,6 +31,7 @@ async def create_player(payload: PlayerCreate) -> Player:
     for attempt in range(1, 6):
         try:
             player = Player(
+                tournament_id=team.tournament_id,
                 team_id=team.id,
                 dcl_id=dcl_id,
                 name=payload.name,

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from app.core.deps import get_current_admin
-from app.models import Admin, Tournament
+from app.core.deps import check_tournament_ownership, get_current_admin
+from app.models import Tournament, User
 from app.schemas.tournament import TournamentOut, TournamentUpdate
 from app.services.tournament_scope import get_active_tournament
 
@@ -16,6 +16,10 @@ def _to_out(t: Tournament) -> TournamentOut:
         format_description=t.format_description,
         stage=t.stage,
         champion_team_id=str(t.champion_team_id) if t.champion_team_id else None,
+        organizer_id=str(t.organizer_id) if t.organizer_id else None,
+        slug=t.slug,
+        status=t.status,
+        logo_url=t.logo_url,
     )
 
 
@@ -26,9 +30,10 @@ async def get_tournament() -> TournamentOut:
 
 @router.patch("", response_model=TournamentOut)
 async def update_tournament(
-    payload: TournamentUpdate, _admin: Admin = Depends(get_current_admin)
+    payload: TournamentUpdate, admin: User = Depends(get_current_admin)
 ) -> TournamentOut:
     tournament = await get_active_tournament()
+    await check_tournament_ownership(admin, tournament.id)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(tournament, field, value)
     await tournament.save()

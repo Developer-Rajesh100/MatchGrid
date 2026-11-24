@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from app.core.deps import get_current_admin
-from app.models import Admin, Group, GroupTeam, Team
+from app.core.deps import check_tournament_ownership, get_current_admin
+from app.models import Group, GroupTeam, Team, User
 from app.schemas.group import GroupWithTeamsOut
 from app.services.groups import random_draw
 from app.services.serializers import group_to_out, team_to_out
@@ -34,8 +34,9 @@ async def list_groups() -> list[GroupWithTeamsOut]:
 
 
 @router.post("/random-draw", response_model=list[GroupWithTeamsOut])
-async def do_random_draw(_admin: Admin = Depends(get_current_admin)) -> list[GroupWithTeamsOut]:
+async def do_random_draw(admin: User = Depends(get_current_admin)) -> list[GroupWithTeamsOut]:
     """Shuffle all teams randomly into Group A / Group B (3 each)."""
     tournament_id = await get_active_tournament_id()
+    await check_tournament_ownership(admin, tournament_id)
     await random_draw(tournament_id)
     return await _groups_with_teams()
