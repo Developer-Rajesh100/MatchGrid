@@ -1258,7 +1258,7 @@ tr.qualify-spot td:first-child {
 .brand-footer {
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-canvas);
-  padding: 36px 20px 28px;
+  padding: 18px 20px;
   color: var(--text-secondary);
   font-size: 13px;
   margin-top: auto;
@@ -2086,3 +2086,113 @@ tr.qualify-spot td:first-child {
 .champion-trophy svg { color: var(--accent-gold); }
 .empty-icon svg { color: var(--text-muted); }
 .error-text svg { vertical-align: -3px; margin-right: 4px; }
+
+/* ---- Footer: brand, two links, copyright. Nothing else. ---- */
+.brand-footer .footer-row {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  flex-wrap: wrap;
+}
+.footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.footer-brand img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+.footer-links {
+  display: flex;
+  gap: 20px;
+}
+.footer-links a:hover {
+  color: var(--brand-primary);
+}
+.footer-copy {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---- Operations shell (/scorer and the live console) ---- */
+.ops-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.ops-bar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.ops-bar__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 52px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ops-bar__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ops-bar__wordmark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+}
+.ops-bar__wordmark span {
+  color: var(--brand-primary);
+}
+.ops-bar__who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-left: 12px;
+  border-left: 1px solid var(--border-subtle);
+}
+.ops-bar__user {
+  font-weight: 600;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ops-bar__role {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+.ops-bar__spacer {
+  flex: 1;
+}
+.ops-main {
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 56px;
+}
+@media (max-width: 600px) {
+  .ops-bar__inner { gap: 8px; padding: 0 12px; }
+  .ops-bar__wordmark,
+  .ops-bar__hub-label { display: none; }
+  .ops-main { padding: 16px 12px 48px; }
+}
