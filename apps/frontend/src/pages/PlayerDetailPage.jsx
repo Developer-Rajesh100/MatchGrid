@@ -7,6 +7,7 @@ import { ArrowLeft, Trophy, Flame, Shield, Calendar, ArrowRight } from 'lucide-r
 import { useLiveSocket } from '../hooks/useLiveSocket';
 import { useTournament } from '../context/TournamentContext';
 import { tPath } from '../utils/paths';
+import { EventIcon } from '../components/common/EventIcon';
 
 export function PlayerDetailPage() {
   const { playerId } = useParams();
@@ -212,7 +213,7 @@ export function PlayerDetailPage() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span>⚽</span>
+                  <EventIcon type="goal" size={15} />
                   <span style={{ fontWeight: 700, color: 'var(--brand-primary)', fontSize: '13.5px' }}>
                     {g.minute}'
                   </span>

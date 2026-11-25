@@ -39,7 +39,7 @@ export function Avatar({
           width: size,
           height: size,
           borderRadius,
-          border: `1.5px solid ${cleanColor}55`,
+          boxShadow: `0 0 0 2px var(--bg-canvas), 0 0 0 3.5px ${cleanColor}`,
           background: 'var(--bg-elevated)',
           flexShrink: 0,
         }}
@@ -63,14 +63,14 @@ export function Avatar({
         width: size,
         height: size,
         borderRadius,
-        background: `linear-gradient(135deg, ${cleanColor}22, ${cleanColor}44)`,
-        border: `1.5px solid ${cleanColor}77`,
+        background: 'var(--bg-elevated)',
+        boxShadow: `0 0 0 2px var(--bg-canvas), 0 0 0 3.5px ${cleanColor}`,
         color: 'var(--text-primary)',
-        fontSize: Math.max(11, Math.round(size * 0.38)),
+        fontFamily: 'var(--font-num)',
+        fontSize: Math.max(12, Math.round(size * 0.42)),
         fontWeight: 700,
-        letterSpacing: '0.5px',
+        letterSpacing: '0.04em',
         flexShrink: 0,
-        boxShadow: `0 2px 8px ${cleanColor}22`,
       }}
     >
       {initials}

@@ -5,6 +5,7 @@ import { Avatar } from '../common/Avatar';
 import { Calendar, Clock, MapPin, Activity } from 'lucide-react';
 import { useTournament } from '../../context/TournamentContext';
 import { tPath } from '../../utils/paths';
+import { formatDay } from '../../utils/dates';
 
 export function MatchRow({ match, showVenue = false }) {
   const navigate = useNavigate();
@@ -133,7 +134,7 @@ export function MatchRow({ match, showVenue = false }) {
         )}
         {match.date && (
           <div className="match-date-time" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
-            <Calendar size={11} /> {match.date}
+            <Calendar size={11} /> {formatDay(match.date)}
           </div>
         )}
         {match.time && (

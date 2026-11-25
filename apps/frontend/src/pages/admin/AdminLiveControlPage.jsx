@@ -9,6 +9,7 @@ import { LoadingState, ErrorState } from '../../components/common/Common';
 import { useLiveSocket } from '../../hooks/useLiveSocket';
 import { formatTime } from '../../utils/time';
 import { clockOffsetMs, matchElapsedSeconds } from '../../utils/clock';
+import { EventIcon } from '../../components/common/EventIcon';
 import {
   ArrowLeft,
   Play,
@@ -97,11 +98,11 @@ export function AdminLiveControlPage() {
       if (data.team1_id) {
         setEventTeamId(data.team1_id);
         const p1 = await playersApi.getPlayers({ team_id: data.team1_id, tournament_id: data.tournament_id });
-        setTeam1Players(p1 || []);
+        setTeam1Players((p1 || []).filter((p) => !p.is_manager)); // managers do not play
       }
       if (data.team2_id) {
         const p2 = await playersApi.getPlayers({ team_id: data.team2_id, tournament_id: data.tournament_id });
-        setTeam2Players(p2 || []);
+        setTeam2Players((p2 || []).filter((p) => !p.is_manager));
       }
     } catch (err) {
       if (showLoading) setError(err.message || 'Failed to load match details');
@@ -570,10 +571,10 @@ export function AdminLiveControlPage() {
               <label>Event Type</label>
               <div className="admin-event-type-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                 {[
-                  { id: 'goal', label: '⚽ Goal' },
-                  { id: 'yellow', label: '🟨 Yellow' },
-                  { id: 'red', label: '🟥 Red' },
-                  { id: 'potm', label: '⭐ POTM' },
+                  { id: 'goal', label: 'Goal' },
+                  { id: 'yellow', label: 'Yellow' },
+                  { id: 'red', label: 'Red' },
+                  { id: 'potm', label: 'POTM' },
                 ].map((type) => (
                   <button
                     key={type.id}
@@ -703,9 +704,7 @@ export function AdminLiveControlPage() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '15px' }}>
-                    {evt.type === 'goal' ? '⚽' : evt.type === 'yellow' ? '🟨' : evt.type === 'red' ? '🟥' : '⭐'}
-                  </span>
+                  <EventIcon type={evt.type} size={16} />
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '13.5px' }}>
                       {evt.player_name}

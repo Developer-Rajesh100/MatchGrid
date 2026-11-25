@@ -13,6 +13,8 @@ import { Avatar } from '../../components/common/Avatar';
 import { LoadingState, ErrorState, StatTile } from '../../components/common/Common';
 import { useLiveSocket } from '../../hooks/useLiveSocket';
 import { tPath } from '../../utils/paths';
+import { formatDay } from '../../utils/dates';
+import { stageLabel } from '../../utils/matchLabels';
 
 export function TournamentOverviewPage() {
   const navigate = useNavigate();
@@ -85,7 +87,7 @@ export function TournamentOverviewPage() {
                 <span className="pill-dot" /> LIVE MATCH
               </span>
               <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                Match #{featuredLive.match_number} &bull; {featuredLive.label || 'Match'}
+                Match #{featuredLive.match_number}{stageLabel(featuredLive) ? ` · ${stageLabel(featuredLive)}` : ''}
               </span>
             </div>
             <button
@@ -188,7 +190,7 @@ export function TournamentOverviewPage() {
               <span><MapPin size={13} style={{ display: 'inline', marginRight: '5px' }} />{featuredLive.venue}</span>
             )}
             {featuredLive.date && (
-              <span><Calendar size={13} style={{ display: 'inline', marginRight: '5px' }} />{featuredLive.date}</span>
+              <span><Calendar size={13} style={{ display: 'inline', marginRight: '5px' }} />{formatDay(featuredLive.date)}</span>
             )}
             {featuredLive.time && (
               <span><Clock size={13} style={{ display: 'inline', marginRight: '5px' }} />{featuredLive.time}</span>
@@ -230,7 +232,7 @@ export function TournamentOverviewPage() {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px', flexWrap: 'wrap' }}>
-                {nextMatch.date && <span><Calendar size={12} style={{ display: 'inline', marginRight: '4px' }} />{nextMatch.date}</span>}
+                {nextMatch.date && <span><Calendar size={12} style={{ display: 'inline', marginRight: '4px' }} />{formatDay(nextMatch.date)}</span>}
                 {nextMatch.time && <span><Clock size={12} style={{ display: 'inline', marginRight: '4px' }} />{nextMatch.time}</span>}
                 {nextMatch.venue && <span><MapPin size={12} style={{ display: 'inline', marginRight: '4px' }} />{nextMatch.venue}</span>}
               </div>
@@ -271,7 +273,7 @@ export function TournamentOverviewPage() {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
-                <span>{latestResult.date} &bull; {latestResult.venue || 'Stadium'}</span>
+                <span>{formatDay(latestResult.date)}{latestResult.venue ? ` · ${latestResult.venue}` : ''}</span>
                 <span style={{ color: 'var(--brand-primary)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
                   Full Details <ArrowRight size={12} />
                 </span>

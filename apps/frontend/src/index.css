@@ -50,6 +50,8 @@
   --yellow: var(--event-yellow);
 
   /* Modern Geometric Typography */
+  /* Barlow Condensed carries every number that ticks or ranks: scores, clocks, standings, stats */
+  --font-num: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
   --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-body: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
@@ -91,7 +93,9 @@ a {
   text-decoration: none;
 }
 
-/* Numeric Precision: Tabular Figures prevent live ticking jitters */
+/* Numeric Precision: one condensed, tabular face for everything that ticks or ranks, so digits
+   never change width (no jitter on a live clock or score) and columns line up. */
+.num,
 .tabular-nums,
 .timer-display,
 .hero-score,
@@ -99,9 +103,15 @@ a {
 .standings-col-num,
 .match-score,
 .stat-tile-val,
-.event-minute {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
+.event-minute,
+.bracket-team-score,
+table th.num,
+table td.num,
+[data-testid="timer-display"] {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  letter-spacing: 0.01em;
 }
 
 /* Custom Sports-SaaS Scrollbars */
@@ -120,19 +130,11 @@ a {
   background: var(--border-strong);
 }
 
-/* Top Shimmer Accent */
+/* Top rule: a plain 2px emerald line (no animated gradient) */
 .brand-topbar,
 .dcl-topbar {
-  height: 3px;
-  background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-hover), var(--status-info), var(--brand-primary));
-  background-size: 300% 100%;
-  animation: brandShimmer 6s ease infinite;
-}
-
-@keyframes brandShimmer {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  height: 2px;
+  background: var(--brand-primary);
 }
 
 /* App Header & Navigation */
@@ -176,7 +178,6 @@ a {
   height: 32px;
   object-fit: contain;
   border-radius: 6px;
-  filter: drop-shadow(0 2px 8px var(--brand-primary-glow));
 }
 
 .brand-wordmark {
@@ -256,23 +257,16 @@ a {
   gap: 12px;
 }
 
-/* Live Connection Beacon */
+/* Live connection: a single dot (emerald = receiving live updates), details in its tooltip */
 .connection-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 11.5px;
-  font-weight: 600;
-  background: var(--bg-surface);
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: transparent;
   border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-}
-
-.connection-indicator.online {
-  border-color: rgba(16, 185, 129, 0.3);
-  color: var(--brand-primary);
 }
 
 .connection-dot {
@@ -284,7 +278,6 @@ a {
 
 .connection-indicator.online .connection-dot {
   background: var(--brand-primary);
-  box-shadow: 0 0 8px var(--brand-primary);
   animation: pulseBeacon 2s infinite ease-in-out;
 }
 
@@ -513,11 +506,10 @@ main {
 
 /* Hero Live Match Center Banner */
 .hero-live-card {
-  background: linear-gradient(135deg, rgba(19, 26, 34, 0.95), rgba(28, 37, 48, 0.85));
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 28px;
-  box-shadow: 0 12px 36px rgba(239, 68, 68, 0.12), var(--shadow-lg);
   position: relative;
   overflow: hidden;
   margin-bottom: 28px;
@@ -530,9 +522,7 @@ main {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--status-live), #F87171, var(--status-live));
-  background-size: 200% 100%;
-  animation: brandShimmer 3s infinite linear;
+  background: var(--status-live);
 }
 
 /* Buttons */
@@ -590,7 +580,6 @@ main {
   background: var(--brand-primary-hover);
   border-color: var(--brand-primary-hover);
   color: var(--text-on-brand);
-  box-shadow: 0 6px 20px var(--brand-primary-glow);
 }
 
 .btn-success {
@@ -693,7 +682,6 @@ main {
 }
 .pill-live .pill-dot {
   background: var(--status-live);
-  box-shadow: 0 0 8px var(--status-live);
   animation: pulseBeacon 1.4s infinite ease-in-out;
 }
 
@@ -819,13 +807,13 @@ main {
 
 /* Scoreboard Displays */
 .hero-score, .gradient-text {
-  font-family: var(--font-display);
+  font-family: var(--font-num);
   font-weight: 700;
   color: var(--text-primary);
 }
 
 /* Forms & Inputs */
-.input, .select, .form-input {
+.input, .input-field, .select, .form-input {
   width: 100%;
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
@@ -837,12 +825,12 @@ main {
   transition: all 0.2s ease;
 }
 
-.input:focus, .select:focus, .form-input:focus {
+.input:focus, .input-field:focus, .select:focus, .form-input:focus {
   border-color: var(--brand-primary);
   box-shadow: 0 0 0 3px var(--brand-primary-tint);
 }
 
-.input::placeholder {
+.input::placeholder, .input-field::placeholder {
   color: var(--text-muted);
 }
 
@@ -1228,9 +1216,8 @@ tr.qualify-spot td:first-child {
   text-align: center;
   padding: 48px 24px;
   border-radius: var(--radius-lg);
-  background: radial-gradient(ellipse at 50% 0%, rgba(245, 158, 11, 0.2), transparent 75%), var(--bg-surface);
+  background: var(--bg-surface);
   border: 1px solid rgba(245, 158, 11, 0.4);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
   position: relative;
   overflow: hidden;
   margin-bottom: 28px;
@@ -1926,3 +1913,176 @@ tr.qualify-spot td:first-child {
     padding: 0 14px;
   }
 }
+
+/* =====================================================================================
+   P0 foundations: focus, motion, skeletons, team accents, score and clock faces
+   ===================================================================================== */
+
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.input:focus-visible,
+.input-field:focus-visible,
+.select:focus-visible,
+.form-input:focus-visible {
+  outline: none; /* these draw their own focus ring (border + tint) */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Skeletons: calm, flat blocks that breathe; no shimmer gradients */
+.skeleton {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-xs);
+  animation: skeletonBreath 1.6s ease-in-out infinite;
+}
+.skeleton--circle {
+  border-radius: 50%;
+}
+.skeleton-stack {
+  display: grid;
+  gap: 8px;
+}
+.skeleton-card {
+  display: grid;
+  gap: 12px;
+}
+@keyframes skeletonBreath {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* A team's colour is a sharp 3px bar beside its name, never a tinted tile */
+.team-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+}
+.team-mark--bar {
+  border-left: 3px solid var(--team-color, var(--border-strong));
+  padding-left: 10px;
+}
+.team-mark--right {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.team-mark--right.team-mark--bar {
+  border-left: 0;
+  padding-left: 0;
+  border-right: 3px solid var(--team-color, var(--border-strong));
+  padding-right: 10px;
+}
+.team-mark__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.team-mark__name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-mark__sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Scores */
+.score-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28em;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+.score-line__n {
+  display: inline-block;
+  min-width: 0.62em;
+  text-align: center;
+}
+.score-line__sep {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.score-line__pens {
+  font-size: 0.42em;
+  font-weight: 600;
+  color: var(--accent-gold);
+  letter-spacing: 0.04em;
+  align-self: center;
+  margin-left: 0.4em;
+}
+.score-line--muted { color: var(--text-secondary); }
+.score-line--sm { font-size: 18px; }
+.score-line--md { font-size: 26px; }
+.score-line--lg { font-size: 44px; }
+.score-line--xl { font-size: clamp(52px, 12vw, 84px); }
+
+/* Match clock */
+.match-clock {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.match-clock__time {
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-primary);
+}
+.match-clock--md .match-clock__time { font-size: 34px; }
+.match-clock--lg .match-clock__time { font-size: clamp(48px, 11vw, 72px); }
+.match-clock--sm .match-clock__time { font-size: 20px; }
+.match-clock__state {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.match-clock--live .match-clock__time { color: var(--text-primary); }
+.match-clock--live .match-clock__state { color: var(--status-live); }
+.match-clock--halftime .match-clock__time { color: var(--accent-gold); }
+.match-clock--halftime .match-clock__state { color: var(--accent-gold); }
+
+.event-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.match-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.match-title__no {
+  font-family: var(--font-num);
+  font-size: 17px;
+  color: var(--text-primary);
+}
+.match-title__stage {
+  padding-left: 12px;
+  border-left: 1px solid var(--border-strong);
+}
+.champion-trophy svg { color: var(--accent-gold); }
+.empty-icon svg { color: var(--text-muted); }
+.error-text svg { vertical-align: -3px; margin-right: 4px; }

@@ -12,6 +12,9 @@ import { formatTime } from '../utils/time';
 import { clockOffsetMs, matchElapsedSeconds } from '../utils/clock';
 import { useTournament } from '../context/TournamentContext';
 import { tPath } from '../utils/paths';
+import { EventIcon } from '../components/common/EventIcon';
+import { formatDay } from '../utils/dates';
+import { stageLabel } from '../utils/matchLabels';
 
 export function MatchDetailPage() {
   const { matchId } = useParams();
@@ -124,8 +127,9 @@ export function MatchDetailPage() {
       {/* Main Match Header Card */}
       <div className="card" style={{ marginBottom: '24px', padding: '28px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.6px', textTransform: 'uppercase' }}>
-            Match #{match.match_number} {label ? `&bull; ${label}` : ''}
+          <span className="match-title">
+            <span className="match-title__no">Match #{match.match_number}</span>
+            {stageLabel(match) && <span className="match-title__stage">{stageLabel(match)}</span>}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <StatusPill status={match.status} isHalfTime={Boolean(match.is_half_time)} />
@@ -365,7 +369,7 @@ export function MatchDetailPage() {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px', textAlign: 'left' }}>
               {team1Goals.map((g) => (
                 <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>⚽</span>
+                  <EventIcon type="goal" size={14} />
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{g.player_name}</span>
                   {g.minute && <span style={{ color: 'var(--brand-primary)', fontSize: '11.5px', fontWeight: 700 }}>{g.minute}'</span>}
                   {g.assist_player_name && (
@@ -382,7 +386,7 @@ export function MatchDetailPage() {
                   )}
                   {g.minute && <span style={{ color: 'var(--brand-primary)', fontSize: '11.5px', fontWeight: 700 }}>{g.minute}'</span>}
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{g.player_name}</span>
-                  <span>⚽</span>
+                  <EventIcon type="goal" size={14} />
                 </div>
               ))}
             </div>
@@ -430,7 +434,7 @@ export function MatchDetailPage() {
         >
           {match.date && (
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Calendar size={14} color="var(--brand-primary)" /> {match.date}
+              <Calendar size={14} color="var(--brand-primary)" /> {formatDay(match.date)}
             </span>
           )}
           {match.time && (
@@ -507,9 +511,7 @@ export function MatchDetailPage() {
                   >
                     <div className="event-minute">{evt.minute ? `${evt.minute}'` : '•'}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '16px' }}>
-                        {evt.type === 'goal' ? '⚽' : evt.type === 'yellow' ? '🟨' : evt.type === 'red' ? '🟥' : '•'}
-                      </span>
+                      <EventIcon type={evt.type} size={17} />
                       <div>
                         <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{evt.player_name}</span>
                         {evt.assist_player_name && (

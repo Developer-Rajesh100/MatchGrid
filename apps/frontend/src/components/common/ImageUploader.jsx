@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { uploadImage } from '../../api/uploads';
+import { CloudUpload } from 'lucide-react';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -197,7 +198,7 @@ export function ImageUploader({
           </div>
         ) : (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-            <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>☁️</div>
+            <CloudUpload size={22} aria-hidden="true" style={{ marginBottom: '4px' }} />
             <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>
               {isDragging ? 'Drop image here' : 'Click or drag image here'}
             </div>

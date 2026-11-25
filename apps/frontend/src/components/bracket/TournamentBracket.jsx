@@ -4,6 +4,7 @@ import { matchesApi } from '../../api/matches';
 import './TournamentBracket.css';
 import { useTournament } from '../../context/TournamentContext';
 import { tPath } from '../../utils/paths';
+import { Trophy, TriangleAlert } from 'lucide-react';
 
 export default function TournamentBracket({ tournamentId, refreshTrigger = 0 }) {
   const { slug } = useTournament();
@@ -56,7 +57,7 @@ export default function TournamentBracket({ tournamentId, refreshTrigger = 0 }) 
   if (error) {
     return (
       <div className="bracket-error" data-testid="bracket-error">
-        <p className="error-text">⚠️ {error}</p>
+        <p className="error-text"><TriangleAlert size={16} aria-hidden="true" /> {error}</p>
       </div>
     );
   }
@@ -68,7 +69,7 @@ export default function TournamentBracket({ tournamentId, refreshTrigger = 0 }) 
   if (!hasMatches && bracket?.knockout_format === 'none') {
     return (
       <div className="bracket-empty-state" data-testid="bracket-none">
-        <div className="empty-icon">🏆</div>
+        <div className="empty-icon"><Trophy size={30} aria-hidden="true" /></div>
         <h3>No Knockout Stage</h3>
         <p>This tournament is decided on the group table, so there is no bracket.</p>
       </div>
@@ -78,7 +79,7 @@ export default function TournamentBracket({ tournamentId, refreshTrigger = 0 }) 
   if (!hasMatches) {
     return (
       <div className="bracket-empty-state" data-testid="bracket-empty">
-        <div className="empty-icon">🏆</div>
+        <div className="empty-icon"><Trophy size={30} aria-hidden="true" /></div>
         <h3>Knockout Stage Pending</h3>
         <p>
           The knockout bracket will be dynamically populated once the group stage fixtures conclude.
@@ -91,7 +92,7 @@ export default function TournamentBracket({ tournamentId, refreshTrigger = 0 }) 
     <div className="tournament-bracket-wrapper" data-testid="tournament-bracket">
       {champion && (
         <div className="champion-banner" data-testid="champion-banner">
-          <div className="champion-trophy">🏆</div>
+          <div className="champion-trophy"><Trophy size={34} aria-hidden="true" /></div>
           <div className="champion-info">
             <span className="champion-subtitle">TOURNAMENT CHAMPION</span>
             <div className="champion-team">
