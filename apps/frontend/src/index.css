@@ -931,13 +931,14 @@ tr.qualify-spot td:first-child {
 /* Grid Layouts */
 .grid-2 {
   display: grid;
-  grid-template-columns: 1fr;
+  /* minmax(0, ...) lets a wide table scroll inside its card instead of stretching the whole column */
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
 }
 
 .grid-3 {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -949,10 +950,10 @@ tr.qualify-spot td:first-child {
 
 @media (min-width: 640px) {
   .grid-2 {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .grid-3 {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .stat-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -961,7 +962,7 @@ tr.qualify-spot td:first-child {
 
 @media (min-width: 900px) {
   .grid-3 {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .stat-grid {
     grid-template-columns: repeat(6, 1fr);
@@ -1873,3 +1874,55 @@ tr.qualify-spot td:first-child {
   margin-bottom: 24px;
 }
 
+
+/* Narrow phones: the header must fit in 375px. The logo mark stays, the tournament switcher
+   absorbs the remaining width (label truncates), and the connection beacon steps aside. */
+@media (max-width: 600px) {
+  .brand-nav-inner,
+  .dcl-nav-inner {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .brand-wordmark {
+    display: none;
+  }
+
+  .brand-nav-right,
+  .dcl-nav-right {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .connection-indicator {
+    display: none;
+  }
+
+  .brand-nav-inner > .tournament-switcher {
+    flex: 1 1 0;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .tournament-switcher-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .switcher-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+}
+
+/* The sub-nav bleeds to the screen edges by cancelling main's padding, which is 14px (not 16px) on phones. */
+@media (max-width: 767px) {
+  .tournament-subnav-container {
+    margin: -20px -14px 24px -14px;
+    padding: 0 14px;
+  }
+}

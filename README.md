@@ -124,3 +124,13 @@ This automatically:
 - **Development Workflow & Quality Gates:** [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md)
 - **Historical Baseline Codebase Audit:** [`docs/PROJECT_ANALYSIS.md`](docs/PROJECT_ANALYSIS.md)
 - **Tournament Data Format & Importers:** [`apps/backend/data/README.md`](apps/backend/data/README.md)
+
+
+## Demo data
+
+`bun run seed:demo` fills the dev database with a busy, realistic platform: ~50 tournaments (completed with champions, active at every stage with matches live and at half time right now, and upcoming drafts), 400+ clubs, 3,000+ players, ~770 matches with lineups, events and the materialized standings and statistics, plus 8 organizers and 20 scorers.
+
+* Safe to re-run: it does nothing once seeded. `bun run seed:demo -- --reset` removes exactly what it created (accounts named `demo_*` and their tournaments) and rebuilds it; other data is never touched.
+* It never uses Cloudflare R2 (crests, logos and banners are inline SVGs) and refuses the test database and `ENVIRONMENT=production`.
+* All demo accounts share the password `DemoPass#2026`, e.g. organizer `demo_premier_street`, scorer `demo_scorer_01`. Your existing superadmin is reused.
+* `--tournaments N` changes the size (used by the tests with a small N).
