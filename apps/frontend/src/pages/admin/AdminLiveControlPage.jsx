@@ -10,6 +10,8 @@ import { useLiveSocket } from '../../hooks/useLiveSocket';
 import { formatTime } from '../../utils/time';
 import { clockOffsetMs, matchElapsedSeconds } from '../../utils/clock';
 import { EventIcon } from '../../components/common/EventIcon';
+import { Scoreboard } from '../../components/match/Scoreboard';
+import { ScoreLine } from '../../components/common/ScoreLine';
 import {
   ArrowLeft,
   Play,
@@ -47,6 +49,10 @@ export function AdminLiveControlPage() {
   const [eventPlayerId, setEventPlayerId] = useState('');
   const [eventAssistId, setEventAssistId] = useState('');
   const [eventMinute, setEventMinute] = useState('');
+  // The minute follows the match clock until the operator types their own
+  const [minuteTouched, setMinuteTouched] = useState(false);
+  const boardRef = useRef(null);
+  const [boardVisible, setBoardVisible] = useState(true);
 
   // Lineup management state
   const [selectedLineup, setSelectedLineup] = useState([]);
@@ -86,6 +92,28 @@ export function AdminLiveControlPage() {
     return undefined;
   }, [match]);
 
+  const clockMinute =
+    match?.status === 'live'
+      ? isHalfTime
+        ? Math.max(1, Math.ceil(timerSeconds / 60))
+        : Math.floor(timerSeconds / 60) + 1
+      : null;
+
+  useEffect(() => {
+    if (!minuteTouched && clockMinute) setEventMinute(String(clockMinute));
+  }, [clockMinute, minuteTouched]);
+
+  // Keep the score and clock in view: when the full scoreboard scrolls away, a compact strip takes over.
+  const hasMatch = Boolean(match);
+  useEffect(() => {
+    if (!hasMatch || !boardRef.current || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver(([entry]) => setBoardVisible(entry.isIntersecting), {
+      rootMargin: '-60px 0px 0px 0px',
+    });
+    observer.observe(boardRef.current);
+    return () => observer.disconnect();
+  }, [hasMatch]);
+
   const loadMatchDetails = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
@@ -93,10 +121,12 @@ export function AdminLiveControlPage() {
       const data = await matchesApi.getMatch(matchId);
       clockOffsetRef.current = clockOffsetMs(data, Date.now());
       setMatch(data);
-      setSelectedLineup(data.lineup || []);
+      // Only seed the form on the first load: a live refresh must not undo a team the operator has
+      // picked or a lineup they are in the middle of editing.
+      if (showLoading) setSelectedLineup(data.lineup || []);
 
       if (data.team1_id) {
-        setEventTeamId(data.team1_id);
+        setEventTeamId((current) => current || data.team1_id);
         const p1 = await playersApi.getPlayers({ team_id: data.team1_id, tournament_id: data.tournament_id });
         setTeam1Players((p1 || []).filter((p) => !p.is_manager)); // managers do not play
       }
@@ -232,14 +262,16 @@ export function AdminLiveControlPage() {
         type: eventType,
         team_id: eventTeamId,
         player_id: eventPlayerId,
-        minute: eventMinute ? parseInt(eventMinute, 10) : undefined,
+        minute: eventType !== 'potm' && eventMinute ? parseInt(eventMinute, 10) : undefined,
         assist_player_id: eventType === 'goal' && eventAssistId ? eventAssistId : undefined,
       };
 
       await matchesApi.addEvent(matchId, payload);
       showSuccess(`Recorded ${eventType.toUpperCase()} event!`);
       setEventMinute('');
+      setMinuteTouched(false);
       setEventAssistId('');
+      setEventPlayerId('');
       await loadMatchDetails();
     } catch (err) {
       setError(err.message || 'Failed to add event');
@@ -300,524 +332,360 @@ export function AdminLiveControlPage() {
   if (error && !match) return <ErrorState message={error} onRetry={loadMatchDetails} />;
 
   const activeTeamPlayers = eventTeamId === match.team1_id ? team1Players : team2Players;
+  const live = match.status === 'live';
+  const clockState = live ? (isHalfTime ? 'ht' : 'live') : match.status === 'full_time' ? 'ft' : 'idle';
+  const clockText = live
+    ? isHalfTime
+      ? 'Half Time • Timer Paused'
+      : 'Live • Timer Running'
+    : match.status === 'full_time'
+    ? 'Full Time • Timer Stopped'
+    : match.status === 'cancelled'
+    ? 'Match Cancelled'
+    : 'Match Not Started';
+  const eventTypes = [
+    { id: 'goal', label: 'Goal' },
+    { id: 'yellow', label: 'Yellow' },
+    { id: 'red', label: 'Red' },
+    { id: 'potm', label: 'POTM' },
+  ];
+  const teamSides = [
+    { id: match.team1_id, name: match.team1_name, color: match.team1_color },
+    { id: match.team2_id, name: match.team2_name, color: match.team2_color },
+  ];
+  const pickTeam = (teamId) => {
+    setEventTeamId(teamId);
+    setEventPlayerId('');
+    setEventAssistId('');
+  };
+  const assistOptions = activeTeamPlayers.filter((p) => p.id !== eventPlayerId);
+
+  const clockBlock = (
+    <div className={`sb-clock sb-clock--${clockState}`} data-testid="match-timer">
+      <span className="sb-clock__row">
+        <Clock size={15} aria-hidden="true" />
+        <span data-testid="timer-display" className="timer-display num sb-clock__time sb-clock__time--console">
+          {timerUnknown ? '—' : formatTime(timerSeconds)}
+        </span>
+        {live && !isHalfTime && <span className="live-dot" data-testid="timer-live-dot" />}
+        {live && isHalfTime && <span className="sb-dot-ht" data-testid="timer-halftime-dot" title="Paused for Half Time" />}
+      </span>
+      <span data-testid="timer-status" className="sb-clock__state">{clockText}</span>
+      <button
+        type="button"
+        className="btn btn-outline btn-sm cockpit-reset"
+        onClick={handleResetTimer}
+        title="Reset timer to 00:00"
+        disabled={!live || actionLoading}
+      >
+        <RotateCcw size={12} aria-hidden="true" /> Reset to 00:00
+      </button>
+    </div>
+  );
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+    <div className="cockpit">
+      <div className="cockpit__bar">
         <button onClick={() => navigate(authApi.isScorer() ? '/scorer' : '/organizer')} className="btn btn-outline btn-sm">
-          <ArrowLeft size={13} /> Back to Dashboard
+          <ArrowLeft size={13} aria-hidden="true" /> Back to Dashboard
         </button>
-        <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.6px' }}>
-          MATCHGRID LIVE CONTROL CONSOLE
-        </span>
+        <span className="cockpit__title">Live control console</span>
       </div>
 
-      {successMsg && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '6px', background: 'rgba(62, 207, 110, 0.15)', border: '1px solid var(--green)', color: 'var(--green)', fontSize: '13px', marginBottom: '16px' }}>
-          <CheckCircle size={16} /> <span>{successMsg}</span>
+      {/* Sticky strip: appears once the full scoreboard has scrolled out of view */}
+      {!boardVisible && (
+        <div className={`cockpit-strip cockpit-strip--${clockState}`} aria-label="Score and clock">
+          <span className="cockpit-strip__team" style={{ '--team-color': match.team1_color || '#64748B' }}>{match.team1_name}</span>
+          <ScoreLine home={match.score1} away={match.score2} size="md" />
+          <span className="cockpit-strip__team cockpit-strip__team--away" style={{ '--team-color': match.team2_color || '#64748B' }}>{match.team2_name}</span>
+          <span className="cockpit-strip__clock num">{timerUnknown ? '—' : formatTime(timerSeconds)}</span>
         </div>
       )}
 
+      {successMsg && (
+        <div className="cockpit-banner cockpit-banner--ok" role="status">
+          <CheckCircle size={16} aria-hidden="true" /> <span>{successMsg}</span>
+        </div>
+      )}
       {error && (() => {
-        const isForbidden = (
-          error.toLowerCase().includes('not assigned') ||
-          error.toLowerCase().includes('not own') ||
-          error.toLowerCase().includes('forbidden') ||
-          error.toLowerCase().includes('unauthorized') ||
-          error.toLowerCase().includes('permission') ||
-          error.toLowerCase().includes('403')
-        );
+        const lower = error.toLowerCase();
+        const isForbidden = ['not assigned', 'not own', 'forbidden', 'unauthorized', 'permission', '403'].some((k) => lower.includes(k));
         return (
           <div
+            role="alert"
             data-testid={isForbidden ? 'access-denied-banner' : 'live-control-error'}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: isForbidden ? '14px 18px' : '10px 16px',
-              borderRadius: '8px',
-              background: 'rgba(209, 88, 90, 0.15)',
-              border: '1px solid var(--red)',
-              color: 'var(--red)',
-              fontSize: isForbidden ? '14px' : '13px',
-              fontWeight: isForbidden ? 600 : 'normal',
-              marginBottom: '16px',
-            }}
+            className={`cockpit-banner cockpit-banner--err ${isForbidden ? 'is-forbidden' : ''}`}
           >
-            <AlertTriangle size={isForbidden ? 20 : 16} />
-            <span>{isForbidden && !error.toLowerCase().includes('access denied') ? `Access Denied: ${error}` : error}</span>
+            <AlertTriangle size={isForbidden ? 20 : 16} aria-hidden="true" />
+            <span>{isForbidden && !lower.includes('access denied') ? `Access Denied: ${error}` : error}</span>
           </div>
         );
       })()}
 
-      {/* Match Control Header */}
-      <div className="card" style={{ marginBottom: '24px', padding: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-          <span style={{ fontSize: '12px', color: 'var(--chalk-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Match #{match.match_number} · {match.label || `Stage: ${match.stage}`}
+      {/* Scoreboard and clock controls */}
+      <section className="card cockpit-board" ref={boardRef}>
+        <div className="cockpit-board__head">
+          <span className="match-title">
+            <span className="match-title__no">Match #{match.match_number}</span>
+            <span className="match-title__stage">{match.label || `Stage: ${match.stage}`}</span>
           </span>
           <StatusPill status={match.status} isHalfTime={isHalfTime} />
         </div>
 
-        {/* Live Score Display */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', margin: '14px 0' }}>
-          <div style={{ textAlign: 'center', flex: 1 }}>
-            <Avatar name={match.team1_name || 'TBD'} size={52} color="#f0a53d" />
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 700, marginTop: '8px' }}>
-              {match.team1_name || 'TBD'}
-            </div>
-          </div>
+        <Scoreboard match={match} variant="console" center={clockBlock} />
 
-          <div style={{ textAlign: 'center', padding: '0 20px' }}>
-            <div className="hero-score" style={{ fontSize: '46px', letterSpacing: '2px' }}>
-              {match.score1 ?? 0} &ndash; {match.score2 ?? 0}
-            </div>
-          </div>
-
-          <div style={{ textAlign: 'center', flex: 1 }}>
-            <Avatar name={match.team2_name || 'TBD'} size={52} color="#3ecf6e" />
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 700, marginTop: '8px' }}>
-              {match.team2_name || 'TBD'}
-            </div>
-          </div>
-        </div>
-
-        {/* Match Timer Display */}
-        <div
-          className="admin-timer-card"
-          data-testid="match-timer"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '16px auto 20px',
-            padding: '12px 28px',
-            background: 'var(--panel-alt)',
-            border: '1px solid var(--line)',
-            borderRadius: 'var(--radius-md)',
-            maxWidth: '340px',
-            width: '100%',
-            textAlign: 'center',
-            boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.3)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <Clock size={15} color={match.status === 'live' ? (isHalfTime ? 'var(--amber)' : 'var(--green)') : 'var(--amber)'} />
-            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--chalk-dim)' }}>
-              Match Timer
-            </span>
-            {match.status === 'live' && !isHalfTime && (
-              <span
-                className="pulse-live"
-                data-testid="timer-live-dot"
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: 'var(--green)',
-                  display: 'inline-block',
-                }}
-              />
-            )}
-            {match.status === 'live' && isHalfTime && (
-              <span
-                data-testid="timer-halftime-dot"
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: 'var(--amber)',
-                  display: 'inline-block',
-                }}
-                title="Paused for Half Time"
-              />
-            )}
-          </div>
-
-          <div
-            data-testid="timer-display"
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '38px',
-              fontWeight: 700,
-              letterSpacing: '2px',
-              lineHeight: 1.1,
-              fontVariantNumeric: 'tabular-nums',
-              color: match.status === 'live' ? (isHalfTime ? 'var(--amber)' : 'var(--green)') : match.status === 'full_time' ? 'var(--amber)' : 'var(--chalk)',
-            }}
-          >
-            {timerUnknown ? '—' : formatTime(timerSeconds)}
-          </div>
-
-          <div
-            data-testid="timer-status"
-            style={{
-              fontSize: '11.5px',
-              fontWeight: 600,
-              color: match.status === 'live' ? (isHalfTime ? 'var(--amber)' : 'var(--green)') : match.status === 'full_time' ? 'var(--amber)' : 'var(--chalk-muted)',
-              marginTop: '4px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-            }}
-          >
-            {match.status === 'live'
-              ? isHalfTime
-                ? 'Half Time • Timer Paused'
-                : 'Live • Timer Running'
-              : match.status === 'full_time'
-              ? 'Full Time • Timer Stopped'
-              : match.status === 'cancelled'
-              ? 'Match Cancelled'
-              : 'Match Not Started'}
-          </div>
-
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={handleResetTimer}
-            title="Reset timer to 00:00"
-            style={{ fontSize: '11px', padding: '3px 8px', marginTop: '6px', height: '24px', color: 'var(--chalk-dim)' }}
-          >
-            <RotateCcw size={11} /> Reset to 00:00
-          </button>
-        </div>
-
-        {/* Status Transition Control Bar */}
-        <div
-          className="admin-status-bar"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '16px',
-            flexWrap: 'wrap',
-          }}
-        >
+        <div className="cockpit-controls admin-status-bar">
           {match.status === 'upcoming' && (
-            <button className="btn btn-success" onClick={handleStart} disabled={actionLoading}>
-              <Play size={14} /> Start Match (Kick Off)
+            <button className="cockpit-btn cockpit-btn--go" onClick={handleStart} disabled={actionLoading}>
+              <Play size={18} aria-hidden="true" /> Start Match (Kick Off)
             </button>
           )}
-
-          {match.status === 'live' && (
+          {live && (
             <>
               {!isHalfTime ? (
-                <button
-                  type="button"
-                  className="btn btn-warning"
-                  onClick={handleHalfTime}
-                  disabled={actionLoading}
-                >
-                  <Pause size={14} /> Half Time
+                <button type="button" className="cockpit-btn cockpit-btn--pause" onClick={handleHalfTime} disabled={actionLoading}>
+                  <Pause size={18} aria-hidden="true" /> Half Time
                 </button>
               ) : (
-                <button
-                  type="button"
-                  className="btn btn-success"
-                  onClick={handleResume}
-                  disabled={actionLoading}
-                >
-                  <Play size={14} /> Resume
+                <button type="button" className="cockpit-btn cockpit-btn--go" onClick={handleResume} disabled={actionLoading}>
+                  <Play size={18} aria-hidden="true" /> Resume
                 </button>
               )}
-              <button className="btn btn-primary" onClick={handleEnd} disabled={actionLoading}>
-                <Square size={14} /> End Match (Full Time)
+              <button className="cockpit-btn cockpit-btn--end" onClick={handleEnd} disabled={actionLoading}>
+                <Square size={18} aria-hidden="true" /> End Match (Full Time)
               </button>
             </>
           )}
-
           {/* Reopen and winner override are tournament-owner actions; scorers only run the live clock/events. */}
           {match.status === 'full_time' && !authApi.isScorer() && (
-            <button className="btn btn-outline" onClick={handleReopen} disabled={actionLoading}>
-              <RotateCcw size={14} /> Reopen Match to LIVE
+            <button className="cockpit-btn cockpit-btn--quiet" onClick={handleReopen} disabled={actionLoading}>
+              <RotateCcw size={18} aria-hidden="true" /> Reopen Match to LIVE
             </button>
           )}
-
-          {/* Knockout Winner Override if drawn */}
           {match.stage !== 'group' && match.status === 'full_time' && !authApi.isScorer() && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '12px', color: 'var(--chalk-dim)' }}>Winner:</span>
-              <button
-                className={`btn btn-sm ${match.winner_id === match.team1_id ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => handleWinnerOverride(match.team1_id)}
-                disabled={actionLoading}
-              >
-                {match.team1_name}
-              </button>
-              <button
-                className={`btn btn-sm ${match.winner_id === match.team2_id ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => handleWinnerOverride(match.team2_id)}
-                disabled={actionLoading}
-              >
-                {match.team2_name}
-              </button>
+            <div className="cockpit-winner">
+              <span>Winner:</span>
+              {teamSides.map((t) => (
+                <button
+                  key={t.id}
+                  className={`btn btn-sm ${match.winner_id === t.id ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => handleWinnerOverride(t.id)}
+                  disabled={actionLoading}
+                >
+                  {t.name}
+                </button>
+              ))}
             </div>
           )}
         </div>
-      </div>
+      </section>
 
-      {/* Quick Event Logger & Current Events */}
-      <div className="grid-2" style={{ marginBottom: '28px' }}>
-        {/* Event Form */}
-        <div className="card">
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 600, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Zap size={18} color="var(--amber)" /> Log Match Event
-          </h3>
-
+      <div className="cockpit-grid">
+        {/* Event pad: type, team, player, minute */}
+        <section className="card cockpit-pad">
+          <h3 className="cockpit-h"><Zap size={17} aria-hidden="true" /> Log Match Event</h3>
           <form onSubmit={handleAddEvent}>
-            {/* Event Type */}
             <div className="field">
-              <label>Event Type</label>
-              <div className="admin-event-type-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                {[
-                  { id: 'goal', label: 'Goal' },
-                  { id: 'yellow', label: 'Yellow' },
-                  { id: 'red', label: 'Red' },
-                  { id: 'potm', label: 'POTM' },
-                ].map((type) => (
+              <label id="event-type-label">Event Type</label>
+              <div className="pad-types" role="group" aria-labelledby="event-type-label">
+                {eventTypes.map((type) => (
                   <button
                     key={type.id}
                     type="button"
-                    className={`btn btn-sm ${eventType === type.id ? 'btn-primary' : 'btn-outline'}`}
+                    aria-pressed={eventType === type.id}
+                    className={`pad-type ${eventType === type.id ? 'is-on' : ''}`}
                     onClick={() => setEventType(type.id)}
-                    style={{ fontSize: '12px', padding: '6px 4px' }}
                   >
+                    <EventIcon type={type.id} size={20} title={false} />
                     {type.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Team Selector */}
             <div className="field">
-              <label>Team</label>
-              <div className="admin-event-team-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${eventTeamId === match.team1_id ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => {
-                    setEventTeamId(match.team1_id);
-                    setEventPlayerId('');
-                    setEventAssistId('');
-                  }}
-                >
-                  {match.team1_name}
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${eventTeamId === match.team2_id ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => {
-                    setEventTeamId(match.team2_id);
-                    setEventPlayerId('');
-                    setEventAssistId('');
-                  }}
-                >
-                  {match.team2_name}
-                </button>
+              <label id="event-team-label">Team</label>
+              <div className="pad-teams" role="group" aria-labelledby="event-team-label">
+                {teamSides.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    aria-label={t.name}
+                    aria-pressed={eventTeamId === t.id}
+                    className={`pad-team ${eventTeamId === t.id ? 'is-on' : ''}`}
+                    style={{ '--team-color': t.color || '#64748B' }}
+                    onClick={() => pickTeam(t.id)}
+                  >
+                    {t.name}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Player Selector */}
             <div className="field">
-              <label htmlFor="event-player">Player</label>
-              <select
-                id="event-player"
-                className="select"
-                value={eventPlayerId}
-                onChange={(e) => setEventPlayerId(e.target.value)}
-                required
-              >
-                <option value="">Select Player...</option>
+              <label id="event-chips-label">Tap the player</label>
+              <div className="pad-chips" role="group" aria-labelledby="event-chips-label">
                 {activeTeamPlayers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    #{p.number} {p.name}
-                  </option>
+                  <button
+                    key={p.id}
+                    type="button"
+                    aria-pressed={eventPlayerId === p.id}
+                    className={`player-chip ${eventPlayerId === p.id ? 'is-on' : ''}`}
+                    onClick={() => setEventPlayerId(p.id)}
+                  >
+                    <span className="player-chip__no num">{p.number}</span>
+                    <span className="player-chip__name">{p.name}</span>
+                  </button>
                 ))}
-              </select>
+                {activeTeamPlayers.length === 0 && <span className="pad-empty">No players on this squad yet.</span>}
+              </div>
             </div>
 
-            {/* Assist Selector (only for goals) */}
-            {eventType === 'goal' && (
+            <div className="pad-fields">
               <div className="field">
-                <label htmlFor="event-assist">Assist (Optional)</label>
+                <label htmlFor="event-player">Player</label>
                 <select
-                  id="event-assist"
+                  id="event-player"
                   className="select"
-                  value={eventAssistId}
-                  onChange={(e) => setEventAssistId(e.target.value)}
+                  value={eventPlayerId}
+                  onChange={(e) => setEventPlayerId(e.target.value)}
+                  required
                 >
-                  <option value="">None / Unassisted</option>
-                  {activeTeamPlayers
-                    .filter((p) => p.id !== eventPlayerId)
-                    .map((p) => (
+                  <option value="">Select Player...</option>
+                  {activeTeamPlayers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      #{p.number} {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {eventType === 'goal' && (
+                <div className="field">
+                  <label htmlFor="event-assist">Assist (Optional)</label>
+                  <select
+                    id="event-assist"
+                    className="select"
+                    value={eventAssistId}
+                    onChange={(e) => setEventAssistId(e.target.value)}
+                  >
+                    <option value="">None / Unassisted</option>
+                    {assistOptions.map((p) => (
                       <option key={p.id} value={p.id}>
                         #{p.number} {p.name}
                       </option>
                     ))}
-                </select>
-              </div>
-            )}
+                  </select>
+                </div>
+              )}
 
-            {/* Minute (not needed for POTM) */}
-            {eventType !== 'potm' && (
-              <div className="field">
-                <label htmlFor="event-minute">Match Minute (1 - 120, required)</label>
-                <input
-                  id="event-minute"
-                  type="number"
-                  min="1"
-                  max="120"
-                  required
-                  className="input"
-                  placeholder="e.g. 34"
-                  value={eventMinute}
-                  onChange={(e) => setEventMinute(e.target.value)}
-                />
-              </div>
-            )}
+              {eventType !== 'potm' && (
+                <div className="field">
+                  <label htmlFor="event-minute">Match Minute (1 - 120, required)</label>
+                  <input
+                    id="event-minute"
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    max="120"
+                    required
+                    className="input num pad-minute"
+                    placeholder="e.g. 34"
+                    value={eventMinute}
+                    onFocus={(e) => e.target.select()} // typing replaces the clock's suggestion instead of extending it
+                    onChange={(e) => {
+                      setMinuteTouched(true);
+                      setEventMinute(e.target.value);
+                    }}
+                  />
+                  <span className="pad-hint">
+                    {minuteTouched && clockMinute ? (
+                      <button type="button" className="link-btn" onClick={() => setMinuteTouched(false)}>
+                        Use the match clock ({clockMinute}&prime;)
+                      </button>
+                    ) : clockMinute ? (
+                      'Follows the match clock'
+                    ) : (
+                      'Enter the minute'
+                    )}
+                  </span>
+                </div>
+              )}
+            </div>
 
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '8px' }} disabled={actionLoading}>
-              <Plus size={15} /> Submit Event
+            <button type="submit" className="cockpit-btn cockpit-btn--submit" disabled={actionLoading}>
+              <Plus size={18} aria-hidden="true" /> Submit Event
             </button>
           </form>
-        </div>
+        </section>
 
-        {/* Current Events List */}
-        <div className="card">
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 600, marginBottom: '16px' }}>
-            Recorded Match Events ({match.events?.length || 0})
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto' }}>
+        {/* Recorded events */}
+        <section className="card cockpit-events">
+          <h3 className="cockpit-h">Recorded Match Events ({match.events?.length || 0})</h3>
+          <ul className="cockpit-events__list">
             {(match.events || []).map((evt) => (
-              <div
-                key={evt.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  background: 'var(--panel-alt)',
-                  border: '1px solid var(--line)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <EventIcon type={evt.type} size={16} />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '13.5px' }}>
-                      {evt.player_name}
-                      {evt.minute ? ` (${evt.minute}')` : ''}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--chalk-dim)' }}>
-                      {evt.type.toUpperCase()}
-                      {evt.assist_player_name ? ` · Assist: ${evt.assist_player_name}` : ''}
-                    </div>
-                  </div>
-                </div>
-
+              <li key={evt.id} className="cockpit-event">
+                <span className="cockpit-event__min num">{evt.minute ? `${evt.minute}'` : ''}</span>
+                <EventIcon type={evt.type} size={17} />
+                <span className="cockpit-event__who">
+                  <span className="cockpit-event__name">{evt.player_name}</span>
+                  <span className="cockpit-event__sub">
+                    {evt.type.toUpperCase()}
+                    {evt.assist_player_name ? ` · Assist: ${evt.assist_player_name}` : ''}
+                  </span>
+                </span>
                 <button
-                  className="btn btn-sm btn-danger"
+                  className="btn btn-sm btn-danger cockpit-event__del"
                   onClick={() => handleDeleteEvent(evt.id)}
                   disabled={actionLoading}
                   title="Remove this event"
-                  style={{ padding: '4px 8px' }}
+                  aria-label={`Remove ${evt.type} by ${evt.player_name}`}
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={14} aria-hidden="true" />
                 </button>
-              </div>
+              </li>
             ))}
-
-            {(!match.events || match.events.length === 0) && (
-              <div style={{ textAlign: 'center', padding: '36px', color: 'var(--chalk-muted)' }}>
-                No events recorded for this match yet.
-              </div>
-            )}
-          </div>
-        </div>
+          </ul>
+          {(!match.events || match.events.length === 0) && (
+            <div className="cockpit-empty">No events recorded for this match yet.</div>
+          )}
+        </section>
       </div>
 
-      {/* Match Lineup Submissions */}
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+      {/* Lineups */}
+      <section className="card cockpit-lineups">
+        <div className="cockpit-lineups__head">
           <div>
-            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 600 }}>
-              Match Lineups ({selectedLineup.length} Selected)
-            </h3>
-            <p style={{ fontSize: '12.5px', color: 'var(--chalk-dim)' }}>
-              Select all players who took the pitch in this match to track their appearances.
-            </p>
+            <h3 className="cockpit-h">Match Lineups ({selectedLineup.length} Selected)</h3>
+            <p>Select all players who took the pitch in this match to track their appearances.</p>
           </div>
           <button className="btn btn-primary btn-sm" onClick={handleSaveLineup} disabled={actionLoading}>
             Save Lineups
           </button>
         </div>
-
         <div className="grid-2">
-          {/* Team 1 squad */}
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '10px', color: 'var(--amber)' }}>
-              {match.team1_name} Squad
+          {[
+            { side: teamSides[0], players: team1Players },
+            { side: teamSides[1], players: team2Players },
+          ].map(({ side, players }) => (
+            <div key={side.id} className="lineup-col" style={{ '--team-color': side.color || '#64748B' }}>
+              <div className="lineup-col__title">{side.name} Squad</div>
+              <div className="lineup-col__rows">
+                {players.map((p) => (
+                  <label key={p.id} className={`lineup-row ${selectedLineup.includes(p.id) ? 'is-on' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={selectedLineup.includes(p.id)}
+                      onChange={() => handleToggleLineupPlayer(p.id)}
+                    />
+                    <span>#{p.number} {p.name}</span>
+                  </label>
+                ))}
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '250px', overflowY: 'auto' }}>
-              {team1Players.map((p) => (
-                <label
-                  key={p.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '6px 10px',
-                    borderRadius: '4px',
-                    background: selectedLineup.includes(p.id) ? 'rgba(240, 165, 61, 0.12)' : 'var(--panel-alt)',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedLineup.includes(p.id)}
-                    onChange={() => handleToggleLineupPlayer(p.id)}
-                  />
-                  <span>#{p.number} {p.name}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Team 2 squad */}
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '10px', color: 'var(--green)' }}>
-              {match.team2_name} Squad
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '250px', overflowY: 'auto' }}>
-              {team2Players.map((p) => (
-                <label
-                  key={p.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '6px 10px',
-                    borderRadius: '4px',
-                    background: selectedLineup.includes(p.id) ? 'rgba(62, 207, 110, 0.12)' : 'var(--panel-alt)',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedLineup.includes(p.id)}
-                    onChange={() => handleToggleLineupPlayer(p.id)}
-                  />
-                  <span>#{p.number} {p.name}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -37,8 +37,9 @@ describe('ScorerDashboardPage Component', () => {
         team2_name: 'Chelsea FC',
         team2_color: '#3B82F6',
         team2_crest_url: 'https://r2.cdn/crests/chelsea.png',
-        team1_score: 2,
-        team2_score: 1,
+        score1: 2,
+        score2: 1,
+        started_at: new Date().toISOString(),
       },
     ]);
 
@@ -64,7 +65,9 @@ describe('ScorerDashboardPage Component', () => {
     expect(screen.getByText('Summer Champions Cup')).toBeInTheDocument();
     expect(screen.getByText('Arsenal FC')).toBeInTheDocument();
     expect(screen.getByText('Chelsea FC')).toBeInTheDocument();
-    expect(screen.getByText('2 : 1')).toBeInTheDocument();
+    // the real API fields are score1/score2 (the old cards read team1_score and showed 0 for everything)
+    expect(screen.getByLabelText('2 goals')).toBeInTheDocument();
+    expect(screen.getByLabelText('1 goals')).toBeInTheDocument();
 
     const openConsoleBtn = screen.getByTestId('scorer-open-console-match-101');
     expect(openConsoleBtn).toBeInTheDocument();
@@ -116,5 +119,48 @@ describe('ScorerDashboardPage Component', () => {
     await waitFor(() => {
       expect(screen.getByTestId('scorer-empty-state')).toBeInTheDocument();
     });
+  });
+
+  const game = (id, status, over = {}) => ({
+    id, match_number: Number(id.replace(/\D/g, '')) || 1, tournament_name: 'Cup', stage: 'group', status,
+    team1_name: `${id} Home`, team2_name: `${id} Away`, score1: 0, score2: 0, date: '2026-11-25', time: '10:00', ...over,
+  });
+
+  it('puts what is live first, then upcoming by kick-off, with finished matches tucked away', async () => {
+    matchesApi.getAssignedMatches.mockResolvedValueOnce([
+      game('done1', 'full_time', { date: '2026-11-20' }),
+      game('later', 'upcoming', { date: '2026-11-30', time: '15:00' }),
+      game('sooner', 'upcoming', { date: '2026-11-26', time: '09:00' }),
+      game('inplay', 'live', { started_at: new Date().toISOString() }),
+      game('done2', 'cancelled', { date: '2026-11-22' }),
+    ]);
+    const { container } = render(
+      <MemoryRouter initialEntries={['/scorer']}>
+        <Routes><Route path="/scorer" element={<ScorerDashboardPage />} /></Routes>
+      </MemoryRouter>
+    );
+    await screen.findByTestId('scorer-match-card-inplay');
+
+    const order = [...container.querySelectorAll('[data-testid^="scorer-match-card-"]')].map((c) => c.dataset.testid.replace('scorer-match-card-', ''));
+    expect(order).toEqual(['inplay', 'sooner', 'later', 'done2', 'done1']); // live, upcoming by time, finished newest first
+
+    expect(screen.getByRole('heading', { name: 'Live now' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeInTheDocument();
+    const finished = container.querySelector('details.scorer-finished');
+    expect(finished).not.toHaveAttribute('open'); // secondary: collapsed while there is active work
+    expect(finished).toHaveTextContent('Finished (2)');
+    expect(container.querySelector('.scorer-summary')).toHaveTextContent('1 live');
+  });
+
+  it('opens the finished list by itself when nothing is live or upcoming', async () => {
+    matchesApi.getAssignedMatches.mockResolvedValueOnce([game('done1', 'full_time')]);
+    const { container } = render(
+      <MemoryRouter initialEntries={['/scorer']}>
+        <Routes><Route path="/scorer" element={<ScorerDashboardPage />} /></Routes>
+      </MemoryRouter>
+    );
+    await screen.findByTestId('scorer-match-card-done1');
+    expect(container.querySelector('details.scorer-finished')).toHaveAttribute('open');
+    expect(screen.queryByRole('heading', { name: 'Live now' })).not.toBeInTheDocument();
   });
 });

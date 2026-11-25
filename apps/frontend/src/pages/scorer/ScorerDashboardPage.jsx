@@ -1,20 +1,83 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { matchesApi } from '../../api/matches';
 import { authApi } from '../../api/auth';
 import { useLiveSocket } from '../../hooks/useLiveSocket';
+import { useNow } from '../../hooks/useNow';
 import { StatusPill } from '../../components/common/StatusPill';
-import { Avatar } from '../../components/common/Avatar';
+import { TeamMark } from '../../components/common/TeamMark';
 import { LoadingState, ErrorState, EmptyState } from '../../components/common/Common';
-import { Clock, Shield, RefreshCw, Trophy, ChevronRight, Activity, Calendar } from 'lucide-react';
+import { RefreshCw, ChevronRight, Activity, Calendar, ChevronDown } from 'lucide-react';
+import { clockOffsetMs, minuteLabel } from '../../utils/clock';
+import { formatWhen } from '../../utils/dates';
+import { stageLabel } from '../../utils/matchLabels';
+
+const isFinished = (m) => m.status === 'full_time' || m.status === 'completed' || m.status === 'cancelled';
+const kickoff = (m) => `${m.date || '9999-12-31'}T${m.time || '23:59'}`;
+
+function MatchCard({ match, offset, now, onOpen }) {
+  const live = match.status === 'live';
+  const finished = isFinished(match);
+  const played = live || match.status === 'full_time' || match.status === 'completed';
+  const title = [stageLabel(match), match.tournament_name].filter(Boolean).join(' · ');
+
+  return (
+    <article
+      className={`scorer-card ${live ? 'scorer-card--live' : finished ? 'scorer-card--finished' : ''}`}
+      data-testid={`scorer-match-card-${match.id}`}
+    >
+      <div className="scorer-card__head">
+        <span className="scorer-card__no num">Match #{match.match_number}</span>
+        {match.tournament_name && <span className="scorer-card__tournament" title={match.tournament_name}>{match.tournament_name}</span>}
+        <StatusPill status={match.status} isHalfTime={match.is_half_time} />
+      </div>
+
+      <div className="scorer-card__teams">
+        {[
+          { name: match.team1_name, color: match.team1_color, crest: match.team1_crest_url, score: match.score1 },
+          { name: match.team2_name, color: match.team2_color, crest: match.team2_crest_url, score: match.score2 },
+        ].map((side, i) => (
+          <div className="scorer-card__team" key={i}>
+            <TeamMark name={side.name} color={side.color} crestUrl={side.crest} size={30} />
+            <span className={`scorer-card__score num ${live ? 'is-live' : ''}`} aria-label={played ? `${side.score ?? 0} goals` : undefined}>
+              {played ? side.score ?? 0 : '–'}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="scorer-card__foot">
+        <span className="scorer-card__when">
+          {live ? (
+            <span className={`scorer-card__minute num ${match.is_half_time ? 'is-ht' : ''}`}>{minuteLabel(match, offset, now)}</span>
+          ) : (
+            formatWhen(match.date, match.time) || title
+          )}
+          {!live && match.venue ? <span className="scorer-card__venue"> · {match.venue}</span> : null}
+        </span>
+        <button
+          onClick={() => onOpen(match.id)}
+          className={live ? 'btn btn-primary scorer-card__open' : 'btn btn-outline scorer-card__open'}
+          data-testid={`scorer-open-console-${match.id}`}
+        >
+          <Activity size={14} aria-hidden="true" />
+          <span>{live ? 'Open Live Console (Live Now)' : 'Open Match Console'}</span>
+          <ChevronRight size={14} aria-hidden="true" />
+        </button>
+      </div>
+    </article>
+  );
+}
 
 export function ScorerDashboardPage() {
   const [matches, setMatches] = useState([]);
+  const [clockOffset, setClockOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
   const username = authApi.getUsername();
   const role = authApi.getRole();
+  const now = useNow(30000);
 
   const loadAssignedMatches = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -22,6 +85,7 @@ export function ScorerDashboardPage() {
     try {
       const data = await matchesApi.getAssignedMatches();
       setMatches(data || []);
+      setClockOffset(clockOffsetMs((data || [])[0], Date.now()));
     } catch (err) {
       setError(err.message || 'Failed to load assigned matches');
     } finally {
@@ -38,84 +102,38 @@ export function ScorerDashboardPage() {
     loadAssignedMatches(false);
   });
 
+  // Active work first: what is in play, then what is next, then history
+  const groups = useMemo(() => {
+    const live = matches.filter((m) => m.status === 'live').sort((a, b) => String(a.started_at).localeCompare(String(b.started_at)));
+    const upcoming = matches.filter((m) => m.status === 'upcoming').sort((a, b) => kickoff(a).localeCompare(kickoff(b)));
+    const finished = matches.filter(isFinished).sort((a, b) => kickoff(b).localeCompare(kickoff(a)));
+    return { live, upcoming, finished };
+  }, [matches]);
+
+  const open = (id) => navigate(`/scorer/matches/${id}/live`);
+  const nothingActive = groups.live.length === 0 && groups.upcoming.length === 0;
+
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 16px' }}>
-      {/* Cockpit Header */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '16px',
-          marginBottom: '28px',
-          paddingBottom: '20px',
-          borderBottom: '1px solid var(--border-subtle)',
-        }}
-      >
+    <div className="scorer-page">
+      <header className="scorer-page__head">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                background: 'rgba(16, 185, 129, 0.15)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--brand-primary)',
-              }}
-            >
-              <Activity size={20} />
-            </div>
-            <h1
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '26px',
-                fontWeight: 700,
-                color: 'var(--text-primary)',
-                margin: 0,
-              }}
-            >
-              Scorer Cockpit
-            </h1>
-          </div>
-          <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--text-secondary)' }}>
-            Live match console access for operator{' '}
-            <strong style={{ color: 'var(--text-primary)' }}>{username}</strong>{' '}
-            <span
-              style={{
-                fontSize: '11px',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-subtle)',
-                color: 'var(--brand-primary)',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                marginLeft: '4px',
-              }}
-            >
-              {role}
-            </span>
+          <h1 className="scorer-page__title"><Activity size={22} aria-hidden="true" /> Scorer Cockpit</h1>
+          <p className="scorer-page__sub">
+            Live match console access for operator <strong>{username}</strong>
+            {role && <span className="scorer-page__role">{role}</span>}
           </p>
         </div>
-
         <button
           onClick={() => loadAssignedMatches(true)}
           className="btn btn-outline"
-          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           disabled={loading}
           data-testid="refresh-scorer-matches"
         >
-          <RefreshCw size={14} className={loading ? 'spin' : ''} />
+          <RefreshCw size={14} className={loading ? 'spin' : ''} aria-hidden="true" />
           <span>Refresh Roster</span>
         </button>
-      </div>
+      </header>
 
-      {/* Main Content Area */}
       {loading ? (
         <LoadingState message="Loading your assigned matches..." />
       ) : error ? (
@@ -129,236 +147,45 @@ export function ScorerDashboardPage() {
           />
         </div>
       ) : (
-        <div
-          data-testid="scorer-matches-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-            gap: '20px',
-          }}
-        >
-          {matches.map((match) => {
-            const isLive = match.status === 'live';
-            const isFinished = match.status === 'full_time' || match.status === 'completed';
+        <div data-testid="scorer-matches-grid" className="scorer-sections">
+          <p className="scorer-summary">
+            <span className="num">{groups.live.length}</span> live
+            <span className="scorer-summary__sep" aria-hidden="true" />
+            <span className="num">{groups.upcoming.length}</span> upcoming
+            <span className="scorer-summary__sep" aria-hidden="true" />
+            <span className="num">{groups.finished.length}</span> finished
+          </p>
 
-            return (
-              <div
-                key={match.id}
-                className="card"
-                data-testid={`scorer-match-card-${match.id}`}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  padding: '20px',
-                  borderRadius: '12px',
-                  background: 'var(--bg-surface)',
-                  border: isLive
-                    ? '1.5px solid rgba(239, 68, 68, 0.4)'
-                    : '1px solid var(--border-subtle)',
-                  boxShadow: isLive ? '0 0 20px rgba(239, 68, 68, 0.12)' : 'var(--shadow-sm)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: 'border-color 0.2s, box-shadow 0.2s',
-                }}
-              >
-                {/* Top Tournament & Match Meta */}
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '14px',
-                    gap: '8px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        color: 'var(--text-muted)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        background: 'var(--bg-elevated)',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        border: '1px solid var(--border-subtle)',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Match #{match.match_number}
-                    </span>
-                    {match.tournament_name && (
-                      <span
-                        title={match.tournament_name}
-                        style={{
-                          fontSize: '12px',
-                          color: 'var(--text-secondary)',
-                          fontWeight: 500,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {match.tournament_name}
-                      </span>
-                    )}
-                  </div>
-                  <StatusPill status={match.status} isHalfTime={match.is_half_time} />
-                </div>
-
-                {/* Matchup Header */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '16px 12px',
-                    background: 'var(--bg-base)',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-subtle)',
-                    marginBottom: '16px',
-                  }}
-                >
-                  {/* Team 1 */}
-                  <div
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      textAlign: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    <Avatar
-                      name={match.team1_name || 'Team 1'}
-                      crestUrl={match.team1_crest_url}
-                      color={match.team1_color || '#10B981'}
-                      size={44}
-                    />
-                    <span
-                      style={{
-                        fontSize: '13.5px',
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
-                        maxWidth: '120px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {match.team1_name || 'TBD'}
-                    </span>
-                  </div>
-
-                  {/* Score or VS */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      padding: '0 12px',
-                    }}
-                  >
-                    {isLive || isFinished ? (
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-display)',
-                          fontSize: '22px',
-                          fontWeight: 800,
-                          color: isLive ? 'var(--status-live)' : 'var(--text-primary)',
-                          letterSpacing: '1px',
-                        }}
-                      >
-                        {match.team1_score ?? 0} : {match.team2_score ?? 0}
-                      </div>
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          color: 'var(--text-muted)',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        VS
-                      </span>
-                    )}
-                    {match.label && (
-                      <span
-                        style={{
-                          fontSize: '10.5px',
-                          color: 'var(--text-muted)',
-                          marginTop: '4px',
-                        }}
-                      >
-                        {match.label}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Team 2 */}
-                  <div
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      textAlign: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    <Avatar
-                      name={match.team2_name || 'Team 2'}
-                      crestUrl={match.team2_crest_url}
-                      color={match.team2_color || '#3B82F6'}
-                      size={44}
-                    />
-                    <span
-                      style={{
-                        fontSize: '13.5px',
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
-                        maxWidth: '120px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {match.team2_name || 'TBD'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Action Button: Open Live Console */}
-                <div style={{ marginTop: 'auto' }}>
-                  <button
-                    onClick={() => navigate(`/scorer/matches/${match.id}/live`)}
-                    className={isLive ? 'btn btn-primary' : 'btn btn-outline'}
-                    data-testid={`scorer-open-console-${match.id}`}
-                    style={{
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      padding: '10px 16px',
-                      fontSize: '13.5px',
-                      fontWeight: 600,
-                      background: isLive ? 'var(--status-live)' : undefined,
-                      borderColor: isLive ? 'var(--status-live)' : undefined,
-                      color: isLive ? '#ffffff' : undefined,
-                    }}
-                  >
-                    <Clock size={15} />
-                    <span>{isLive ? 'Open Live Console (Live Now)' : 'Open Match Console'}</span>
-                    <ChevronRight size={14} style={{ marginLeft: 'auto' }} />
-                  </button>
-                </div>
+          {groups.live.length > 0 && (
+            <section aria-labelledby="scorer-live-h">
+              <h2 id="scorer-live-h" className="scorer-section__title">
+                <span className="live-dot" aria-hidden="true" /> Live now
+              </h2>
+              <div className="scorer-cards scorer-cards--live">
+                {groups.live.map((m) => <MatchCard key={m.id} match={m} offset={clockOffset} now={now} onOpen={open} />)}
               </div>
-            );
-          })}
+            </section>
+          )}
+
+          {groups.upcoming.length > 0 && (
+            <section aria-labelledby="scorer-up-h">
+              <h2 id="scorer-up-h" className="scorer-section__title">Upcoming</h2>
+              <div className="scorer-cards">
+                {groups.upcoming.map((m) => <MatchCard key={m.id} match={m} offset={clockOffset} now={now} onOpen={open} />)}
+              </div>
+            </section>
+          )}
+
+          {groups.finished.length > 0 && (
+            <details className="scorer-finished" open={nothingActive}>
+              <summary className="scorer-section__title scorer-finished__summary">
+                <ChevronDown size={16} aria-hidden="true" /> Finished <span className="num">({groups.finished.length})</span>
+              </summary>
+              <div className="scorer-cards scorer-cards--quiet">
+                {groups.finished.map((m) => <MatchCard key={m.id} match={m} offset={clockOffset} now={now} onOpen={open} />)}
+              </div>
+            </details>
+          )}
         </div>
       )}
     </div>

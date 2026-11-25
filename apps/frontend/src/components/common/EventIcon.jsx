@@ -17,8 +17,13 @@ export function EventIcon({ type, size = 16, title = true }) {
   if (type === 'goal') glyph = <Goal {...common} />;
   else if (type === 'potm') glyph = <Star {...common} fill={meta.color} />;
   else glyph = <Square {...common} fill={meta.color} strokeWidth={1.5} />;
-  return (
-    <span className={`event-icon event-icon--${type}`} role="img" aria-label={title ? meta.label : undefined}>
+  // title={false}: the icon sits next to its own text label, so it is decoration only
+  return title ? (
+    <span className={`event-icon event-icon--${type}`} role="img" aria-label={meta.label}>
+      {glyph}
+    </span>
+  ) : (
+    <span className={`event-icon event-icon--${type}`} aria-hidden="true">
       {glyph}
     </span>
   );
