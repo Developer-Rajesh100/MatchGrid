@@ -2,6 +2,81 @@
 
 **Date:** 2026-11-25
 **Branch audited:** `main` (commit `7299b12`)
+**Resolved on:** `fix/pre-phase7-audit`, merged into `main` as `c1cf35d`
+
+## Resolution status
+
+All three approved waves are implemented, tested and merged.
+
+| Check | Result |
+|---|---|
+| Backend `bun run test:backend` | **397 passed** (296 before the audit) |
+| Frontend `bun run test:frontend` | **94 passed** (79 before) |
+| `bun run build` | OK |
+| Playwright e2e (`bun run test:e2e`) | **16 / 16 passed** (run against freshly started servers) |
+
+Wave 1 (C1–C10, M6, H14), Wave 2 (H1–H13) and Wave 3 (M1–M9, L1–L8) are done, except the items below.
+
+### Not fully resolved
+
+| Finding | State |
+|---|---|
+| **C1** | Code and CI no longer contain the R2 credentials, **but the key is still in git history. Rotate the R2 token.** |
+| **H3 / M8** | In-process WebSocket hub and login rate limiter are unchanged. Run a single backend instance until they move to shared state. Documented in `DEPLOYMENT.md` ("Scaling constraints"). |
+| **H10** | Multi-group league champion and cancelled-fixture handling fixed. Head-to-head / fair-play tiebreakers were **not** added (standings still sort by points, goal difference, goals for, name). |
+| **M7** | Docs links, branding and CI aligned. Deployment identifiers (DO app name, `dcl_scoreboard` database, repo, domain) left on purpose; the duplicate `.agent/` and `.agents/` folders are untouched. |
+| **M8** | Upload streaming cap, image verification and HSTS done. JWTs still live in `localStorage` with no revocation, and uploaded images keep their EXIF metadata (both documented). |
+
+### Findings and where they were fixed
+
+| ID | Status | Resolution |
+|---|---|---|
+| C1 | Partly | Empty R2 defaults, no CI fallbacks, production safety requires `R2_*` and `DEBUG=false`; rotate the key |
+| C2 | Fixed | `services/media.py`: only own-tournament R2 keys or plain URLs accepted; delete only if unreferenced and in own folder |
+| C3 | Fixed | `assert_group_in_tournament` in `services/groups.py` and team create/update |
+| C4 | Fixed | Singleton `PATCH /tournament` removed; `PATCH /organizer/tournaments/{id}` and `/config` added |
+| C5 | Fixed | Unowned tournaments are superadmin-only; missing tournament is 404; writes require an explicit `tournament_id` |
+| C6 | Fixed | `services/tournaments.py`: full cascade, then R2 prefix purge |
+| C7 | Fixed | Organizer with tournaments cannot be deleted (409); deleted scorers are removed from matches |
+| C8 | Fixed | `Admin` model removed; migration `m0007` moves legacy admins into `users` |
+| C9 | Fixed | Schedule edit, cancel, uncancel, winner and reopen need tournament ownership |
+| C10 | Fixed | Strict media key regex on delete and in storage |
+| H1 | Fixed | Tournament broadcasts stay in their room; global room gets only `match_status_changed`; client joins its room at connect |
+| H2 | Fixed | `assign_match_teams` broadcast carries `tournament_id` |
+| H3 | Partly | Concurrent sends with timeout, room cap; still in-process (see above) |
+| H4 | Fixed | `services/bracket.py::recompute_bracket`, with guards once the next round has started |
+| H5 | Fixed | Generalized seeding with 409 errors; historical pairings kept |
+| H6 | Fixed | `purge_matches` recomputes standings, stats and stage |
+| H7 | Fixed | No global renumbering; replaced matches reuse their numbers |
+| H8 | Fixed | Draw needs exactly `num_groups × teams_per_group`; redraw after fixtures needs `force=true` |
+| H9 | Fixed | Group moves recalculate both tables |
+| H10 | Partly | See above |
+| H11 | Fixed | `server_now` in match responses; `utils/clock.js`; no `localStorage` clock |
+| H12 | Fixed | Events blocked on cancelled matches; lineup replacement never empties the sheet |
+| H13 | Fixed | Per-tournament player counter, migration `m0008`, unique index, repair before index build |
+| H14 | Fixed | Replaced tournament logo/banner is deleted |
+| M1 | Fixed | Public lists need a tournament; pages nested under `/t/:slug`; legacy URLs redirect |
+| M2 | Fixed | `/admin` redirects to `/organizer`; `AdminDashboardPage` removed |
+| M3 | Fixed | Dead pages, wrappers and singleton helpers removed |
+| M4 | Fixed | `draft \| active \| completed` and stage enums; migration `m0009`; UI aligned |
+| M5 | Fixed | Scorer ids staff-only; public directory shows organization name only |
+| M6 | Fixed | Organizers can only assign scorers they created |
+| M7 | Partly | See above |
+| M8 | Partly | See above |
+| M9 | Fixed | Scoped or grouped queries instead of whole-collection scans |
+| L1 | Fixed | 403 screen and live 401 redirect in `RoleGuard` |
+| L2 | Fixed | `getRole()` has no default role |
+| L3 | Fixed | No spinner flash on bracket refresh; `(P)` marker; "no knockout stage" message |
+| L4 | Fixed | `live_matches_count` returned by the tournament endpoints |
+| L5 | Fixed | Tournament context mounted once |
+| L6 | Fixed | Reconnect triggers a refetch; stale-socket close no longer clobbers the live one |
+| L7 | Fixed | Password hash verified on every login path |
+| L8 | Fixed | `reset-timer` on a non-live match is 409; cancel/uncancel update `updated_at` |
+
+---
+
+# Original findings (as reported before the fixes)
+
 **Scope:** Read-only audit of backend (`apps/backend`), frontend routing/WebSocket/portal code (`apps/frontend`), CI and deploy config.
 **Not covered:** Test suites were not executed. CSS and the 2,300-line organizer page were only skimmed, so 375px vs 1440px responsive layouts are not verified.
 
