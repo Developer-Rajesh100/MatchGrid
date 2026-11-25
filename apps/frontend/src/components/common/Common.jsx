@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, RefreshCw, Inbox } from 'lucide-react';
+import { AlertCircle, RefreshCw, Inbox, ShieldAlert } from 'lucide-react';
 
 export function Stripe({ color = 'var(--brand-primary)' }) {
   return <div className="stripe" style={{ backgroundColor: color }} />;
@@ -38,6 +38,23 @@ export function ErrorState({ message = 'Failed to load data', onRetry = null }) 
           <RefreshCw size={14} /> Retry
         </button>
       )}
+    </div>
+  );
+}
+
+export function ForbiddenState({ role = null, homePath = '/', homeLabel = 'Back to home' }) {
+  return (
+    <div className="state-container" data-testid="forbidden-state" style={{ padding: '64px 20px' }}>
+      <ShieldAlert size={42} color="var(--accent-gold)" style={{ marginBottom: 14 }} />
+      <h2 style={{ margin: '0 0 8px', fontSize: '20px' }}>403 — Access denied</h2>
+      <p style={{ color: 'var(--text-secondary)', maxWidth: 420, textAlign: 'center', marginBottom: 16 }}>
+        {role
+          ? `Your ${role.replace('_', ' ').toLowerCase()} account is not allowed to open this page.`
+          : 'Your account is not allowed to open this page.'}
+      </p>
+      <a className="btn btn-primary" href={homePath}>
+        {homeLabel}
+      </a>
     </div>
   );
 }

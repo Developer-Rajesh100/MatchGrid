@@ -12,6 +12,9 @@ import os
 
 os.environ["MONGO_DB_NAME"] = "dcl_scoreboard_test"
 os.environ["AUTO_SEED"] = "true"
+# Never talk to a real R2 bucket from tests: individual tests opt in with a mocked client.
+for _name in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME", "R2_PUBLIC_BASE_URL"):
+    os.environ[_name] = ""
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -24,7 +27,6 @@ from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models import (
     DOCUMENT_MODELS,
-    Admin,
     Group,
     GroupTeam,
     Player,
@@ -88,7 +90,9 @@ async def _make_team(tournament: Tournament, group: Group, name: str, color: str
 
 
 async def _make_player(team: Team, dcl_id: str, name: str, number: int) -> Player:
-    player = Player(team_id=team.id, dcl_id=dcl_id, name=name, number=number)
+    player = Player(
+        tournament_id=team.tournament_id, team_id=team.id, dcl_id=dcl_id, name=name, number=number
+    )
     await player.insert()
     return player
 
@@ -121,18 +125,15 @@ async def players(teams) -> dict[str, list[Player]]:
 
 
 @pytest_asyncio.fixture
-async def admin(clean_db) -> Admin:
-    a = Admin(username="testadmin", password_hash=hash_password("testpass123"))
-    await a.insert()
+async def admin(clean_db) -> User:
     u = User(
-        id=a.id,
         username="testadmin",
-        password_hash=a.password_hash,
+        password_hash=hash_password("testpass123"),
         role=UserRole.SUPER_ADMIN,
         is_active=True,
     )
     await u.insert()
-    return a
+    return u
 
 
 @pytest_asyncio.fixture

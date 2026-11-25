@@ -24,12 +24,12 @@ async def test_malformed_object_id_is_a_422_not_a_500(async_client, tournament, 
 
 @pytest.mark.parametrize("color", ["red", "<script>", "#12345", "#gggggg", ""])
 async def test_team_color_must_be_hex(async_client, tournament, auth_headers, color):
-    r = await async_client.post("/api/teams", json={"name": "T", "color": color}, headers=auth_headers)
+    r = await async_client.post("/api/teams", json={"name": "T", "color": color, "tournament_id": str(tournament.id)}, headers=auth_headers)
     assert r.status_code == 422
 
 
 async def test_team_color_accepts_hex(async_client, tournament, auth_headers):
-    r = await async_client.post("/api/teams", json={"name": "T", "color": "#a1B2c3"}, headers=auth_headers)
+    r = await async_client.post("/api/teams", json={"name": "T", "color": "#a1B2c3", "tournament_id": str(tournament.id)}, headers=auth_headers)
     assert r.status_code == 201
 
 

@@ -28,7 +28,7 @@ MIN_JWT_SECRET_LENGTH = 32
 
 def check_runtime_config(settings: Settings) -> list[str]:
     """Checks that only apply once the app is actually serving requests:
-    JWT signing and CORS. (The admin bootstrap password is checked
+    JWT signing, CORS, DEBUG and R2 media storage. (The admin bootstrap password is checked
     separately, at migration time — see check_bootstrap_password below —
     since it's only relevant then, not on every app start.)"""
     if settings.environment != "production":
@@ -48,6 +48,23 @@ def check_runtime_config(settings: Settings) -> list[str]:
             "CORS_ORIGINS still includes the local dev origin (http://localhost:5173) "
             "— restrict it to the real deployed frontend domain(s)."
         )
+
+    if settings.debug:
+        problems.append("DEBUG must be false in production (set DEBUG=false).")
+
+    missing_r2 = [
+        name
+        for name, value in (
+            ("R2_ACCOUNT_ID", settings.r2_account_id),
+            ("R2_ACCESS_KEY_ID", settings.r2_access_key_id),
+            ("R2_SECRET_ACCESS_KEY", settings.r2_secret_access_key),
+            ("R2_BUCKET_NAME", settings.r2_bucket_name),
+            ("R2_PUBLIC_BASE_URL", settings.r2_public_base_url),
+        )
+        if not value
+    ]
+    if missing_r2:
+        problems.append(f"Cloudflare R2 media storage is not configured: set {', '.join(missing_r2)}.")
 
     return problems
 

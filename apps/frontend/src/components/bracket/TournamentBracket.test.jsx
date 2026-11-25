@@ -191,4 +191,79 @@ describe('TournamentBracket Component', () => {
       expect(screen.getByRole('heading', { name: 'Red Dragons' })).toBeInTheDocument();
     });
   });
+
+  it('says so when the tournament has no knockout stage', async () => {
+    matchesApi.getBracket.mockResolvedValue({ tournament_id: 't1', knockout_format: 'none', rounds: [], champion: null });
+    render(
+      <MemoryRouter>
+        <TournamentBracket tournamentId="t1" />
+      </MemoryRouter>
+    );
+    expect(await screen.findByTestId('bracket-none')).toHaveTextContent(/no knockout stage/i);
+    expect(screen.queryByTestId('bracket-empty')).not.toBeInTheDocument();
+  });
+
+  it('keeps the tree on screen during a background refresh instead of flashing the spinner', async () => {
+    const bracket = {
+      tournament_id: 't1',
+      knockout_format: 'semis_final',
+      champion: null,
+      rounds: [
+        {
+          round_order: 1,
+          round_name: 'Semi-finals',
+          matches: [
+            {
+              bracket_slot: 'SF1',
+              match_id: 'm1',
+              stage: 'semi',
+              team1: { id: 'a', name: 'Alpha' },
+              team2: { id: 'b', name: 'Bravo' },
+              score1: 1,
+              score2: 1,
+              winner_id: 'a',
+              status: 'full_time',
+            },
+          ],
+        },
+      ],
+    };
+    matchesApi.getBracket.mockResolvedValue(bracket);
+    const { rerender } = render(
+      <MemoryRouter>
+        <TournamentBracket tournamentId="t1" refreshTrigger={0} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByTestId('tournament-bracket')).toBeInTheDocument();
+    expect(screen.getByTestId('match-card-SF1')).toHaveTextContent('1 (P)'); // decided on penalties
+
+    let release;
+    matchesApi.getBracket.mockReturnValue(new Promise((resolve) => { release = resolve; }));
+    rerender(
+      <MemoryRouter>
+        <TournamentBracket tournamentId="t1" refreshTrigger={1} />
+      </MemoryRouter>
+    );
+    expect(screen.queryByTestId('bracket-loading')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tournament-bracket')).toBeInTheDocument();
+    release(bracket);
+    await waitFor(() => expect(matchesApi.getBracket).toHaveBeenCalledTimes(2));
+  });
+
+  it('shows the spinner when switching to a different tournament', async () => {
+    matchesApi.getBracket.mockResolvedValue({ tournament_id: 't1', knockout_format: 'semis_final', rounds: [], champion: null });
+    const { rerender } = render(
+      <MemoryRouter>
+        <TournamentBracket tournamentId="t1" />
+      </MemoryRouter>
+    );
+    await screen.findByTestId('bracket-empty');
+    matchesApi.getBracket.mockReturnValue(new Promise(() => {}));
+    rerender(
+      <MemoryRouter>
+        <TournamentBracket tournamentId="t2" />
+      </MemoryRouter>
+    );
+    expect(screen.getByTestId('bracket-loading')).toBeInTheDocument();
+  });
 });

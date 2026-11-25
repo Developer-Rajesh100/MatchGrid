@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, Shield, Calendar, Users, BarChart3, LogOut, Lock, Menu, X, Activity } from 'lucide-react';
+import { Trophy, Shield, LogOut, Lock, Menu, X, Activity } from 'lucide-react';
 import { authApi } from '../../api/auth';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { TournamentSwitcher } from './TournamentSwitcher';
@@ -38,12 +38,7 @@ export function NavBar() {
   };
 
   const navLinks = [
-    { to: '/', label: 'Home', icon: Trophy, end: true },
-    { to: '/matches', label: 'Matches', icon: Calendar },
-    { to: '/standings', label: 'Standings', icon: BarChart3 },
-    { to: '/stats', label: 'Stats', icon: Trophy },
-    { to: '/teams', label: 'Teams', icon: Shield },
-    { to: '/players', label: 'Players', icon: Users },
+    { to: '/', label: 'Tournaments', icon: Trophy, end: true },
   ];
 
   return (
@@ -104,7 +99,7 @@ export function NavBar() {
                       ? '/organizer'
                       : role === 'SCORER'
                       ? '/scorer'
-                      : '/admin'
+                      : '/login'
                   }
                   className={({ isActive }) =>
                     `btn btn-sm ${isActive ? 'btn-primary' : 'btn-outline'}`
@@ -211,7 +206,7 @@ export function NavBar() {
                       ? '/organizer'
                       : role === 'SCORER'
                       ? '/scorer'
-                      : '/admin'
+                      : '/login'
                   }
                   className="btn btn-primary"
                   style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}

@@ -28,7 +28,7 @@ export async function apiClient(endpoint, options = {}) {
     localStorage.removeItem('matchgrid_admin_username');
     localStorage.removeItem('dcl_admin_token');
     localStorage.removeItem('dcl_admin_username');
-    window.dispatchEvent(new Event('matchgrid-auth-changed'));
+    window.dispatchEvent(new CustomEvent('matchgrid-auth-changed', { detail: { reason: 'expired' } }));
     window.dispatchEvent(new Event('dcl-auth-changed'));
   }
 

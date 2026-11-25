@@ -37,9 +37,10 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)" || exit 1
 
 # No --reload (that's a dev-only flag), no venv (dependencies are installed
-# directly into the image's system Python). A single worker is intentional:
-# this is a single-admin, low-traffic tournament scoreboard, not a
-# high-concurrency service (see reference/plan.txt's architecture notes).
+# directly into the image's system Python). A single worker (and a single
+# instance) is REQUIRED for now: the WebSocket room hub and the login rate limiter live in
+# process memory, so a second worker/instance would split rooms and per-IP throttling
+# (see "Scaling constraints" in DEPLOYMENT.md).
 # The entrypoint runs the idempotent migration runner before starting
 # uvicorn, so `docker compose up -d` alone brings a fresh database to a
 # working state.

@@ -46,10 +46,6 @@ export const matchesApi = {
       method: 'POST',
       body: { group_id: groupId, force },
     }),
-  generateSemis: (tournamentId = null) =>
-    apiClient(`/api/matches/generate-semis${tournamentId ? `?tournament_id=${tournamentId}` : ''}`, { method: 'POST' }),
-  generateFinal: (tournamentId = null) =>
-    apiClient(`/api/matches/generate-final${tournamentId ? `?tournament_id=${tournamentId}` : ''}`, { method: 'POST' }),
   getGroups: (params = {}) => {
     const q = new URLSearchParams();
     if (params?.tournament_id) q.append('tournament_id', params.tournament_id);

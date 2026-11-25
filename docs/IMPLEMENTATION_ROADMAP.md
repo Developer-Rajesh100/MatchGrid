@@ -3,9 +3,9 @@
 **Document Version:** 1.0.0  
 **Target Path:** `docs/IMPLEMENTATION_ROADMAP.md`  
 **System Name:** MatchGrid (Multi-Tenant Live Football SaaS Platform)  
-**Standard Lifecycle:** [docs/DEVELOPMENT_WORKFLOW.md](file:///home/rajesh/Placement_Project/DCL_score_board/docs/DEVELOPMENT_WORKFLOW.md)  
-**System Architecture:** [docs/system_architecture.md](file:///home/rajesh/Placement_Project/DCL_score_board/docs/system_architecture.md)  
-**Master Plan:** [docs/plan.md](file:///home/rajesh/Placement_Project/DCL_score_board/docs/plan.md)  
+**Standard Lifecycle:** [docs/DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md)  
+**System Architecture:** [docs/system_architecture.md](system_architecture.md)  
+**Master Plan:** [docs/plan.md](plan.md)  
 
 ---
 
@@ -49,7 +49,7 @@
 
 ## 2. Phased Breakdown & 7-Stage Lifecycle Execution Matrix
 
-Every phase detailed below is an autonomous, incremental milestone that executes strictly through the **7-Stage Feature Development Lifecycle** codified in [docs/DEVELOPMENT_WORKFLOW.md](file:///home/rajesh/Placement_Project/DCL_score_board/docs/DEVELOPMENT_WORKFLOW.md).
+Every phase detailed below is an autonomous, incremental milestone that executes strictly through the **7-Stage Feature Development Lifecycle** codified in [docs/DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md).
 
 ---
 
@@ -576,7 +576,7 @@ flowchart LR
   - Verifies `JWT_SECRET` length $\ge 32$.
   - Asserts bootstrap passwords are non-default.
   - Validates `CORS_ORIGINS` contains zero wildcard/localhost entries.
-- **Runbook:** [DEPLOYMENT.md](file:///home/rajesh/Placement_Project/DCL_score_board/DEPLOYMENT.md).
+- **Runbook:** [DEPLOYMENT.md](../DEPLOYMENT.md).
 
 ##### Stage 3 — Layered Implementation (DB $\to$ Backend $\to$ Frontend)
 1. Hardening audit across backend error handling and proxy-aware rate limiting.

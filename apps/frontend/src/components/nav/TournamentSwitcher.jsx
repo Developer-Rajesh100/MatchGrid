@@ -2,12 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronDown, Trophy, Check, Radio } from 'lucide-react';
 import { tournamentApi } from '../../api/tournament';
-import { useTournament } from '../../context/TournamentContext';
 
 export function TournamentSwitcher() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { tournament } = useTournament();
   const [tournaments, setTournaments] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -66,9 +64,7 @@ export function TournamentSwitcher() {
 
   const match = location.pathname ? location.pathname.match(/\/t\/([^/]+)/) : null;
   const pathSlug = match ? match[1] : null;
-  const activeTourney =
-    tournament ||
-    (pathSlug ? tournaments.find((t) => t.slug === pathSlug || t.id === pathSlug) : null);
+  const activeTourney = pathSlug ? tournaments.find((t) => t.slug === pathSlug || t.id === pathSlug) : null;
   const currentLabel = activeTourney ? activeTourney.name : 'Tournaments';
 
   return (

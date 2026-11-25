@@ -15,9 +15,10 @@ from app.services.players import create_player, delete_player, update_player
 
 
 async def test_create_player_assigns_an_auto_incrementing_dcl_id(tournament, teams, players):
-    existing_count = await Player.find_all().count()
+    existing_count = await Player.find(Player.tournament_id == tournament.id).count()
     payload = PlayerCreate(team_id=str(teams["Red Dragons"].id), name="New Signing", number=99)
     player = await create_player(payload)
+    # fixture players already hold DCL-001..024; the counter catches up past them
     assert player.dcl_id == f"DCL-{existing_count + 1:03d}"
     assert player.team_id == teams["Red Dragons"].id
 
@@ -148,7 +149,7 @@ async def test_legacy_player_documents_with_position_still_load_and_are_not_expo
         {"team_id": team.id, "dcl_id": "LEGACY-1", "name": "Old Doc", "number": 55,
          "position": "GK", "is_manager": False}
     )
-    listed = (await async_client.get(f"/api/players?team_id={team.id}")).json()
+    listed = (await async_client.get(f"/api/players?team_id={team.id}&tournament_id={team.tournament_id}")).json()
     legacy = next(p for p in listed if p["dcl_id"] == "LEGACY-1")
     assert "position" not in legacy
     assert legacy["name"] == "Old Doc"

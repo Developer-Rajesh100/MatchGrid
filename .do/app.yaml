@@ -34,6 +34,11 @@ services:
       - { key: CORS_ORIGINS, value: "https://dcl-j3clh.ondigitalocean.app" }
       - { key: AUTO_MIGRATE, value: "true" }
       - { key: AUTO_SEED, value: "true" }
+      - { key: R2_ACCOUNT_ID, scope: RUN_TIME, type: SECRET }
+      - { key: R2_ACCESS_KEY_ID, scope: RUN_TIME, type: SECRET }
+      - { key: R2_SECRET_ACCESS_KEY, scope: RUN_TIME, type: SECRET }
+      - { key: R2_BUCKET_NAME, value: matchgrid-media }
+      - { key: R2_PUBLIC_BASE_URL, scope: RUN_TIME, type: SECRET }
   - name: frontend
     dockerfile_path: frontend/Dockerfile
     source_dir: /

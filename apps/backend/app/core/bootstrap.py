@@ -21,7 +21,7 @@ from app.core.config import get_settings
 from app.core.database import get_client
 from app.core.security import hash_password
 from app.migrations.runner import apply_migrations
-from app.models import Admin, User, UserRole
+from app.models import User, UserRole
 from app.scripts.import_match_schedule import (
     DEFAULT_PATH as SCHEDULE_PATH,
     import_schedule,
@@ -79,14 +79,12 @@ async def _seed() -> None:
 
 
 async def _sync_bootstrap_user(settings) -> None:
-    """Ensure SUPER_ADMIN record exists in users collection alongside admins."""
+    """Ensure the bootstrap SUPER_ADMIN exists in the users collection."""
     user = await User.find_one(User.username == settings.admin_bootstrap_username)
     if user is None:
-        admin = await Admin.find_one(Admin.username == settings.admin_bootstrap_username)
-        password_hash = admin.password_hash if admin else hash_password(settings.admin_bootstrap_password)
         await User(
             username=settings.admin_bootstrap_username,
-            password_hash=password_hash,
+            password_hash=hash_password(settings.admin_bootstrap_password),
             role=UserRole.SUPER_ADMIN,
             is_active=True,
         ).insert()

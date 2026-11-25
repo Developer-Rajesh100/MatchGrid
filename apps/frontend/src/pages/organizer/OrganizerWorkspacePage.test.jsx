@@ -18,6 +18,9 @@ vi.mock('../../api/organizer', () => ({
     deleteScorer: vi.fn(),
     assignScorer: vi.fn(),
     removeScorer: vi.fn(),
+    getTournamentMatches: vi.fn(),
+    updateTournament: vi.fn(),
+    updateConfig: vi.fn(),
   },
 }));
 
@@ -126,7 +129,7 @@ describe('OrganizerWorkspacePage Component', () => {
     organizerApi.getMyTournaments.mockResolvedValueOnce(mockTournaments);
     teamsApi.getTeams.mockResolvedValueOnce(mockTeams);
     matchesApi.getGroups.mockResolvedValueOnce(mockGroups);
-    matchesApi.getMatches.mockResolvedValueOnce(mockMatches);
+    organizerApi.getTournamentMatches.mockResolvedValueOnce(mockMatches);
     organizerApi.getScorers.mockResolvedValueOnce(mockScorers);
     playersApi.getPlayers.mockResolvedValueOnce(mockPlayers);
 
@@ -150,7 +153,7 @@ describe('OrganizerWorkspacePage Component', () => {
     organizerApi.getMyTournaments.mockResolvedValue(mockTournaments);
     teamsApi.getTeams.mockResolvedValue(mockTeams);
     matchesApi.getGroups.mockResolvedValue(mockGroups);
-    matchesApi.getMatches.mockResolvedValue(mockMatches);
+    organizerApi.getTournamentMatches.mockResolvedValue(mockMatches);
     organizerApi.getScorers.mockResolvedValue(mockScorers);
     playersApi.getPlayers.mockResolvedValue(mockPlayers);
 
@@ -195,7 +198,7 @@ describe('OrganizerWorkspacePage Component', () => {
     organizerApi.getMyTournaments.mockResolvedValue(mockTournaments);
     teamsApi.getTeams.mockResolvedValue(mockTeams);
     matchesApi.getGroups.mockResolvedValue(mockGroups);
-    matchesApi.getMatches.mockResolvedValue(mockMatches);
+    organizerApi.getTournamentMatches.mockResolvedValue(mockMatches);
     organizerApi.getScorers.mockResolvedValue(mockScorers);
     playersApi.getPlayers.mockResolvedValue(mockPlayers);
 
@@ -229,7 +232,7 @@ describe('OrganizerWorkspacePage Component', () => {
     organizerApi.getMyTournaments.mockResolvedValue(mockTournaments);
     teamsApi.getTeams.mockResolvedValue(mockTeams);
     matchesApi.getGroups.mockResolvedValue(mockGroups);
-    matchesApi.getMatches.mockResolvedValue(mockMatches);
+    organizerApi.getTournamentMatches.mockResolvedValue(mockMatches);
     organizerApi.getScorers.mockResolvedValue(mockScorers);
     playersApi.getPlayers.mockResolvedValue(mockPlayers);
 

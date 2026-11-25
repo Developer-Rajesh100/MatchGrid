@@ -31,4 +31,4 @@ class TeamCreate(BaseModel):
     crest_url: Optional[str] = None
     logo_url: Optional[str] = None
     group_id: Optional[str] = None
-    tournament_id: Optional[str] = None
+    tournament_id: str = Field(pattern=r"^[0-9a-fA-F]{24}$")

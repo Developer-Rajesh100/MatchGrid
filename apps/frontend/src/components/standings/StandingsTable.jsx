@@ -1,9 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar } from '../common/Avatar';
+import { useTournament } from '../../context/TournamentContext';
+import { tPath } from '../../utils/paths';
 
 export function StandingsTable({ groupName, standings = [], showLegend = true }) {
   const navigate = useNavigate();
+  const { slug } = useTournament();
 
   return (
     <div style={{ marginBottom: '24px' }}>
@@ -42,7 +45,7 @@ export function StandingsTable({ groupName, standings = [], showLegend = true })
                 <tr
                   key={row.team_id}
                   className={`clickable ${isTopTwo ? 'qualify-spot' : ''}`}
-                  onClick={() => navigate(`/teams/${row.team_id}`)}
+                  onClick={() => navigate(tPath(slug, `teams/${row.team_id}`))}
                 >
                   <td className="num" style={{ fontWeight: 700, color: isTopTwo ? 'var(--brand-primary)' : 'var(--text-secondary)' }}>
                     {idx + 1}

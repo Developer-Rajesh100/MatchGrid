@@ -46,7 +46,7 @@ describe('ScorerDashboardPage Component', () => {
       <MemoryRouter initialEntries={['/scorer']}>
         <Routes>
           <Route path="/scorer" element={<ScorerDashboardPage />} />
-          <Route path="/admin/matches/:matchId/live" element={<div>Live Console View</div>} />
+          <Route path="/scorer/matches/:matchId/live" element={<div>Live Console View</div>} />
         </Routes>
       </MemoryRouter>
     );

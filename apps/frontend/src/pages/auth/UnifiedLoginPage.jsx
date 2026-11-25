@@ -19,9 +19,9 @@ export function UnifiedLoginPage() {
       const res = await authApi.login(username, password);
       const role = res?.role;
 
-      // Honor legacy /admin route if accessed via /admin/login for superadmin, otherwise role portal
-      if (location.pathname === '/admin/login' && role === 'SUPER_ADMIN') {
-        navigate('/admin');
+      const cameFrom = location.state?.from?.pathname;
+      if (cameFrom && cameFrom !== '/login') {
+        navigate(cameFrom, { replace: true }); // back to where the session ran out (or was needed)
       } else if (role === 'SUPER_ADMIN') {
         navigate('/superadmin');
       } else if (role === 'ORGANIZER') {
@@ -29,7 +29,7 @@ export function UnifiedLoginPage() {
       } else if (role === 'SCORER') {
         navigate('/scorer');
       } else {
-        navigate('/admin');
+        navigate('/');
       }
     } catch (err) {
       setError(err.message || 'Authentication failed. Please verify credentials.');
@@ -72,6 +72,11 @@ export function UnifiedLoginPage() {
           </p>
         </div>
 
+        {location.state?.expired && !error && (
+          <div role="status" data-testid="session-expired" style={{ marginBottom: 12, color: 'var(--accent-gold)', fontSize: 13 }}>
+            Your session expired. Please sign in again.
+          </div>
+        )}
         {error && (
           <div
             data-testid="admin-login-error"

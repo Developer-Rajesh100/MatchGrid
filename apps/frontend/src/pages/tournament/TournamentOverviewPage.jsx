@@ -12,6 +12,7 @@ import { LeaderCard } from '../../components/stats/LeaderCard';
 import { Avatar } from '../../components/common/Avatar';
 import { LoadingState, ErrorState, StatTile } from '../../components/common/Common';
 import { useLiveSocket } from '../../hooks/useLiveSocket';
+import { tPath } from '../../utils/paths';
 
 export function TournamentOverviewPage() {
   const navigate = useNavigate();
@@ -88,7 +89,7 @@ export function TournamentOverviewPage() {
               </span>
             </div>
             <button
-              onClick={() => navigate(`/matches/${featuredLive.id}`)}
+              onClick={() => navigate(tPath(slug, `matches/${featuredLive.id}`))}
               className="btn btn-sm btn-primary"
             >
               Open Match Center <ChevronRight size={14} />
@@ -107,7 +108,7 @@ export function TournamentOverviewPage() {
           >
             {/* Team 1 */}
             <div
-              onClick={() => featuredLive.team1_id && navigate(`/teams/${featuredLive.team1_id}`)}
+              onClick={() => featuredLive.team1_id && navigate(tPath(slug, `teams/${featuredLive.team1_id}`))}
               style={{ textAlign: 'center', flex: '1 1 180px', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
@@ -152,7 +153,7 @@ export function TournamentOverviewPage() {
 
             {/* Team 2 */}
             <div
-              onClick={() => featuredLive.team2_id && navigate(`/teams/${featuredLive.team2_id}`)}
+              onClick={() => featuredLive.team2_id && navigate(tPath(slug, `teams/${featuredLive.team2_id}`))}
               style={{ textAlign: 'center', flex: '1 1 180px', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
@@ -202,7 +203,7 @@ export function TournamentOverviewPage() {
           {nextMatch ? (
             <div
               className="card card-clickable"
-              onClick={() => navigate(`/matches/${nextMatch.id}`)}
+              onClick={() => navigate(tPath(slug, `matches/${nextMatch.id}`))}
               style={{ borderLeft: '4px solid var(--accent-gold)' }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -243,7 +244,7 @@ export function TournamentOverviewPage() {
           {latestResult ? (
             <div
               className="card card-clickable"
-              onClick={() => navigate(`/matches/${latestResult.id}`)}
+              onClick={() => navigate(tPath(slug, `matches/${latestResult.id}`))}
               style={{ borderLeft: '4px solid var(--brand-primary)' }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>

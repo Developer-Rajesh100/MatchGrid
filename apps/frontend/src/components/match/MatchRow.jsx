@@ -3,9 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { StatusPill } from '../common/StatusPill';
 import { Avatar } from '../common/Avatar';
 import { Calendar, Clock, MapPin, Activity } from 'lucide-react';
+import { useTournament } from '../../context/TournamentContext';
+import { tPath } from '../../utils/paths';
 
 export function MatchRow({ match, showVenue = false }) {
   const navigate = useNavigate();
+  const { slug: contextSlug } = useTournament();
+  const slug = match.tournament_slug || contextSlug;
 
   const isPlayed = match.status === 'full_time' || match.status === 'live' || match.status === 'completed';
   const team1Name = match.team1_name || 'TBD';
@@ -28,7 +32,7 @@ export function MatchRow({ match, showVenue = false }) {
   return (
     <div
       className="match-row"
-      onClick={() => navigate(`/matches/${match.id}`)}
+      onClick={() => navigate(tPath(slug, `matches/${match.id}`))}
       role="button"
       tabIndex={0}
       style={{
@@ -39,7 +43,7 @@ export function MatchRow({ match, showVenue = false }) {
           : '4px solid var(--border-subtle)',
       }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') navigate(`/matches/${match.id}`);
+        if (e.key === 'Enter') navigate(tPath(slug, `matches/${match.id}`));
       }}
     >
       <div className="match-teams">

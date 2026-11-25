@@ -32,6 +32,13 @@ ALLOWED_FORMATS = {
 
 VALID_CATEGORIES = {"crests", "photos", "logos", "banners"}
 
+# The only key shape this service ever writes (see generate_key). Anything else
+# under "tournaments/" is not ours to delete or reference.
+MEDIA_KEY_RE = re.compile(
+    r"^tournaments/(?P<tournament_id>[0-9a-fA-F]{24})/(?:crests|photos|logos|banners)/"
+    r"[0-9a-fA-F]{32}\.(?:jpg|png|webp)$"
+)
+
 
 class StorageService:
     def __init__(self, settings: Settings | None = None):
@@ -66,6 +73,8 @@ class StorageService:
             raise UnprocessableEntityError("Image file cannot be empty")
 
         try:
+            with Image.open(io.BytesIO(file_bytes)) as probe:
+                probe.verify()  # structural integrity check (truncated / tampered files fail here)
             with Image.open(io.BytesIO(file_bytes)) as img:
                 img_format = (img.format or "").upper()
                 if img_format not in ALLOWED_FORMATS:
@@ -123,10 +132,11 @@ class StorageService:
         return None
 
     def extract_tournament_id_from_key(self, key: str | None) -> str | None:
+        """Tournament id of a strictly well-formed media key, else None."""
         if not key:
             return None
-        match = re.match(r"^tournaments/([0-9a-fA-F]{24})/", key)
-        return match.group(1) if match else None
+        match = MEDIA_KEY_RE.match(key)
+        return match.group("tournament_id").lower() if match else None
 
     async def upload_image(
         self,
@@ -180,7 +190,7 @@ class StorageService:
             return False
 
         key = self.extract_key_from_url(url_or_key)
-        if not key:
+        if not key or not MEDIA_KEY_RE.match(key):
             return False
 
         def _sync_delete() -> None:
@@ -195,6 +205,38 @@ class StorageService:
         except Exception as exc:
             logger.warning("Failed to delete R2 object key %s: %s", key, exc)
             return False
+
+
+    async def delete_prefix(self, prefix: str) -> int:
+        """Deletes every object under `prefix` (paginated). Returns the number deleted.
+        Only ever called with a tournament prefix; failures are logged, never raised,
+        so a storage hiccup cannot undo an already-committed database delete."""
+        if not self.settings.is_r2_configured or not re.match(r"^tournaments/[0-9a-fA-F]{24}/$", prefix):
+            return 0
+
+        def _sync_purge() -> int:
+            deleted = 0
+            token = None
+            while True:
+                kwargs = {"Bucket": self.settings.r2_bucket_name, "Prefix": prefix}
+                if token:
+                    kwargs["ContinuationToken"] = token
+                page = self.s3_client.list_objects_v2(**kwargs)
+                objects = [{"Key": o["Key"]} for o in page.get("Contents", [])]
+                if objects:
+                    self.s3_client.delete_objects(
+                        Bucket=self.settings.r2_bucket_name, Delete={"Objects": objects, "Quiet": True}
+                    )
+                    deleted += len(objects)
+                if not page.get("IsTruncated"):
+                    return deleted
+                token = page.get("NextContinuationToken")
+
+        try:
+            return await asyncio.to_thread(_sync_purge)
+        except Exception as exc:
+            logger.warning("Failed to purge R2 prefix %s: %s", prefix, exc)
+            return 0
 
 
 _storage_service: StorageService | None = None

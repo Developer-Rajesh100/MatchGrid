@@ -14,8 +14,8 @@ from app.services.teams import create_team, delete_team, rename_team_checked
 
 
 async def test_create_team_succeeds_and_assigns_group_when_given(tournament, groups):
-    payload = TeamCreate(name="Silver Eagles", color="#c0c0c0", group_id=str(groups["A"].id))
-    team = await create_team(payload)
+    payload = TeamCreate(name="Silver Eagles", color="#c0c0c0", group_id=str(groups["A"].id), tournament_id=str(tournament.id))
+    team = await create_team(payload, tournament.id)
 
     assert team.name == "Silver Eagles"
     assert team.tournament_id == tournament.id
@@ -25,22 +25,22 @@ async def test_create_team_succeeds_and_assigns_group_when_given(tournament, gro
 
 
 async def test_create_team_without_group_id_creates_ungrouped_team(tournament):
-    payload = TeamCreate(name="Free Agents FC", color="#123456")
-    team = await create_team(payload)
+    payload = TeamCreate(name="Free Agents FC", color="#123456", tournament_id=str(tournament.id))
+    team = await create_team(payload, tournament.id)
 
     assert team.id is not None
     assert await GroupTeam.find_one(GroupTeam.team_id == team.id) is None
 
 
 async def test_create_team_rejects_a_duplicate_name_case_insensitively(tournament, teams):
-    payload = TeamCreate(name="red dragons", color="#000000")  # existing team, different case
+    payload = TeamCreate(name="red dragons", color="#000000", tournament_id=str(tournament.id))  # existing team, different case
     with pytest.raises(ConflictError):
-        await create_team(payload)
+        await create_team(payload, tournament.id)
 
 
 async def test_create_team_strips_whitespace_from_the_name(tournament):
-    payload = TeamCreate(name="  Padded Name FC  ", color="#111111")
-    team = await create_team(payload)
+    payload = TeamCreate(name="  Padded Name FC  ", color="#111111", tournament_id=str(tournament.id))
+    team = await create_team(payload, tournament.id)
     assert team.name == "Padded Name FC"
 
 
@@ -61,7 +61,10 @@ async def test_rename_team_checked_rejects_a_name_already_used_by_another_team(t
 
 
 async def test_delete_team_succeeds_when_it_has_no_players_or_matches(tournament, groups):
-    team = await create_team(TeamCreate(name="Empty Squad FC", color="#222222", group_id=str(groups["A"].id)))
+    team = await create_team(
+        TeamCreate(name="Empty Squad FC", color="#222222", group_id=str(groups["A"].id), tournament_id=str(tournament.id)),
+        tournament.id,
+    )
     await delete_team(team)
 
     assert await Team.get(team.id) is None

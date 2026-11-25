@@ -38,6 +38,7 @@ flowchart LR
 | `TRUSTED_PROXY_HOPS` | `1` | Number of trusted edge reverse-proxy hops for IP extraction in login rate limiting. |
 | `AUTO_MIGRATE` | `true` | Automatically executes sequential Beanie schema migrations on container boot. |
 | `AUTO_SEED` | `false` | Set to `false` in production to prevent inserting dummy development records. |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_BASE_URL` | Cloudflare R2 values (secrets) | **Required in production** — there are no built-in defaults and the app refuses to start without them. |
 
 ### Frontend Environment Variables (`apps/frontend`)
 
@@ -97,3 +98,21 @@ After initial deployment, verify these 5 critical workflows:
 3. **Security Assertions:** Confirm that `docs/` or OpenAPI `/docs` are disabled in production mode.
 4. **Rate Limiting:** Send 6 consecutive bad-password login requests and confirm HTTP 429 throttling response.
 5. **Real-Time Telemetry:** Open a live match on two separate browser windows (one Scorer, one Spectator); log a goal and confirm instant sub-second score update via WSS.
+
+
+---
+
+## 5. Scaling constraints and known limits
+
+Run **one backend instance with one worker** until these move to shared state (Redis or similar):
+
+| Concern | Today | Consequence of a second worker/instance |
+|---|---|---|
+| Live WebSocket rooms (`app/core/websocket.py`) | In-process room registry | A goal logged on instance A never reaches spectators connected to instance B. |
+| Login throttling (`app/core/rate_limit.py`) | In-process, per client IP | The 5-attempt limit is multiplied by the number of instances. |
+| Startup migrations | Guarded by a Mongo lock | Safe with several instances. |
+
+Other deliberate limits:
+* **Session tokens** are 12-hour JWTs kept in browser `localStorage`; there is no server-side revocation list. Deactivating a user takes effect immediately (the account is re-read on every request), but a token for a still-active account stays valid until it expires. Moving to an httpOnly cookie is a Phase 7 option.
+* **Uploads** are capped at 5 MB (enforced while streaming), must be JPEG/PNG/WebP, and are structurally verified. Images are stored as uploaded: EXIF metadata is not stripped.
+* **Deployment identifiers** such as the DigitalOcean app name, the `dcl_scoreboard` database name, the GitHub repository and the app domain predate the MatchGrid rename. They are left alone on purpose: renaming the database value would point production at an empty database.

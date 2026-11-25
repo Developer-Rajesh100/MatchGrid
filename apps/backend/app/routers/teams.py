@@ -6,10 +6,11 @@ from app.core.deps import check_tournament_ownership, get_current_admin
 from app.core.errors import NotFoundError
 from app.models import Group, GroupTeam, Player, Team, User
 from app.schemas.team import TeamCreate, TeamOut, TeamUpdate
-from app.services.groups import assign_team_group
+from app.services.groups import assert_group_in_tournament, assign_team_group
+from app.services.media import release_media, validate_media_url
 from app.services.serializers import team_to_out
 from app.services.teams import create_team, delete_team, rename_team_checked
-from app.services.tournament_scope import get_active_tournament_id, resolve_tournament_id
+from app.services.tournament_scope import resolve_tournament_id
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -28,15 +29,24 @@ async def list_teams(
 ) -> list[TeamOut]:
     resolved_tid = await resolve_tournament_id(tournament_id, tournament_slug)
     teams = await Team.find(Team.tournament_id == resolved_tid).to_list()
-    group_teams = {gt.team_id: gt for gt in await GroupTeam.find_all().to_list()}
-    groups = {g.id: g for g in await Group.find_all().to_list()}
+    group_teams = {gt.team_id: gt for gt in await GroupTeam.find(GroupTeam.tournament_id == resolved_tid).to_list()}
+    groups = {g.id: g for g in await Group.find(Group.tournament_id == resolved_tid).to_list()}
+    # one grouped query for every team's roster size instead of one count per team
+    counts = {
+        row["_id"]: row["n"]
+        async for row in Player.get_pymongo_collection().aggregate(
+            [
+                {"$match": {"team_id": {"$in": [t.id for t in teams]}}},
+                {"$group": {"_id": "$team_id", "n": {"$sum": 1}}},
+            ]
+        )
+    }
 
     out = []
     for team in teams:
         gt = group_teams.get(team.id)
         group = groups.get(gt.group_id) if gt else None
-        player_count = await Player.find(Player.team_id == team.id).count()
-        out.append(team_to_out(team, gt, group, player_count))
+        out.append(team_to_out(team, gt, group, counts.get(team.id, 0)))
     return out
 
 
@@ -45,6 +55,8 @@ async def add_team(payload: TeamCreate, admin: User = Depends(get_current_admin)
     """Create a team. Team names must be unique within the tournament."""
     # Wire ownership guard
     tournament = await check_tournament_ownership(admin, payload.tournament_id)
+    payload.crest_url = validate_media_url(payload.crest_url, tournament.id)
+    payload.logo_url = validate_media_url(payload.logo_url, tournament.id)
     team = await create_team(payload, tournament_id=tournament.id)
     gt = await GroupTeam.find_one(GroupTeam.team_id == team.id)
     group = await Group.get(gt.group_id) if gt else None
@@ -70,6 +82,12 @@ async def update_team(
 
     data = payload.model_dump(exclude_unset=True)
     group_id = data.pop("group_id", None)
+    for field in ("crest_url", "logo_url"):
+        if field in data:
+            data[field] = validate_media_url(data[field], team.tournament_id)
+    if group_id is not None:
+        # Fail before any field is saved if the group belongs to another tournament.
+        await assert_group_in_tournament(PydanticObjectId(group_id), team.tournament_id)
 
     if "name" in data:
         await rename_team_checked(team, data["name"])
@@ -89,8 +107,7 @@ async def update_team(
 
     new_crest = team.crest_url or team.logo_url
     if old_crest and new_crest != old_crest:
-        from app.services.storage import get_storage_service
-        await get_storage_service().delete_image(old_crest)
+        await release_media(old_crest, team.tournament_id)
 
     if group_id is not None:
         await assign_team_group(team.id, PydanticObjectId(group_id))

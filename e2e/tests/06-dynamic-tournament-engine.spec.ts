@@ -5,6 +5,7 @@ import {
   createEntityTracker,
   createTestPlayer,
   createTestTeam,
+  createTournament,
   endMatch,
   generateFinal,
   generateGroupFixtures,
@@ -26,12 +27,17 @@ test.describe('MatchGrid Dynamic Tournament, Group Draw & Knockout Bracket Engin
     const tracker = createEntityTracker();
     const token = await loginAsAdmin(request);
     const suffix = Date.now().toString().slice(-4);
+    // Its own tournament (groups A and B are created with it): mutating endpoints always name one,
+    // and teardown cascades through it.
+    const tournament = await createTournament(request, token, { name: `E2E Engine ${suffix}`, season: '1' });
+    tracker.tournamentIds.push(tournament.id);
+    const tournamentId: string = tournament.id;
 
     try {
       // -------------------------------------------------------------
       // 1. Update Tournament Config: 2 groups of 4, top 2 advance to semis
       // -------------------------------------------------------------
-      const updatedTournament = await updateTournamentConfig(request, token, {
+      const updatedTournament = await updateTournamentConfig(request, token, tournamentId, {
         num_groups: 2,
         teams_per_group: 4,
         qualifiers_per_group: 2,
@@ -63,6 +69,7 @@ test.describe('MatchGrid Dynamic Tournament, Group Draw & Knockout Bracket Engin
         const team = await createTestTeam(request, token, {
           name: `Dyn FC ${i}-${suffix}`,
           color: teamColors[i - 1],
+          tournament_id: tournamentId,
         });
         teams.push(team);
         tracker.teamIds.push(team.id);
@@ -81,7 +88,7 @@ test.describe('MatchGrid Dynamic Tournament, Group Draw & Knockout Bracket Engin
       // -------------------------------------------------------------
       // 3. Dynamic Balanced Group Draw (8 teams distributed across 2 groups: 4 each)
       // -------------------------------------------------------------
-      const groups = await triggerRandomDraw(request, token);
+      const groups = await triggerRandomDraw(request, token, tournamentId);
       expect(groups).toHaveLength(2);
       expect(groups[0].name).toBe('A');
       expect(groups[0].teams).toHaveLength(4);
@@ -109,7 +116,7 @@ test.describe('MatchGrid Dynamic Tournament, Group Draw & Knockout Bracket Engin
       // -------------------------------------------------------------
       // 5. Spectator UI: Navigate to /matches and inspect Bracket tab (Pending State)
       // -------------------------------------------------------------
-      await page.goto('/matches');
+      await page.goto(`/t/${tournament.slug}/matches`);
       await expect(page.getByRole('heading', { level: 2 })).toContainText('Match Fixtures & Results');
 
       const bracketTab = page.locator('[data-testid="tab-bracket"]');
@@ -184,7 +191,7 @@ test.describe('MatchGrid Dynamic Tournament, Group Draw & Knockout Bracket Engin
       // -------------------------------------------------------------
       // 7. Seed Knockout Stage (Semi-Finals)
       // -------------------------------------------------------------
-      const semiMatches = await seedKnockoutBracket(request, token, 'semi', true);
+      const semiMatches = await seedKnockoutBracket(request, token, tournamentId, 'semi', true);
       expect(semiMatches).toHaveLength(2);
       for (const sm of semiMatches) {
         tracker.matchIds.push(sm.id);
@@ -226,7 +233,7 @@ test.describe('MatchGrid Dynamic Tournament, Group Draw & Knockout Bracket Engin
       // -------------------------------------------------------------
       // 10. Generate Final & Verify Seeding from Semi Winners (including penalty override)
       // -------------------------------------------------------------
-      const finalMatch = await generateFinal(request, token);
+      const finalMatch = await generateFinal(request, token, tournamentId);
       tracker.matchIds.push(finalMatch.id);
       expect(finalMatch.stage).toBe('final');
       expect(finalMatch.bracket_slot).toBe('FINAL');
@@ -247,7 +254,7 @@ test.describe('MatchGrid Dynamic Tournament, Group Draw & Knockout Bracket Engin
       await endMatch(request, token, finalMatch.id);
 
       // Check backend tournament stage
-      const tournamentRes = await request.get(`${API_BASE_URL}/api/tournament`);
+      const tournamentRes = await request.get(`${API_BASE_URL}/api/tournaments/${tournamentId}`);
       const tournamentData = await tournamentRes.json();
       expect(tournamentData.stage).toBe('champions');
       expect(tournamentData.champion_team_id).toBe(championTeamId);
@@ -255,7 +262,7 @@ test.describe('MatchGrid Dynamic Tournament, Group Draw & Knockout Bracket Engin
       // -------------------------------------------------------------
       // 12. Frontend UI: Verify Champion Banner & Bracket Node Hierarchy
       // -------------------------------------------------------------
-      await page.goto('/matches');
+      await page.goto(`/t/${tournament.slug}/matches`);
       await page.locator('[data-testid="tab-bracket"]').click();
 
       // Verify Champion Banner is prominently rendered
@@ -275,7 +282,7 @@ test.describe('MatchGrid Dynamic Tournament, Group Draw & Knockout Bracket Engin
       await expect(finalCard.locator('.winner-row')).toBeVisible();
 
       // Verify tree API returns clean data structure
-      const bracketTree = await getBracketTree(request);
+      const bracketTree = await getBracketTree(request, tournamentId);
       expect(bracketTree.champion).toBeDefined();
       expect(bracketTree.champion.team_id).toBe(championTeamId);
       expect(bracketTree.rounds).toHaveLength(2);
@@ -284,7 +291,7 @@ test.describe('MatchGrid Dynamic Tournament, Group Draw & Knockout Bracket Engin
       // 13. Mandatory Cleanup & Invariant Restoration
       // -------------------------------------------------------------
       // Reset tournament config back to defaults
-      await updateTournamentConfig(request, token, {
+      await updateTournamentConfig(request, token, tournamentId, {
         num_groups: 2,
         teams_per_group: 3,
         qualifiers_per_group: 2,

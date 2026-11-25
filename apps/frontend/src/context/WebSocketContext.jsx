@@ -12,6 +12,10 @@ export function WebSocketProvider({ children }) {
   const subscribersRef = useRef(new Set());
   const activeRoomsRef = useRef(new Map()); // tournamentId -> refCount
   const socketRef = useRef(null);
+  // True while this socket sits in the server's hub-level "global" room (it receives only
+  // hub events such as match_status_changed, never another tournament's traffic).
+  const inGlobalRef = useRef(false);
+  const hasOpenedBeforeRef = useRef(false);
   const reconnectTimeoutRef = useRef(null);
   const retryCountRef = useRef(0);
   const isUnmountedRef = useRef(false);
@@ -26,13 +30,30 @@ export function WebSocketProvider({ children }) {
     }
   }, []);
 
+  // Only listeners that did not name a tournament need the global room; leave it otherwise.
+  const syncGlobalRoom = useCallback(() => {
+    const needsGlobal = Array.from(subscribersRef.current).some((sub) => !sub.tournamentId);
+    if (needsGlobal && !inGlobalRef.current) {
+      inGlobalRef.current = true;
+      sendRoomAction('subscribe', 'global');
+    } else if (!needsGlobal && inGlobalRef.current) {
+      inGlobalRef.current = false;
+      sendRoomAction('unsubscribe', 'global');
+    }
+  }, [sendRoomAction]);
+
   const connect = useCallback(() => {
     if (isUnmountedRef.current) return;
 
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/live`;
+      // Join the first tournament room straight from the URL; with no tournament known yet the
+      // server places us in the hub room, and syncGlobalRoom() leaves it if nobody needs it.
+      const rooms = Array.from(activeRoomsRef.current.keys());
+      const query = rooms.length ? `?tournament_id=${encodeURIComponent(rooms[0])}` : '';
+      const wsUrl = `${protocol}//${window.location.host}/ws/live${query}`;
       const socket = new WebSocket(wsUrl);
+      inGlobalRef.current = rooms.length === 0;
       socketRef.current = socket;
 
       socket.onopen = () => {
@@ -49,6 +70,20 @@ export function WebSocketProvider({ children }) {
             }
           }
         });
+        syncGlobalRoom();
+
+        // Events broadcast while we were offline are gone for good: after a RE-connect, tell every
+        // listener to refetch its data so pages never keep showing stale scores.
+        if (hasOpenedBeforeRef.current) {
+          subscribersRef.current.forEach((sub) => {
+            try {
+              sub.callback({ type: 'resync' });
+            } catch (err) {
+              console.error('Error in WebSocket resync callback:', err);
+            }
+          });
+        }
+        hasOpenedBeforeRef.current = true;
       };
 
       socket.onmessage = (event) => {
@@ -70,6 +105,8 @@ export function WebSocketProvider({ children }) {
       };
 
       socket.onclose = () => {
+        // A stale socket (e.g. closed by StrictMode's remount) must not clobber the live one.
+        if (socketRef.current !== socket) return;
         setConnected(false);
         socketRef.current = null;
         if (!isUnmountedRef.current) {
@@ -86,7 +123,7 @@ export function WebSocketProvider({ children }) {
     } catch (err) {
       console.error('Failed to create WebSocket:', err);
     }
-  }, []);
+  }, [syncGlobalRoom]);
 
   useEffect(() => {
     isUnmountedRef.current = false;
@@ -119,6 +156,7 @@ export function WebSocketProvider({ children }) {
         sendRoomAction('subscribe', tid);
       }
     }
+    syncGlobalRoom();
 
     return () => {
       subscribersRef.current.delete(subRecord);
@@ -132,8 +170,9 @@ export function WebSocketProvider({ children }) {
           activeRoomsRef.current.set(tid, count);
         }
       }
+      syncGlobalRoom();
     };
-  }, [sendRoomAction]);
+  }, [sendRoomAction, syncGlobalRoom]);
 
   const subscribeRoom = useCallback((tournamentId, callback) => {
     return subscribe(callback, tournamentId);

@@ -225,4 +225,72 @@ describe('WebSocketContext and Room Subscriptions', () => {
       JSON.stringify({ action: 'subscribe', tournament_id: 'tourney_active' })
     );
   });
+
+  it('connects straight into the tournament room named by its first subscriber', () => {
+    render(
+      <WebSocketProvider>
+        <TestConsumer tournamentId="64b000000000000000000001" onMessage={vi.fn()} />
+      </WebSocketProvider>
+    );
+    expect(MockWebSocket.instances[0].url).toMatch(/\/ws\/live\?tournament_id=64b000000000000000000001$/);
+  });
+
+  it('leaves the global room when only tournament-scoped listeners remain, and rejoins for a global one', () => {
+    function Wrapper({ showGlobal }) {
+      return (
+        <WebSocketProvider>
+          <TestConsumer tournamentId="tourney_a" onMessage={vi.fn()} />
+          {showGlobal && <TestConsumer onMessage={vi.fn()} />}
+        </WebSocketProvider>
+      );
+    }
+    const { rerender } = render(<Wrapper showGlobal={false} />);
+    const ws = MockWebSocket.instances[0];
+    expect(ws.url).toContain('tournament_id=tourney_a'); // no global listener: never in the global room
+    act(() => {
+      ws.simulateOpen();
+    });
+    expect(ws.send).not.toHaveBeenCalledWith(JSON.stringify({ action: 'subscribe', tournament_id: 'global' }));
+
+    rerender(<Wrapper showGlobal={true} />);
+    expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ action: 'subscribe', tournament_id: 'global' }));
+
+    rerender(<Wrapper showGlobal={false} />);
+    expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ action: 'unsubscribe', tournament_id: 'global' }));
+  });
+
+  it('a hub-only page connects to the global room by default', () => {
+    render(
+      <WebSocketProvider>
+        <TestConsumer onMessage={vi.fn()} />
+      </WebSocketProvider>
+    );
+    expect(MockWebSocket.instances[0].url).toMatch(/\/ws\/live$/);
+  });
+
+  it('tells every listener to refetch after a RE-connect, but not on the first connect', () => {
+    const onMsg = vi.fn();
+    render(
+      <WebSocketProvider>
+        <TestConsumer tournamentId="tourney_resync" onMessage={onMsg} />
+      </WebSocketProvider>
+    );
+    const ws1 = MockWebSocket.instances[0];
+    act(() => {
+      ws1.simulateOpen();
+    });
+    expect(onMsg).not.toHaveBeenCalledWith({ type: 'resync' });
+
+    act(() => {
+      ws1.simulateClose();
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    const ws2 = MockWebSocket.instances[1];
+    act(() => {
+      ws2.simulateOpen();
+    });
+    expect(onMsg).toHaveBeenCalledWith({ type: 'resync' });
+  });
 });

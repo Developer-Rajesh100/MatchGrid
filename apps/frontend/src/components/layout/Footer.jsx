@@ -20,13 +20,8 @@ export function Footer() {
         </p>
 
         <div className="brand-footer-links">
-          <NavLink to="/">Match Center</NavLink>
-          <NavLink to="/matches">Fixtures</NavLink>
-          <NavLink to="/standings">Standings</NavLink>
-          <NavLink to="/stats">Leaderboards</NavLink>
-          <NavLink to="/teams">Clubs</NavLink>
-          <NavLink to="/players">Players</NavLink>
-          <NavLink to="/admin">Admin Portal</NavLink>
+          <NavLink to="/">Tournaments</NavLink>
+          <NavLink to="/login">Staff Sign In</NavLink>
         </div>
 
         <div

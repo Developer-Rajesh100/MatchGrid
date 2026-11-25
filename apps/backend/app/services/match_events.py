@@ -5,6 +5,7 @@ from app.core.websocket import broadcast
 from app.models import Match, MatchEvent, Player
 from app.schemas.match_event import MatchEventCreate
 from app.services.player_stats import recalculate_player_statistics
+from app.services.bracket import assert_downstream_unstarted, recompute_bracket
 from app.services.standings import recalculate_group_standings
 from app.services.tournament_stage import refresh_tournament_stage
 
@@ -27,7 +28,11 @@ async def _after_mutation(match: Match, affected_player_ids: set[PydanticObjectI
         await recalculate_group_standings(match.group_id)
     for player_id in affected_player_ids:
         await recalculate_player_statistics(player_id)
-    await refresh_tournament_stage(match.tournament_id)
+    if match.stage in ("quarter", "semi", "final"):
+        # A changed score can change the winner: move (or withdraw) it in the bracket.
+        await recompute_bracket(match.tournament_id, trigger_match=match)
+    else:
+        await refresh_tournament_stage(match.tournament_id)
 
 
 async def add_event(
@@ -35,6 +40,10 @@ async def add_event(
 ) -> MatchEvent:
     if match.status == "upcoming":
         raise ConflictError("Cannot record events on a match that hasn't started")
+    if match.status == "cancelled":
+        raise ConflictError("Cannot record events on a cancelled match")
+    if match.status == "full_time":
+        await assert_downstream_unstarted(match)
 
     team_id = PydanticObjectId(payload.team_id)
     player_id = PydanticObjectId(payload.player_id)
@@ -79,6 +88,8 @@ async def remove_event(match: Match, event_id: PydanticObjectId) -> None:
     event = await MatchEvent.get(event_id)
     if event is None or event.match_id != match.id:
         raise NotFoundError("Event not found on this match")
+    if match.status == "full_time":
+        await assert_downstream_unstarted(match)
 
     affected = {event.player_id}
     if event.assist_player_id:

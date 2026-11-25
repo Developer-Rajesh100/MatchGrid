@@ -40,6 +40,13 @@ class MatchOut(BaseModel):
     ended_at: Optional[datetime] = None
     is_half_time: bool = False
     elapsed_seconds: Optional[int] = None
+    # Server UTC clock at response time: clients derive the match clock from it (not their own clock).
+    server_now: Optional[datetime] = None
+
+
+class MatchAdminOut(MatchOut):
+    """Match as seen by the tournament's staff: adds who is assigned to score it. Never public."""
+
     assigned_scorer_ids: list[str] = Field(default_factory=list)
 
 
@@ -61,7 +68,7 @@ class MatchCreate(BaseModel):
     time: Optional[str] = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")  # HH:MM, 24h
     venue: Optional[str] = Field(default=None, max_length=200)
     label: Optional[str] = Field(default=None, max_length=100)
-    tournament_id: Optional[str] = Field(default=None, pattern=r"^[0-9a-fA-F]{24}$")
+    tournament_id: str = Field(pattern=r"^[0-9a-fA-F]{24}$")
     duration_minutes: Optional[int] = Field(default=None, ge=1, le=240)
     notes: Optional[str] = Field(default=None, max_length=1000)
 

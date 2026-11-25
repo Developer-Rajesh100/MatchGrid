@@ -84,17 +84,18 @@ async def test_list_public_tournaments_aggregation_and_counts(async_client: Asyn
     assert ucl["name"] == "Champions League 2026"
     assert ucl["season"] == "2026"
     assert ucl["logo_url"] == "https://r2.cdn/ucl-logo.png"
-    assert ucl["organizer_name"] == "org_public"
+    assert ucl["organizer_name"] == "UEFA Operations"  # organization name, never the login username
+    assert "org_public" not in res.text
     assert ucl["organization_name"] == "UEFA Operations"
     assert ucl["teams_count"] == 2
     assert ucl["matches_count"] == 2
     assert ucl["live_matches_count"] == 1
-    assert ucl["status"] == "ACTIVE"
+    assert ucl["status"] == "active"
 
     # Find USC-2025 summary
     usc = next((x for x in data if x["slug"] == "usc-2025"), None)
     assert usc is not None
-    assert usc["status"] == "COMPLETED"
+    assert usc["status"] == "completed"
     assert usc["champion_team_id"] == str(team1.id)
     assert usc["champion_team_name"] == "Real Madrid"
     assert usc["champion_crest_url"] == "https://r2.cdn/real.png"

@@ -204,7 +204,7 @@ test.describe('MatchGrid Phase 6: Role-Based Portals & End-to-End Governance Lif
       await openConsoleBtn.click();
 
       // Assert Live Console loaded
-      await expect(page).toHaveURL(/\/admin\/matches\/.*\/live|\/scorer\/matches\/.*\/live/);
+      await expect(page).toHaveURL(/\/scorer\/matches\/.*\/live/);
       await expect(page.getByText(/Match Control|Live Match|Match #/i).first()).toBeVisible();
 
       // Kick off match

@@ -2,6 +2,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 
 from app.core.config import get_settings
+from app.core.legacy_fixes import repair_player_ids
 from app.models import DOCUMENT_MODELS
 
 settings = get_settings()
@@ -30,6 +31,8 @@ def get_client() -> AsyncIOMotorClient:
 async def init_db() -> None:
     client = get_client()
     database = client[settings.mongo_db_name]
+    # Data that would violate a newly declared unique index is repaired first, or the index build aborts boot.
+    await repair_player_ids(database)
     await init_beanie(database=database, document_models=DOCUMENT_MODELS, allow_index_dropping=True)
 
 

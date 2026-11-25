@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import (
     check_match_operator,
+    check_match_tournament_owner,
     check_tournament_ownership,
     get_current_admin,
     get_current_user,
@@ -51,7 +52,7 @@ from app.services.matches import (
     uncancel_match,
 )
 from app.services.serializers import match_event_to_out, match_to_out
-from app.services.tournament_scope import get_active_tournament_id, resolve_tournament_id
+from app.services.tournament_scope import resolve_tournament_id
 from app.services.tournament_stage import get_match_winner
 
 router = APIRouter(prefix="/matches", tags=["matches"])
@@ -64,13 +65,26 @@ async def _teams_map(*matches: Match) -> dict:
     return {t.id: t for t in teams}
 
 
-async def _groups_map() -> dict:
-    return {g.id: g for g in await Group.find_all().to_list()}
+async def _groups_map(*matches: Match) -> dict:
+    """Only the groups the given matches belong to (never the whole collection)."""
+    ids = {m.group_id for m in matches if m.group_id}
+    if not ids:
+        return {}
+    return {g.id: g for g in await Group.find({"_id": {"$in": list(ids)}}).to_list()}
 
 
-async def _to_out(match: Match) -> MatchOut:
+async def _players_map(*matches: Match) -> dict:
+    """Players of the matches' two teams only: every event, lineup entry and scorer in a
+    match belongs to one of them."""
+    team_ids = {t for m in matches for t in (m.team1_id, m.team2_id) if t}
+    if not team_ids:
+        return {}
+    return {p.id: p for p in await Player.find({"team_id": {"$in": list(team_ids)}}).to_list()}
+
+
+async def _to_out(match: Match, admin: bool = False) -> MatchOut:
     teams = await _teams_map(match)
-    groups = await _groups_map()
+    groups = await _groups_map(match)
     score1, score2 = await compute_score(match)
     winner_id = await get_match_winner(match) if match.status == "full_time" else None
     group_name = groups[match.group_id].name if match.group_id in groups else None
@@ -86,6 +100,7 @@ async def _to_out(match: Match) -> MatchOut:
         group_name,
         tournament_name=t_name,
         tournament_slug=t_slug,
+        include_scorers=admin,
     )
 
 
@@ -97,6 +112,7 @@ async def _list_matches(
     date: Optional[str] = None,
     tournament_id: Optional[str] = None,
     tournament_slug: Optional[str] = None,
+    include_scorers: bool = False,
 ) -> list[MatchOut]:
     resolved_tid = await resolve_tournament_id(tournament_id, tournament_slug)
     filters: dict = {"tournament_id": resolved_tid}
@@ -114,7 +130,7 @@ async def _list_matches(
 
     matches = await Match.find(filters).sort("match_number").to_list()
     teams = await _teams_map(*matches)
-    groups = await _groups_map()
+    groups = await _groups_map(*matches)
     scores_and_winners = await compute_scores_and_winners(matches)
     tournament_ids = {m.tournament_id for m in matches if m.tournament_id}
     tournaments = {t.id: t for t in await Tournament.find({"_id": {"$in": list(tournament_ids)}}).to_list()}
@@ -134,6 +150,7 @@ async def _list_matches(
                 group_name,
                 tournament_name=t.name if t else None,
                 tournament_slug=t.slug if t else None,
+                include_scorers=include_scorers,
             )
         )
     return out
@@ -192,7 +209,7 @@ async def get_match(match_id: str) -> MatchDetailOut:
     base = await _to_out(match)
 
     events = await MatchEvent.find(MatchEvent.match_id == match.id).sort("minute").to_list()
-    players = {p.id: p for p in await Player.find_all().to_list()}
+    players = await _players_map(match)
     event_outs = [match_event_to_out(e, players) for e in events]
 
     lineup = await MatchLineup.find(MatchLineup.match_id == match.id).to_list()
@@ -203,10 +220,11 @@ async def get_match(match_id: str) -> MatchDetailOut:
 
 @router.patch("/{match_id}", response_model=MatchOut)
 async def update_match(
-    match_id: str, payload: MatchUpdate, user: User = Depends(get_current_user)
+    match_id: str, payload: MatchUpdate, admin: User = Depends(get_current_admin)
 ) -> MatchOut:
-    """Update a match's match number and scheduled date/time/venue/duration/notes. Does not change status or score."""
-    match = await check_match_operator(user, match_id)
+    """Update a match's match number and scheduled date/time/venue/duration/notes. Does not change status or score.
+    Tournament owner (or superadmin) only — assigned scorers cannot reschedule."""
+    match = await check_match_tournament_owner(admin, match_id)
     changes = payload.model_dump(exclude_unset=True)
     if "match_number" in changes:
         new_number = changes.pop("match_number")
@@ -294,9 +312,9 @@ async def end(match_id: str, user: User = Depends(get_current_user)) -> MatchOut
 
 
 @router.post("/{match_id}/reopen", response_model=MatchOut)
-async def reopen(match_id: str, user: User = Depends(get_current_user)) -> MatchOut:
+async def reopen(match_id: str, user: User = Depends(get_current_admin)) -> MatchOut:
     """full_time -> live, to correct a mis-recorded event. Also refreshes standings/stage."""
-    match = await check_match_operator(user, match_id)
+    match = await check_match_tournament_owner(user, match_id)
     match = await reopen_match(match)
     return await _to_out(match)
 
@@ -333,28 +351,28 @@ async def reset_match_timer(
 
 
 @router.post("/{match_id}/cancel", response_model=MatchOut)
-async def cancel(match_id: str, user: User = Depends(get_current_user)) -> MatchOut:
+async def cancel(match_id: str, user: User = Depends(get_current_admin)) -> MatchOut:
     """Cancel a not-yet-started match. Only valid while status is 'upcoming'. Authorized match operator only."""
-    match = await check_match_operator(user, match_id)
+    match = await check_match_tournament_owner(user, match_id)
     match = await cancel_match(match)
     return await _to_out(match)
 
 
 @router.post("/{match_id}/uncancel", response_model=MatchOut)
-async def uncancel(match_id: str, user: User = Depends(get_current_user)) -> MatchOut:
+async def uncancel(match_id: str, user: User = Depends(get_current_admin)) -> MatchOut:
     """Revert a cancelled match back to 'upcoming'. Authorized match operator only."""
-    match = await check_match_operator(user, match_id)
+    match = await check_match_tournament_owner(user, match_id)
     match = await uncancel_match(match)
     return await _to_out(match)
 
 
 @router.post("/{match_id}/winner", response_model=MatchOut)
 async def winner(
-    match_id: str, payload: WinnerRequest, user: User = Depends(get_current_user)
+    match_id: str, payload: WinnerRequest, user: User = Depends(get_current_admin)
 ) -> MatchOut:
     """Manually record the winner of a drawn knockout match (e.g. on penalties).
     Only valid for a completed, tied, non-group match."""
-    match = await check_match_operator(user, match_id)
+    match = await check_match_tournament_owner(user, match_id)
     match = await set_winner(match, PydanticObjectId(payload.team_id))
     return await _to_out(match)
 
@@ -370,7 +388,7 @@ async def generate_fixtures(
         await check_tournament_ownership(admin, group.tournament_id)
     matches = await generate_group_fixtures(PydanticObjectId(payload.group_id), payload.force)
     teams = await _teams_map(*matches)
-    groups = await _groups_map()
+    groups = await _groups_map(*matches)
     return [
         match_to_out(m, teams, 0, 0, group_name=groups[m.group_id].name if m.group_id in groups else None)
         for m in matches
@@ -379,38 +397,35 @@ async def generate_fixtures(
 
 @router.post("/generate-semis", response_model=list[MatchOut])
 async def do_generate_semis(
-    tournament_id: Optional[str] = Query(default=None),
+    tournament_id: str = Query(..., pattern=r"^[0-9a-fA-F]{24}$"),
     admin: User = Depends(get_current_admin),
 ) -> list[MatchOut]:
     """Seed the 2 semi-finals from final group standings: SF1 = A2 vs B1, SF2 = B2 vs A1.
     Requires both groups fully complete and no semis generated yet."""
-    tid = await resolve_tournament_id(tournament_id)
-    await check_tournament_ownership(admin, tid)
+    tid = (await check_tournament_ownership(admin, tournament_id)).id
     matches = await generate_semis(tid)
     return [await _to_out(m) for m in matches]
 
 
 @router.post("/generate-final", response_model=MatchOut)
 async def do_generate_final(
-    tournament_id: Optional[str] = Query(default=None),
+    tournament_id: str = Query(..., pattern=r"^[0-9a-fA-F]{24}$"),
     admin: User = Depends(get_current_admin),
 ) -> MatchOut:
     """Seed the final from the two semi-final winners. Requires both semis
     completed with a decided winner (score or manual override)."""
-    tid = await resolve_tournament_id(tournament_id)
-    await check_tournament_ownership(admin, tid)
+    tid = (await check_tournament_ownership(admin, tournament_id)).id
     match = await generate_final(tid)
     return await _to_out(match)
 
 
 @router.post("/seed-knockout", response_model=list[MatchOut])
 async def do_seed_knockout(
-    tournament_id: Optional[str] = Query(default=None),
+    tournament_id: str = Query(..., pattern=r"^[0-9a-fA-F]{24}$"),
     admin: User = Depends(get_current_admin),
 ) -> list[MatchOut]:
     """Universal knockout seeder: seeds Quarters, Semis, or crowns Champion based on tournament config."""
-    tid = await resolve_tournament_id(tournament_id)
-    await check_tournament_ownership(admin, tid)
+    tid = (await check_tournament_ownership(admin, tournament_id)).id
     matches = await seed_knockout_bracket(tid)
     return [await _to_out(m) for m in matches]
 
@@ -422,7 +437,7 @@ async def do_seed_knockout(
 async def list_events(match_id: str) -> list[MatchEventOut]:
     match = await get_match_or_404(PydanticObjectId(match_id))
     events = await MatchEvent.find(MatchEvent.match_id == match.id).sort("minute").to_list()
-    players = {p.id: p for p in await Player.find_all().to_list()}
+    players = await _players_map(match)
     return [match_event_to_out(e, players) for e in events]
 
 
@@ -435,7 +450,7 @@ async def create_event(
     while the match is still 'upcoming'. Recalculates standings/statistics."""
     match = await check_match_operator(user, match_id)
     event = await add_event(match, payload, user.id)
-    players = {p.id: p for p in await Player.find_all().to_list()}
+    players = await _players_map(match)
     return match_event_to_out(event, players)
 
 
@@ -454,7 +469,7 @@ async def delete_event(
 async def get_lineup(match_id: str) -> list[LineupEntryOut]:
     match = await get_match_or_404(PydanticObjectId(match_id))
     entries = await MatchLineup.find(MatchLineup.match_id == match.id).to_list()
-    players = {p.id: p for p in await Player.find_all().to_list()}
+    players = await _players_map(match)
     return [
         LineupEntryOut(
             player_id=str(e.player_id),
@@ -474,7 +489,7 @@ async def put_lineup(
     what appearance statistics are computed from, not team roster membership."""
     match = await check_match_operator(user, match_id)
     entries = await set_lineup(match, payload.player_ids)
-    players = {p.id: p for p in await Player.find_all().to_list()}
+    players = await _players_map(match)
     return [
         LineupEntryOut(
             player_id=str(e.player_id),

@@ -1,10 +1,9 @@
-"""Sets (or rotates) the single admin account's credentials.
+"""Sets (or rotates) a SUPER_ADMIN account's credentials.
 
-This system has exactly one admin account by design (see
-reference/plan.txt §8, docs/DATABASE_DESIGN.md §2 — the Admin schema has no
-role/permissions field at all). This script enforces that: it refuses to
-run if more than one admin document somehow exists, and it updates the one
-account in place rather than ever creating a second one.
+Operates on the `users` collection (the legacy `admins` collection has been
+retired). With exactly one SUPER_ADMIN it updates that account in place; with
+several it refuses to guess unless --username names one of them; with none it
+creates the account.
 
 Usage:
     python -m app.scripts.set_admin_password --password 'a-strong-password'
@@ -21,7 +20,7 @@ import string
 
 from app.core.database import close_db, init_db
 from app.core.security import hash_password
-from app.models import Admin
+from app.models import User, UserRole
 
 MIN_PASSWORD_LENGTH = 12
 # Excludes visually-ambiguous characters (0/O, 1/l/I) so a printed password
@@ -37,12 +36,14 @@ async def set_admin_password(username: str | None, password: str) -> str:
     if len(password) < MIN_PASSWORD_LENGTH:
         raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
 
-    admins = await Admin.find_all().to_list()
+    admins = await User.find(User.role == UserRole.SUPER_ADMIN).to_list()
     if len(admins) > 1:
-        raise RuntimeError(
-            f"Expected at most one admin account, found {len(admins)} — refusing to guess which "
-            "one to update. This system is designed for exactly one admin; resolve this manually."
-        )
+        named = [a for a in admins if username and a.username == username]
+        if len(named) != 1:
+            raise RuntimeError(
+                f"Found {len(admins)} super-admin accounts — pass --username naming the one to update."
+            )
+        admins = named
 
     if admins:
         admin = admins[0]
@@ -51,7 +52,12 @@ async def set_admin_password(username: str | None, password: str) -> str:
         admin.password_hash = hash_password(password)
         await admin.save()
     else:
-        admin = Admin(username=username or "admin", password_hash=hash_password(password))
+        admin = User(
+            username=username or "admin",
+            password_hash=hash_password(password),
+            role=UserRole.SUPER_ADMIN,
+            is_active=True,
+        )
         await admin.insert()
 
     return admin.username

@@ -157,7 +157,7 @@ export function OrganizerWorkspacePage() {
       const [tList, gList, mList, sList] = await Promise.all([
         teamsApi.getTeams({ tournament_id: tid }).catch(() => []),
         matchesApi.getGroups({ tournament_id: tid }).catch(() => []),
-        matchesApi.getMatches({ tournament_id: tid }).catch(() => []),
+        organizerApi.getTournamentMatches(tid).catch(() => []),
         organizerApi.getScorers().catch(() => []),
       ]);
       setTeams(tList || []);
@@ -406,7 +406,7 @@ export function OrganizerWorkspacePage() {
       await matchesApi.updateMatch(selectedMatchForSchedule.id, scheduleForm);
       setScheduleModalOpen(false);
       notifySuccess(`Match #${selectedMatchForSchedule.match_number} schedule updated.`);
-      const updatedMatches = await matchesApi.getMatches({ tournament_id: activeTournament.id });
+      const updatedMatches = await organizerApi.getTournamentMatches(activeTournament.id);
       setMatches(updatedMatches || []);
     } catch (err) {
       setError(err.message || 'Failed to update schedule');
@@ -439,7 +439,7 @@ export function OrganizerWorkspacePage() {
       notifySuccess(`Scorer "${scorerUsername}" deleted.`);
       const updatedScorers = await organizerApi.getScorers();
       setScorers(updatedScorers || []);
-      const updatedMatches = await matchesApi.getMatches({ tournament_id: activeTournament.id });
+      const updatedMatches = await organizerApi.getTournamentMatches(activeTournament.id);
       setMatches(updatedMatches || []);
     } catch (err) {
       setError(err.message || 'Failed to delete scorer');
@@ -459,7 +459,7 @@ export function OrganizerWorkspacePage() {
       await organizerApi.assignScorer(selectedMatchForAssign.id, selectedScorerIdToAssign);
       setAssignModalOpen(false);
       notifySuccess('Scorer assigned to match!');
-      const updatedMatches = await matchesApi.getMatches({ tournament_id: activeTournament.id });
+      const updatedMatches = await organizerApi.getTournamentMatches(activeTournament.id);
       setMatches(updatedMatches || []);
     } catch (err) {
       setError(err.message || 'Failed to assign scorer');
@@ -470,7 +470,7 @@ export function OrganizerWorkspacePage() {
     try {
       await organizerApi.removeScorer(matchId, scorerId);
       notifySuccess('Scorer unassigned from match.');
-      const updatedMatches = await matchesApi.getMatches({ tournament_id: activeTournament.id });
+      const updatedMatches = await organizerApi.getTournamentMatches(activeTournament.id);
       setMatches(updatedMatches || []);
     } catch (err) {
       setError(err.message || 'Failed to unassign scorer');
@@ -611,21 +611,21 @@ export function OrganizerWorkspacePage() {
                     padding: '2px 8px',
                     borderRadius: '4px',
                     background:
-                      activeTournament.stage === 'GROUP_STAGE'
+                      activeTournament.stage === 'group'
                         ? 'rgba(16, 185, 129, 0.15)'
-                        : activeTournament.stage === 'KNOCKOUT_STAGE'
+                        : ['quarters', 'semis', 'final'].includes(activeTournament.stage)
                         ? 'rgba(245, 158, 11, 0.15)'
                         : 'var(--bg-elevated)',
                     border: '1px solid var(--border-subtle)',
                     color:
-                      activeTournament.stage === 'GROUP_STAGE'
+                      activeTournament.stage === 'group'
                         ? 'var(--brand-primary)'
-                        : activeTournament.stage === 'KNOCKOUT_STAGE'
+                        : ['quarters', 'semis', 'final'].includes(activeTournament.stage)
                         ? 'var(--brand-gold)'
                         : 'var(--text-muted)',
                   }}
                 >
-                  {activeTournament.stage?.replace('_', ' ') || 'UPCOMING'}
+                  {activeTournament.stage || 'group'}
                 </span>
               )}
             </div>

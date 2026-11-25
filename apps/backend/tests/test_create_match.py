@@ -7,7 +7,10 @@ from app.models import Match, PlayerStatistics
 
 
 def _body(a, b, **kw):
-    return {"team1_id": str(a.id), "team2_id": str(b.id), "date": "2026-11-01", "time": "15:00", **kw}
+    return {
+        "team1_id": str(a.id), "team2_id": str(b.id), "tournament_id": str(a.tournament_id),
+        "date": "2026-11-01", "time": "15:00", **kw,
+    }
 
 
 @pytest_asyncio.fixture
@@ -27,7 +30,7 @@ async def test_requires_admin(async_client, teams):
     assert r.status_code == 401
 
 
-async def test_create_saves_and_is_listed_publicly(async_client, auth_headers, teams, base_matches):
+async def test_create_saves_and_is_listed_publicly(async_client, auth_headers, teams, base_matches, tournament):
     r = await async_client.post(
         "/api/matches",
         json=_body(teams["Red Dragons"], teams["Blue Whales"], venue="Main Arena", label="Charity Cup"),
@@ -40,7 +43,7 @@ async def test_create_saves_and_is_listed_publicly(async_client, auth_headers, t
     assert (out["team1_name"], out["team2_name"], out["venue"], out["label"]) == (
         "Red Dragons", "Blue Whales", "Main Arena", "Charity Cup",
     )
-    listed = (await async_client.get("/api/matches")).json()
+    listed = (await async_client.get("/api/matches", params={"tournament_id": str(tournament.id)})).json()
     assert [m["match_number"] for m in listed] == [1, 2]
     assert (await Match.find_one(Match.match_number == 1)).stage == "group"
 
@@ -196,7 +199,7 @@ async def test_deleted_knockout_slots_are_recreated_by_generation(
             team1_id=teams[name_a].id, team2_id=teams[name_b].id, status="full_time",
         )
         await gm.insert()
-    r = await async_client.post("/api/matches/generate-semis", headers=auth_headers)
+    r = await async_client.post(f"/api/matches/generate-semis?tournament_id={tournament.id}", headers=auth_headers)
     assert r.status_code == 200, r.json()
     got = [(m["label"], m["match_number"]) for m in r.json()]
     assert [lbl for lbl, _ in got] == ["Semi-final 1", "Semi-final 2"]
@@ -226,9 +229,9 @@ async def test_played_extra_match_is_isolated_from_tournament_data_and_deletable
     # tournament data unaffected: no stats row counts the friendly goal, no standings, stage unchanged
     stats = await PlayerStatistics.find_one(PlayerStatistics.player_id == scorer.id)
     assert stats is None or stats.goals == 0
-    board = (await async_client.get("/api/statistics/leaderboards")).json()
+    board = (await async_client.get("/api/statistics/leaderboards", params={"tournament_id": str(tournament.id)})).json()
     assert board["top_scorers"] == []
-    assert all(r["played"] == 0 for g in (await async_client.get("/api/standings")).json() for r in g["standings"])
+    assert all(r["played"] == 0 for g in (await async_client.get("/api/standings", params={"tournament_id": str(tournament.id)})).json() for r in g["standings"])
     assert (await Tournament.find_one()).stage == "group"
     detail = (await async_client.get(f"/api/players/{scorer.id}")).json()
     assert detail["history"] == [] and detail["stats"]["goals"] == 0
@@ -265,7 +268,7 @@ async def test_admin_can_renumber_a_match(async_client, auth_headers, base_match
     await other.insert()
     r = await async_client.patch(f"/api/matches/{base_matches.id}", json={"match_number": 20}, headers=auth_headers)
     assert r.status_code == 200 and r.json()["match_number"] == 20
-    assert [m["match_number"] for m in (await async_client.get("/api/matches")).json()] == [2, 20]  # ordering follows
+    assert [m["match_number"] for m in (await async_client.get("/api/matches", params={"tournament_id": str(tournament.id)})).json()] == [2, 20]  # ordering follows
     # the freed number can be reused
     r = await async_client.patch(f"/api/matches/{other.id}", json={"match_number": 1}, headers=auth_headers)
     assert r.status_code == 200
@@ -287,7 +290,7 @@ async def test_match_number_validation_and_unchanged_number_is_fine(async_client
 
 def _group_body(group, a, b, **kw):
     return {"stage": "group", "group_id": str(group.id), "team1_id": str(a.id), "team2_id": str(b.id),
-            "date": "2026-10-10", **kw}
+            "tournament_id": str(a.tournament_id), "date": "2026-10-10", **kw}
 
 
 async def test_create_real_group_fixture_with_chosen_number(async_client, auth_headers, teams, groups, tournament):
@@ -300,7 +303,7 @@ async def test_create_real_group_fixture_with_chosen_number(async_client, auth_h
     out = r.json()
     assert (out["stage"], out["group_name"], out["match_number"], out["label"], out["status"]) == ("group", "B", 1, None, "upcoming")
     # it is a real fixture: listed under its group, filterable by stage, no time set
-    assert [m["match_number"] for m in (await async_client.get("/api/matches?stage=group")).json()] == [1]
+    assert [m["match_number"] for m in (await async_client.get(f"/api/matches?stage=group&tournament_id={tournament.id}")).json()] == [1]
     assert out["time"] is None
 
 
@@ -347,5 +350,5 @@ async def test_most_appearances_hides_players_with_zero(async_client, tournament
         tournament_id=tournament.id, player_id=players["Red Dragons"][0].id, team_id=teams["Red Dragons"].id
     )
     await stats.insert()
-    board = (await async_client.get("/api/statistics/leaderboards")).json()
+    board = (await async_client.get("/api/statistics/leaderboards", params={"tournament_id": str(tournament.id)})).json()
     assert board["most_appearances"] == []

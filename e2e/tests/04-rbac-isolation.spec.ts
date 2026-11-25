@@ -169,9 +169,10 @@ test.describe('MatchGrid Four-Tier RBAC & Multi-Tenant Data Isolation', () => {
       await page.evaluate((token) => {
         localStorage.setItem('matchgrid_admin_token', token);
         localStorage.setItem('dcl_admin_token', token);
+        localStorage.setItem('matchgrid_role', 'SCORER'); // a session without a role is not trusted
       }, scorerToken);
 
-      await page.goto(`/admin/matches/${match1.id}/live`);
+      await page.goto(`/scorer/matches/${match1.id}/live`);
       await expect(page.locator(`text=${team1.name}`).first()).toBeVisible({ timeout: 8000 });
       await expect(page.locator(`text=${team2.name}`).first()).toBeVisible({ timeout: 8000 });
 

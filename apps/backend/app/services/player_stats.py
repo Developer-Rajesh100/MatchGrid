@@ -17,7 +17,15 @@ async def recalculate_player_statistics(player_id: PydanticObjectId) -> PlayerSt
         return None
 
     # Admin-created "extra" matches (friendlies) are not part of the tournament record.
-    extra_ids = [m.id for m in await Match.find(Match.stage == "extra").to_list()]
+    # Only this player's own tournament can contain matches they took part in.
+    tournament_id = player.tournament_id
+    if tournament_id is None:
+        team = await Team.get(player.team_id)
+        tournament_id = team.tournament_id if team else None
+    extra_ids = [
+        m.id
+        for m in await Match.find(Match.stage == "extra", Match.tournament_id == tournament_id).to_list()
+    ]
 
     appearances = await MatchLineup.find(
         {"player_id": player_id, "match_id": {"$nin": extra_ids}}

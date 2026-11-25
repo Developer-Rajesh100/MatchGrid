@@ -7,7 +7,7 @@ export function TournamentCard({ tournament }) {
 
   if (!tournament) return null;
 
-  const status = (tournament.status || 'UPCOMING').toUpperCase();
+  const status = (tournament.status || 'draft').toUpperCase();
   const isLive = (tournament.live_matches_count || 0) > 0 || status === 'LIVE';
   const slug = tournament.slug || tournament.id;
 

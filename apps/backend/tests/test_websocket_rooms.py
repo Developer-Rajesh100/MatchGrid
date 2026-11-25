@@ -48,9 +48,9 @@ async def test_connection_manager_room_partitioning_and_isolation():
     msg1 = {"type": "match_status_changed", "match_id": "m1"}
     await manager.broadcast_to_tournament("tourney_1", msg1)
 
-    # ws_t1 and ws_global must receive msg1; ws_t2 must receive NOTHING
+    # Only the room receives it: neither the other tournament nor the global/hub room (audit H1)
     assert ws_t1.send_json.call_count == 1
-    assert ws_global.send_json.call_count == 1
+    assert ws_global.send_json.call_count == 0
     assert ws_t2.send_json.call_count == 0
 
     assert ws_t1.send_json.call_args[0][0]["tournament_id"] == "tourney_1"
@@ -59,10 +59,14 @@ async def test_connection_manager_room_partitioning_and_isolation():
     msg2 = {"type": "match_event_added", "match_id": "m2"}
     await manager.broadcast_to_tournament("tourney_2", msg2)
 
-    # ws_t2 and ws_global must receive msg2; ws_t1 must not receive msg2
+    # ws_t2 receives msg2; ws_t1 must not; the hub only gets what is explicitly mirrored to it
     assert ws_t1.send_json.call_count == 1  # Unchanged
     assert ws_t2.send_json.call_count == 1  # Received msg2
-    assert ws_global.send_json.call_count == 2  # Received both msg1 and msg2
+    assert ws_global.send_json.call_count == 0
+
+    await manager.broadcast_to_tournament("tourney_2", {"type": "match_status_changed"}, include_global=True)
+    assert ws_global.send_json.call_count == 1
+    assert ws_t1.send_json.call_count == 1
 
     # Disconnect ws_t1
     await manager.disconnect(ws_t1)
@@ -320,3 +324,77 @@ async def test_strict_live_match_mutation_lock_matrix_403_forbidden(async_client
     )
     assert r_ok.status_code == 200
     assert r_ok.json()["is_half_time"] is True
+
+
+@pytest.mark.asyncio
+async def test_broadcast_helper_mirrors_only_status_changes_to_the_hub():
+    from app.core import websocket as ws_module
+
+    manager = ConnectionManager()
+    room, hub = MagicMock(), MagicMock()
+    for sock in (room, hub):
+        sock.accept = AsyncMock()
+        sock.send_json = AsyncMock()
+    await manager.connect(room, tournament_id="t1")
+    await manager.connect(hub, tournament_id=None)
+
+    await manager.broadcast({"type": "match_event_added", "tournament_id": "t1"})
+    assert room.send_json.call_count == 1 and hub.send_json.call_count == 0
+
+    await manager.broadcast({"type": "match_status_changed", "tournament_id": "t1"})
+    assert room.send_json.call_count == 2 and hub.send_json.call_count == 1
+    assert "match_status_changed" in ws_module.HUB_MESSAGE_TYPES
+
+
+@pytest.mark.asyncio
+async def test_broadcast_is_concurrent_and_a_stalled_client_is_dropped(monkeypatch):
+    import asyncio
+    import time
+
+    from app.core import websocket as ws_module
+
+    monkeypatch.setattr(ws_module, "SEND_TIMEOUT_SECONDS", 0.2)
+    manager = ConnectionManager()
+
+    async def stall(_msg):
+        await asyncio.sleep(5)
+
+    slow = MagicMock()
+    slow.accept = AsyncMock()
+    slow.send_json = stall
+    fast = MagicMock()
+    fast.accept = AsyncMock()
+    fast.send_json = AsyncMock()
+    await manager.connect(slow, tournament_id="t1")
+    await manager.connect(fast, tournament_id="t1")
+
+    started = time.monotonic()
+    await manager.broadcast_to_tournament("t1", {"type": "x"})
+    assert time.monotonic() - started < 1.0  # bounded by the timeout, not by the stalled client
+    assert fast.send_json.call_count == 1
+    assert manager.room_count("t1") == 1  # the stalled client was dropped
+
+
+@pytest.mark.asyncio
+async def test_a_client_cannot_join_unbounded_rooms():
+    from app.core.websocket import MAX_ROOMS_PER_CLIENT
+
+    manager = ConnectionManager()
+    sock = MagicMock()
+    sock.accept = AsyncMock()
+    await manager.connect(sock, tournament_id=None)
+    for i in range(MAX_ROOMS_PER_CLIENT + 10):
+        await manager.subscribe_room(sock, f"room{i}")
+    assert len(manager._client_rooms[sock]) == MAX_ROOMS_PER_CLIENT
+
+
+def test_websocket_endpoint_rejects_malformed_room_ids():
+    from starlette.testclient import TestClient
+    from starlette.websockets import WebSocketDisconnect
+
+    from app.main import app
+
+    client = TestClient(app)
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/ws/live?tournament_id=not-an-object-id"):
+            pass

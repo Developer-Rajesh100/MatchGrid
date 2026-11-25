@@ -148,7 +148,7 @@ async def test_delete_image_endpoints(async_client: AsyncClient, admin_token: st
     storage.settings.r2_bucket_name = "test-bucket"
     storage.settings.r2_public_base_url = "https://cdn.matchgrid.app"
 
-    key = f"tournaments/{tourn.id}/crests/test12345.png"
+    key = f"tournaments/{tourn.id}/crests/{'a' * 32}.png"
 
     # 1. Other organizer blocked (403)
     res_other = await async_client.request(
