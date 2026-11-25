@@ -1,23 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import {
-  Shield,
-  Users,
-  Trophy,
-  Activity,
-  Plus,
-  Trash2,
-  Power,
-  RefreshCw,
-  Search,
-  ExternalLink,
-  AlertTriangle,
-  X,
-  CheckCircle2,
-} from 'lucide-react';
+import { Shield, Trophy, Plus, Trash2, Power, RefreshCw, Search, ExternalLink, AlertTriangle, X, CheckCircle2 } from 'lucide-react';
 import { superadminApi } from '../../api/superadmin';
 import { authApi } from '../../api/auth';
-import { LoadingState, ErrorState, StatTile } from '../../components/common/Common';
+import { LoadingState, ErrorState } from '../../components/common/Common';
+import { Modal, Field, Actions } from '../../components/common/Dialog';
+import { formatDay } from '../../utils/dates';
 import { useLiveSocket } from '../../hooks/useLiveSocket';
 
 export function SuperadminDashboardPage() {
@@ -81,9 +69,12 @@ export function SuperadminDashboardPage() {
     }, [loadData])
   );
 
+  const toastTimer = useRef(null);
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
   const showSuccess = (msg) => {
     setSuccessMsg(msg);
-    setTimeout(() => setSuccessMsg(null), 4000);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setSuccessMsg(null), 4000);
   };
 
   // Toggle user active status
@@ -186,198 +177,85 @@ export function SuperadminDashboardPage() {
     return true;
   });
 
+  const roles = ['ALL', 'SUPER_ADMIN', 'ORGANIZER', 'SCORER'];
+  const kpis = [
+    ['Total Accounts', stats?.total_users ?? users.length],
+    ['Organizers', stats?.total_organizers ?? users.filter((u) => u.role === 'ORGANIZER').length],
+    ['Scorers', stats?.total_scorers ?? users.filter((u) => u.role === 'SCORER').length],
+    ['Tournaments', stats?.total_tournaments ?? tournaments.length],
+    ['Total Fixtures', stats?.total_matches ?? 0],
+  ];
+
   return (
-    <div className="superadmin-command-center" style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 16px' }}>
-      {/* Header Banner */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '16px',
-          marginBottom: '28px',
-          paddingBottom: '20px',
-          borderBottom: '1px solid var(--border-subtle)',
-        }}
-      >
+    <div className="superadmin-command-center sa">
+      <header className="sa-head">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-            <div
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '8px',
-                background: 'rgba(16, 185, 129, 0.15)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--brand-primary)',
-              }}
-            >
-              <Shield size={22} />
-            </div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '26px', fontWeight: 800, margin: 0 }}>
-              Superadmin Command Center
-            </h1>
-          </div>
-          <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--text-secondary)' }}>
-            Platform Oversight &bull; Operator <strong style={{ color: 'var(--text-primary)' }}>{currentUsername}</strong> &bull; Cross-Tenant Governance
-          </p>
+          <h1 className="sa-title"><Shield size={22} aria-hidden="true" /> Superadmin Command Center</h1>
+          <p className="ow-muted">Platform Oversight · Operator <strong>{currentUsername}</strong> · Cross-Tenant Governance</p>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            type="button"
-            className="btn btn-sm btn-outline"
-            onClick={() => loadData(false)}
-            title="Refresh metrics and directory"
-          >
-            <RefreshCw size={13} /> Refresh
+        <div className="sa-head__actions">
+          <button type="button" className="btn btn-sm btn-outline" onClick={() => loadData(false)} title="Refresh metrics and directory">
+            <RefreshCw size={13} aria-hidden="true" /> Refresh
           </button>
-          <button
-            type="button"
-            className="btn btn-sm btn-primary"
-            data-testid="create-organizer-btn"
-            onClick={() => setCreateOrgOpen(true)}
-          >
-            <Plus size={14} /> Create Organizer
+          <button type="button" className="btn btn-sm btn-primary" data-testid="create-organizer-btn" onClick={() => setCreateOrgOpen(true)}>
+            <Plus size={14} aria-hidden="true" /> Create Organizer
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Notifications */}
       {successMsg && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            background: 'rgba(16, 185, 129, 0.15)',
-            border: '1px solid rgba(16, 185, 129, 0.4)',
-            color: 'var(--brand-primary)',
-            fontSize: '13.5px',
-            marginBottom: '20px',
-          }}
-        >
-          <CheckCircle2 size={16} />
-          <span>{successMsg}</span>
+        <div className="cockpit-banner cockpit-banner--ok" role="status">
+          <CheckCircle2 size={16} aria-hidden="true" /> <span>{successMsg}</span>
         </div>
       )}
-
       {error && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            background: 'var(--status-live-tint)',
-            border: '1px solid rgba(239, 68, 68, 0.4)',
-            color: 'var(--status-live)',
-            fontSize: '13.5px',
-            marginBottom: '20px',
-          }}
-        >
-          <AlertTriangle size={16} />
+        <div className="ow-alert ow-alert--bar" role="alert">
+          <AlertTriangle size={16} aria-hidden="true" />
           <span>{error}</span>
-          <button
-            type="button"
-            onClick={() => setError(null)}
-            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
-          >
-            <X size={14} />
+          <button type="button" className="ow-icon-btn" onClick={() => setError(null)} aria-label="Dismiss error">
+            <X size={14} aria-hidden="true" />
           </button>
         </div>
       )}
 
-      {/* Platform KPI Metric Cards */}
-      <div className="stat-grid" data-testid="superadmin-kpis" style={{ marginBottom: '32px' }}>
-        <StatTile label="Total Accounts" value={stats?.total_users ?? users.length} />
-        <StatTile label="Organizers" value={stats?.total_organizers ?? users.filter((u) => u.role === 'ORGANIZER').length} />
-        <StatTile label="Scorers" value={stats?.total_scorers ?? users.filter((u) => u.role === 'SCORER').length} />
-        <StatTile label="Tournaments" value={stats?.total_tournaments ?? tournaments.length} />
-        <StatTile label="Total Fixtures" value={stats?.total_matches ?? 0} />
-      </div>
-
-      {/* Section 1: User & Role Directory */}
-      <div className="card" style={{ marginBottom: '36px', padding: '24px' }}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '14px',
-            marginBottom: '20px',
-          }}
-        >
-          <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 4px 0' }}>
-              Platform User & Role Directory
-            </h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
-              Manage accounts, enforce role boundaries, and suspend or purge operators
-            </p>
+      <dl className="facts sa-kpis" data-testid="superadmin-kpis">
+        {kpis.map(([label, value]) => (
+          <div className="facts__item" key={label}>
+            <dt>{label}</dt>
+            <dd className="num">{value ?? '-'}</dd>
           </div>
+        ))}
+      </dl>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            {/* Role Filter Select */}
-            <select
-              data-testid="user-role-filter"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="select"
-              style={{ width: 'auto', padding: '6px 12px', fontSize: '12px' }}
-            >
+      <section className="ow-card sa-section" aria-labelledby="sa-users-h">
+        <div className="sa-section__head">
+          <div>
+            <h2 id="sa-users-h" className="ow-h">Platform User & Role Directory</h2>
+            <p className="ow-muted">Manage accounts, enforce role boundaries, and suspend or purge operators</p>
+          </div>
+          <div className="sa-tools">
+            <select data-testid="user-role-filter" aria-label="Filter by role" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="select sa-tools__select">
               <option value="ALL">All Roles</option>
               <option value="SUPER_ADMIN">Superadmin</option>
               <option value="ORGANIZER">Organizer</option>
               <option value="SCORER">Scorer</option>
             </select>
-
-            {/* Role Filter Tabs */}
-            <div className="filter-tabs" role="tablist">
-              {['ALL', 'SUPER_ADMIN', 'ORGANIZER', 'SCORER'].map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  role="tab"
-                  aria-selected={roleFilter === r}
-                  className={`filter-tab ${roleFilter === r ? 'active' : ''}`}
-                  onClick={() => setRoleFilter(r)}
-                  style={{ fontSize: '12px', padding: '5px 10px' }}
-                >
+            <div className="filter-tabs sa-tools__tabs" role="tablist" aria-label="Role">
+              {roles.map((r) => (
+                <button key={r} type="button" role="tab" aria-selected={roleFilter === r} className={`filter-tab ${roleFilter === r ? 'active' : ''}`} onClick={() => setRoleFilter(r)}>
                   {r.replace('_', ' ')}
                 </button>
               ))}
             </div>
-
-            {/* Search */}
-            <div style={{ position: 'relative', width: '220px' }}>
-              <Search
-                size={14}
-                style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}
-              />
-              <input
-                type="text"
-                className="input-field"
-                placeholder="Search users..."
-                value={userSearch}
-                onChange={(e) => setUserSearch(e.target.value)}
-                style={{ paddingLeft: '32px', height: '34px', fontSize: '12.5px' }}
-              />
+            <div className="sa-search">
+              <Search size={14} aria-hidden="true" />
+              <input type="search" className="input-field" aria-label="Search users" placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} />
             </div>
           </div>
         </div>
 
-        {/* User Table */}
-        <div className="table-container" data-testid="superadmin-users-table" style={{ overflowX: 'auto' }}>
-          <table className="table" style={{ width: '100%', fontSize: '13px' }}>
+        <div className="sa-table-wrap" data-testid="superadmin-users-table">
+          <table className="sa-table">
             <thead>
               <tr>
                 <th>Username</th>
@@ -385,80 +263,48 @@ export function SuperadminDashboardPage() {
                 <th>Organization / Scope</th>
                 <th>Status</th>
                 <th>Created</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th className="sa-actions-h">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
-                    No users matching criteria
-                  </td>
-                </tr>
+                <tr className="sa-empty-row"><td colSpan={6}>No users matching criteria</td></tr>
               ) : (
                 filteredUsers.map((u) => {
                   const isSelf = u.id === currentUserId;
-                  const roleColor =
-                    u.role === 'SUPER_ADMIN'
-                      ? 'var(--accent-gold)'
-                      : u.role === 'ORGANIZER'
-                      ? 'var(--brand-primary)'
-                      : 'var(--text-secondary)';
-
                   return (
                     <tr key={u.id}>
-                      <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {u.username} {isSelf && <span style={{ fontSize: '11px', color: 'var(--brand-primary)' }}>(You)</span>}
-                        {u.email && <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontWeight: 400 }}>{u.email}</div>}
+                      <td className="sa-cell-main">
+                        <span className="sa-name">{u.username}{isSelf && <span className="sa-you"> (You)</span>}</span>
+                        {u.email && <span className="sa-sub">{u.email}</span>}
                       </td>
-                      <td>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            background: 'var(--bg-elevated)',
-                            color: roleColor,
-                            border: `1px solid ${roleColor}40`,
-                          }}
+                      <td data-label="Role"><span className={`ow-tag sa-role sa-role--${(u.role || '').toLowerCase()}`}>{u.role}</span></td>
+                      <td data-label="Scope" className="sa-muted">{u.organization_name || '—'}</td>
+                      <td data-label="Status">
+                        <span className={`pill ${u.is_active ? 'pill-completed' : 'pill-live'} pill-xs`}>{u.is_active ? 'ACTIVE' : 'SUSPENDED'}</span>
+                      </td>
+                      <td data-label="Created" className="sa-muted num">{u.created_at ? formatDay(String(u.created_at).slice(0, 10)) : '—'}</td>
+                      <td className="sa-actions">
+                        <button
+                          type="button"
+                          data-testid={`toggle-status-btn-${u.id}`}
+                          className={`btn btn-xs ${u.is_active ? 'btn-outline' : 'btn-primary'}`}
+                          onClick={() => handleToggleStatus(u)}
+                          disabled={isSelf}
+                          title={isSelf ? 'Cannot suspend self' : u.is_active ? 'Suspend account' : 'Activate account'}
                         >
-                          {u.role}
-                        </span>
-                      </td>
-                      <td style={{ color: 'var(--text-secondary)' }}>
-                        {u.organization_name || '—'}
-                      </td>
-                      <td>
-                        <span className={`pill ${u.is_active ? 'pill-completed' : 'pill-live'} pill-xs`}>
-                          {u.is_active ? 'ACTIVE' : 'SUSPENDED'}
-                        </span>
-                      </td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-                        {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: '6px' }}>
-                          <button
-                            type="button"
-                            data-testid={`toggle-status-btn-${u.id}`}
-                            className={`btn btn-xs ${u.is_active ? 'btn-outline' : 'btn-primary'}`}
-                            onClick={() => handleToggleStatus(u)}
-                            disabled={isSelf}
-                            title={isSelf ? 'Cannot suspend self' : u.is_active ? 'Suspend account' : 'Activate account'}
-                          >
-                            <Power size={12} /> {u.is_active ? 'Suspend' : 'Activate'}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-xs btn-danger"
-                            onClick={() => handleDeleteUser(u)}
-                            disabled={isSelf}
-                            title={isSelf ? 'Cannot delete self' : 'Permanently delete user'}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
+                          <Power size={12} aria-hidden="true" /> {u.is_active ? 'Suspend' : 'Activate'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-danger"
+                          onClick={() => handleDeleteUser(u)}
+                          disabled={isSelf}
+                          title={isSelf ? 'Cannot delete self' : 'Permanently delete user'}
+                          aria-label={`Delete user ${u.username}`}
+                        >
+                          <Trash2 size={12} aria-hidden="true" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -467,47 +313,22 @@ export function SuperadminDashboardPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      {/* Section 2: Global Tournament Oversight Table */}
-      <div className="card" style={{ padding: '24px' }}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '14px',
-            marginBottom: '20px',
-          }}
-        >
+      <section className="ow-card sa-section" aria-labelledby="sa-tourn-h">
+        <div className="sa-section__head">
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 4px 0' }}>
-              Global Tournament Oversight
-            </h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
-              Cross-organization competition directory with public inspection and cascade deletion
-            </p>
+            <h2 id="sa-tourn-h" className="ow-h">Global Tournament Oversight</h2>
+            <p className="ow-muted">Cross-organization competition directory with public inspection and cascade deletion</p>
           </div>
-
-          <div style={{ position: 'relative', width: '220px' }}>
-            <Search
-              size={14}
-              style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}
-            />
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Search tournaments..."
-              value={tourneySearch}
-              onChange={(e) => setTourneySearch(e.target.value)}
-              style={{ paddingLeft: '32px', height: '34px', fontSize: '12.5px' }}
-            />
+          <div className="sa-search">
+            <Search size={14} aria-hidden="true" />
+            <input type="search" className="input-field" aria-label="Search tournaments" placeholder="Search tournaments..." value={tourneySearch} onChange={(e) => setTourneySearch(e.target.value)} />
           </div>
         </div>
 
-        <div className="table-container" data-testid="superadmin-tournaments-table" style={{ overflowX: 'auto' }}>
-          <table className="table" style={{ width: '100%', fontSize: '13px' }}>
+        <div className="sa-table-wrap" data-testid="superadmin-tournaments-table">
+          <table className="sa-table">
             <thead>
               <tr>
                 <th>Tournament</th>
@@ -515,65 +336,32 @@ export function SuperadminDashboardPage() {
                 <th>Slug</th>
                 <th>Stage</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th className="sa-actions-h">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredTournaments.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
-                    No tournaments recorded on platform
-                  </td>
-                </tr>
+                <tr className="sa-empty-row"><td colSpan={6}>No tournaments recorded on platform</td></tr>
               ) : (
                 filteredTournaments.map((t) => (
                   <tr key={t.id}>
-                    <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {t.logo_url ? (
-                          <img
-                            src={t.logo_url}
-                            alt=""
-                            style={{ width: '24px', height: '24px', borderRadius: '4px', objectFit: 'contain' }}
-                          />
-                        ) : (
-                          <Trophy size={16} style={{ color: 'var(--brand-primary)' }} />
-                        )}
+                    <td className="sa-cell-main">
+                      <span className="sa-name sa-name--icon">
+                        {t.logo_url ? <img src={t.logo_url} alt="" className="sa-logo" /> : <Trophy size={16} aria-hidden="true" />}
                         <span>{t.name}</span>
-                      </div>
-                    </td>
-                    <td>{t.season || 'Season 1'}</td>
-                    <td style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>
-                      /t/{t.slug}
-                    </td>
-                    <td>
-                      <span className="pill pill-upcoming pill-xs">
-                        {t.stage ? t.stage.toUpperCase() : 'GROUP'}
                       </span>
                     </td>
-                    <td>
-                      <span className={`pill pill-${(t.status || 'ACTIVE').toLowerCase()} pill-xs`}>
-                        {t.status || 'ACTIVE'}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: '6px' }}>
-                        <Link
-                          to={`/t/${t.slug}`}
-                          className="btn btn-xs btn-outline"
-                          title="Open public tournament center"
-                        >
-                          <ExternalLink size={12} /> Inspect
-                        </Link>
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-danger"
-                          onClick={() => setDeletingTourney(t)}
-                          title="Permanently purge tournament and fixtures"
-                        >
-                          <Trash2 size={12} /> Delete
-                        </button>
-                      </div>
+                    <td data-label="Season" className="num">{t.season || 'Season 1'}</td>
+                    <td data-label="Slug" className="sa-muted sa-slug">/t/{t.slug}</td>
+                    <td data-label="Stage"><span className="pill pill-upcoming pill-xs">{t.stage ? t.stage.toUpperCase() : 'GROUP'}</span></td>
+                    <td data-label="Status"><span className={`pill pill-${(t.status || 'ACTIVE').toLowerCase()} pill-xs`}>{t.status || 'ACTIVE'}</span></td>
+                    <td className="sa-actions">
+                      <Link to={`/t/${t.slug}`} className="btn btn-xs btn-outline" title="Open public tournament center">
+                        <ExternalLink size={12} aria-hidden="true" /> Inspect
+                      </Link>
+                      <button type="button" className="btn btn-xs btn-danger" onClick={() => setDeletingTourney(t)} title="Permanently purge tournament and fixtures">
+                        <Trash2 size={12} aria-hidden="true" /> Delete
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -581,160 +369,45 @@ export function SuperadminDashboardPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      {/* Modal 1: Create Organizer Modal */}
       {createOrgOpen && (
-        <div className="modal-overlay" data-testid="create-organizer-modal" onClick={() => setCreateOrgOpen(false)}>
-          <div
-            className="card modal-content"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '480px', width: '100%', padding: '28px' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>
-                Provision New Organizer Account
-              </h3>
-              <button
-                type="button"
-                onClick={() => setCreateOrgOpen(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-              >
-                <X size={18} />
+        <Modal testId="create-organizer-modal" title="Provision New Organizer Account" dismissOnBackdrop onClose={() => setCreateOrgOpen(false)}>
+          {orgError && <div className="ow-alert" role="alert">{orgError}</div>}
+          <form onSubmit={handleCreateOrg} className="ow-form">
+            <Field label="Username">
+              <input type="text" data-testid="org-username-input" className="input" value={orgForm.username} onChange={(e) => setOrgForm({ ...orgForm, username: e.target.value })} placeholder="e.g. premier_league_org" required />
+            </Field>
+            <Field label="Organization Name (Optional)">
+              <input type="text" data-testid="org-organization-input" className="input" value={orgForm.organization_name} onChange={(e) => setOrgForm({ ...orgForm, organization_name: e.target.value })} placeholder="e.g. Premier League Management" />
+            </Field>
+            <Field label="Email Address">
+              <input type="email" className="input" value={orgForm.email} onChange={(e) => setOrgForm({ ...orgForm, email: e.target.value })} placeholder="e.g. organizer@matchgrid.com" />
+            </Field>
+            <Field label="Initial Access Password">
+              <input type="password" data-testid="org-password-input" className="input" value={orgForm.password} onChange={(e) => setOrgForm({ ...orgForm, password: e.target.value })} placeholder="••••••••••••" required />
+            </Field>
+            <Actions>
+              <button type="button" className="btn btn-outline" onClick={() => setCreateOrgOpen(false)} disabled={orgLoading}>Cancel</button>
+              <button type="submit" data-testid="submit-organizer-btn" className="btn btn-primary" disabled={orgLoading}>
+                {orgLoading ? 'Provisioning...' : 'Create Organizer Account'}
               </button>
-            </div>
-
-            {orgError && (
-              <div
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: '6px',
-                  background: 'var(--status-live-tint)',
-                  border: '1px solid rgba(239, 68, 68, 0.4)',
-                  color: 'var(--status-live)',
-                  fontSize: '13px',
-                  marginBottom: '16px',
-                }}
-              >
-                {orgError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateOrg}>
-              <div className="field">
-                <label>Username</label>
-                <input
-                  type="text"
-                  data-testid="org-username-input"
-                  className="input"
-                  value={orgForm.username}
-                  onChange={(e) => setOrgForm({ ...orgForm, username: e.target.value })}
-                  placeholder="e.g. premier_league_org"
-                  required
-                />
-              </div>
-
-              <div className="field">
-                <label>Organization Name (Optional)</label>
-                <input
-                  type="text"
-                  data-testid="org-organization-input"
-                  className="input"
-                  value={orgForm.organization_name}
-                  onChange={(e) => setOrgForm({ ...orgForm, organization_name: e.target.value })}
-                  placeholder="e.g. Premier League Management"
-                />
-              </div>
-
-              <div className="field">
-                <label>Email Address</label>
-                <input
-                  type="email"
-                  className="input"
-                  value={orgForm.email}
-                  onChange={(e) => setOrgForm({ ...orgForm, email: e.target.value })}
-                  placeholder="e.g. organizer@matchgrid.com"
-                />
-              </div>
-
-              <div className="field" style={{ marginBottom: '24px' }}>
-                <label>Initial Access Password</label>
-                <input
-                  type="password"
-                  data-testid="org-password-input"
-                  className="input"
-                  value={orgForm.password}
-                  onChange={(e) => setOrgForm({ ...orgForm, password: e.target.value })}
-                  placeholder="••••••••••••"
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setCreateOrgOpen(false)}
-                  disabled={orgLoading}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  data-testid="submit-organizer-btn"
-                  className="btn btn-primary"
-                  disabled={orgLoading}
-                >
-                  {orgLoading ? 'Provisioning...' : 'Create Organizer Account'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            </Actions>
+          </form>
+        </Modal>
       )}
 
-      {/* Modal 2: Delete Tournament Cascade Confirmation */}
       {deletingTourney && (
-        <div className="modal-overlay" onClick={() => setDeletingTourney(null)}>
-          <div
-            className="card modal-content"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '440px', width: '100%', padding: '28px', borderLeft: '4px solid var(--status-live)' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', color: 'var(--status-live)' }}>
-              <AlertTriangle size={22} />
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Purge Tournament
-              </h3>
-            </div>
-
-            <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Are you sure you want to permanently delete <strong>{deletingTourney.name}</strong>?
-            </p>
-            <p style={{ fontSize: '12.5px', color: 'var(--status-live)', background: 'var(--status-live-tint)', padding: '8px 12px', borderRadius: '6px' }}>
-              Warning: This action will cascade-delete all fixtures, teams, player rosters, and associated R2 media assets. This cannot be undone.
-            </p>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setDeletingTourney(null)}
-                disabled={delLoading}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={confirmDeleteTournament}
-                disabled={delLoading}
-              >
-                {delLoading ? 'Purging...' : 'Permanently Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <Modal testId="purge-tournament-modal" title="Purge Tournament" titleClass="is-danger" dismissOnBackdrop onClose={() => setDeletingTourney(null)}>
+          <p className="ow-muted ow-modal__text">Are you sure you want to permanently delete <strong>{deletingTourney.name}</strong>?</p>
+          <p className="sa-warn">Warning: This action will cascade-delete all fixtures, teams, player rosters, and associated R2 media assets. This cannot be undone.</p>
+          <Actions>
+            <button type="button" className="btn btn-outline" onClick={() => setDeletingTourney(null)} disabled={delLoading}>Cancel</button>
+            <button type="button" className="btn btn-danger" onClick={confirmDeleteTournament} disabled={delLoading}>
+              {delLoading ? 'Purging...' : 'Permanently Delete'}
+            </button>
+          </Actions>
+        </Modal>
       )}
     </div>
   );

@@ -182,4 +182,67 @@ describe('SuperadminDashboardPage Component', () => {
       expect(superadminApi.updateUserStatus).toHaveBeenCalledWith('u-2', false);
     });
   });
+
+  const mountPage = async () => {
+    superadminApi.getStats.mockResolvedValue(mockStats);
+    superadminApi.getUsers.mockResolvedValue(mockUsers);
+    superadminApi.getTournaments.mockResolvedValue([
+      { id: 't-1', name: 'Champions Premier League', season: '2026', slug: 'cpl', stage: 'group', status: 'active' },
+    ]);
+    const utils = render(
+      <MemoryRouter initialEntries={['/superadmin']}>
+        <Routes><Route path="/superadmin" element={<SuperadminDashboardPage />} /></Routes>
+      </MemoryRouter>
+    );
+    await screen.findByTestId('superadmin-users-table');
+    return utils;
+  };
+
+  it('shows the KPIs in the shared tabular facts bar', async () => {
+    const { container } = await mountPage();
+    const kpis = screen.getByTestId('superadmin-kpis');
+    expect(kpis).toHaveClass('facts');
+    expect(kpis.querySelectorAll('dd.num')).toHaveLength(5);
+    expect(kpis).toHaveTextContent('Total Accounts');
+    expect(container.querySelector('.spinner')).toBeNull();
+  });
+
+  it('labels every stacked cell so the phone layout stays readable', async () => {
+    await mountPage();
+    const row = screen.getByTestId('superadmin-users-table').querySelector('tbody tr');
+    const labels = [...row.querySelectorAll('td[data-label]')].map((td) => td.dataset.label);
+    expect(labels).toEqual(['Role', 'Scope', 'Status', 'Created']);
+    expect(screen.getByTestId('superadmin-tournaments-table').querySelector('td[data-label="Season"]')).toHaveTextContent('2026');
+  });
+
+  it('filters users by role from either control and says so when nothing matches', async () => {
+    await mountPage();
+    fireEvent.change(screen.getByTestId('user-role-filter'), { target: { value: 'SCORER' } });
+    expect(screen.queryByText('root_superadmin')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'ORGANIZER' }));
+    expect(screen.getByText('org_alex')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search users'), { target: { value: 'zzzz' } });
+    expect(screen.getByText('No users matching criteria')).toBeInTheDocument();
+  });
+
+  it('closes the purge dialog with Escape or a backdrop click, and never deletes without confirmation', async () => {
+    await mountPage();
+    const tourneyRow = screen.getByTestId('superadmin-tournaments-table').querySelector('tbody tr');
+    const openPurge = () => fireEvent.click(tourneyRow.querySelector('button.btn-danger'));
+
+    openPurge();
+    expect(screen.getByRole('dialog', { name: 'Purge Tournament' })).toHaveTextContent('Champions Premier League');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('purge-tournament-modal')).not.toBeInTheDocument();
+
+    openPurge();
+    fireEvent.click(screen.getByTestId('purge-tournament-modal')); // backdrop
+    expect(screen.queryByTestId('purge-tournament-modal')).not.toBeInTheDocument();
+    expect(superadminApi.deleteTournament).not.toHaveBeenCalled();
+
+    superadminApi.deleteTournament.mockResolvedValue({});
+    openPurge();
+    fireEvent.click(screen.getByRole('button', { name: 'Permanently Delete' }));
+    await waitFor(() => expect(superadminApi.deleteTournament).toHaveBeenCalledWith('t-1'));
+  });
 });
