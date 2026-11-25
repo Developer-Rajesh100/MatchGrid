@@ -3383,3 +3383,199 @@ button.sb-team:hover .sb-team__name { text-decoration: underline; text-underline
   .cockpit-strip__team { font-size: 12.5px; }
   .cockpit__title { display: none; }
 }
+
+/* =====================================================================================
+   P4 - Organizer workspace
+   ===================================================================================== */
+.ow { max-width: 1280px; margin: 0 auto; }
+.ow-stack { display: flex; flex-direction: column; gap: 16px; }
+.ow-muted { font-size: 12.5px; color: var(--text-secondary); }
+.ow-empty { padding: 28px 8px; text-align: center; font-size: 13.5px; color: var(--text-secondary); }
+.ow-count { margin-left: 6px; font-size: 15px; color: var(--text-muted); font-weight: 600; }
+.ow-card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px; min-width: 0; }
+.ow-card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.ow-h { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.ow-h--section { margin-bottom: 10px; }
+.ow-sub { margin: 16px 0 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); }
+.ow-blank { padding: 40px 16px; text-align: center; }
+.ow-vs { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.ow-vs.num { font-size: 18px; color: var(--text-primary); }
+
+/* Sticky action header */
+.ow-bar {
+  position: sticky;
+  top: 52px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.ow-bar__id { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 320px; }
+.ow-bar__icon { flex: none; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: var(--brand-primary); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); }
+.ow-bar__text { min-width: 0; flex: 1; }
+.ow-bar__title { font-family: var(--font-display); font-size: 19px; font-weight: 700; }
+.ow-bar__select { display: flex; align-items: center; gap: 8px; margin-top: 4px; min-width: 0; }
+.ow-bar__select .select { min-width: 0; flex: 1; max-width: 360px; padding: 4px 10px; height: 34px; font-size: 13px; }
+.ow-bar__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.ow-toast {
+  position: fixed; top: 64px; right: 16px; z-index: 9999; max-width: calc(100vw - 32px);
+  display: flex; align-items: center; gap: 8px; padding: 12px 18px;
+  background: var(--brand-primary); color: var(--text-on-brand); font-weight: 600; border-radius: var(--radius-sm);
+}
+.ow-alert { padding: 10px 14px; margin-bottom: 14px; font-size: 13px; color: var(--status-live); background: var(--status-live-tint); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: var(--radius-sm); }
+.ow-alert--bar { display: flex; align-items: center; gap: 10px; }
+.ow-alert--bar span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+/* Tabs: one scrolling row, never a clipped page */
+.ow-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--border-subtle); overflow-x: auto; scrollbar-width: none; }
+.ow-tabs::-webkit-scrollbar { display: none; }
+.ow-tab {
+  flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px;
+  font: inherit; font-size: 13.5px; font-weight: 600; color: var(--text-secondary);
+  background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; white-space: nowrap;
+}
+.ow-tab:hover { color: var(--text-primary); }
+.ow-tab.is-on { color: var(--brand-primary); border-bottom-color: var(--brand-primary); }
+.ow-tab__count { font-size: 15px; color: var(--text-muted); }
+
+/* Shared two-column layout */
+.ow-split { display: grid; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.ow-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.ow-list { list-style: none; display: flex; flex-direction: column; }
+.ow-clubs .ow-list { gap: 6px; }
+
+.ow-icon-btn { flex: none; min-width: 36px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); background: none; border: 0; border-radius: var(--radius-xs); cursor: pointer; }
+.ow-icon-btn:hover { color: var(--text-primary); background: var(--bg-elevated); }
+
+/* Clubs and scorers */
+.ow-club, .ow-scorer {
+  display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 6px 8px 12px;
+  background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-left: 3px solid var(--team-color, var(--border-strong));
+  border-radius: var(--radius-sm); cursor: pointer;
+}
+.ow-scorer { cursor: default; border-left-color: var(--border-strong); }
+.ow-club:hover { background: var(--bg-elevated); }
+.ow-club.is-on { background: var(--bg-elevated); border-color: var(--brand-primary); border-left-color: var(--team-color, var(--brand-primary)); }
+.ow-club__text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ow-club__name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ow-scorer__icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: var(--brand-primary); border: 1px solid var(--border-strong); border-radius: 50%; }
+
+/* Roster */
+.ow-roster__head { padding-left: 12px; border-left: 3px solid var(--team-color, var(--border-strong)); padding-bottom: 14px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 8px; }
+.ow-roster__title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ow-roster__title > div { min-width: 0; }
+.ow-player { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 4px 0; border-bottom: 1px solid var(--border-subtle); }
+.ow-player:last-child { border-bottom: 0; }
+.ow-player__no { flex: none; width: 3ch; text-align: right; font-size: 20px; font-weight: 700; color: var(--text-secondary); }
+.ow-player__name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ow-tag { display: inline-flex; align-items: center; padding: 2px 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); border: 1px solid var(--border-strong); border-radius: var(--radius-xs); }
+.ow-tag--on { color: var(--brand-primary); border-color: rgba(16, 185, 129, 0.5); }
+.ow-tag--gold { color: var(--accent-gold); border-color: rgba(245, 158, 11, 0.5); }
+.ow-tag--plain { border-color: var(--border-subtle); }
+
+/* Fixtures */
+.ow-engine { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
+.ow-engine__buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.ow-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.ow-group { padding: 14px 16px; }
+.ow-group__title { font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--brand-primary); padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border-subtle); }
+.ow-group__teams { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.ow-group__teams li { padding-left: 8px; font-size: 13.5px; border-left: 3px solid var(--team-color, var(--border-strong)); }
+.ow-fixture, .ow-assign { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); }
+.ow-fixture:last-child, .ow-assign:last-child { border-bottom: 0; }
+.ow-fixture__no { flex: none; width: 3.6ch; font-size: 18px; font-weight: 600; color: var(--text-muted); }
+.ow-fixture__body, .ow-assign__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ow-fixture__teams { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 600; font-size: 14px; }
+.ow-fixture__team { padding-left: 8px; border-left: 3px solid var(--team-color, var(--border-strong)); overflow-wrap: anywhere; }
+.ow-fixture__meta { overflow-wrap: anywhere; }
+.ow-assign__fixture { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.ow-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ow-chip { display: inline-flex; align-items: center; gap: 2px; padding: 0 2px 0 8px; font-size: 12px; font-weight: 600; color: var(--brand-primary); border: 1px solid rgba(16, 185, 129, 0.45); border-radius: var(--radius-xs); }
+.ow-chip button { min-width: 28px; min-height: 28px; display: inline-flex; align-items: center; justify-content: center; color: inherit; background: none; border: 0; cursor: pointer; }
+
+/* Overview */
+.ow-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ow-summary__tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.ow-summary__name { font-family: var(--font-display); font-size: 24px; font-weight: 700; overflow-wrap: anywhere; }
+.ow-facts { margin: 0; }
+.ow-actions { display: flex; flex-direction: column; gap: 8px; }
+.ow-action { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px; font: inherit; text-align: left; color: var(--text-primary); background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); cursor: pointer; }
+.ow-action:hover { border-color: var(--border-strong); background: var(--bg-elevated); }
+.ow-action svg:first-child { color: var(--brand-primary); flex: none; }
+.ow-action span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ow-action small { font-size: 12px; color: var(--text-secondary); }
+.ow-steps { list-style: none; display: flex; flex-direction: column; }
+.ow-step { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 0; border-bottom: 1px solid var(--border-subtle); color: var(--text-muted); }
+.ow-step:last-child { border-bottom: 0; }
+.ow-step.is-done { color: var(--brand-primary); }
+.ow-step.is-next { color: var(--text-primary); }
+.ow-step svg { flex: none; }
+.ow-step__text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ow-step__label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.ow-progress__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.ow-progress { height: 6px; background: var(--bg-elevated); border-radius: 3px; overflow: hidden; }
+.ow-progress span { display: block; height: 100%; background: var(--brand-primary); }
+.ow-row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 0; border-bottom: 1px solid var(--border-subtle); flex-wrap: wrap; }
+.ow-row:last-child { border-bottom: 0; }
+.ow-row--live { border-left: 3px solid var(--status-live); padding-left: 10px; }
+.ow-row__no { width: 3.6ch; font-size: 18px; color: var(--text-muted); }
+.ow-row__teams { flex: 1 1 260px; min-width: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ow-row__when { margin-left: auto; }
+
+/* Settings and danger zone */
+.ow-config { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1px; background: var(--border-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); overflow: hidden; }
+.ow-config__item { background: var(--bg-canvas); padding: 12px 14px; min-width: 0; }
+.ow-config__item dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+.ow-config__item dd { margin-top: 4px; font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.ow-danger { border-color: rgba(239, 68, 68, 0.45); border-left: 3px solid var(--status-live); }
+.ow-danger__head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; color: var(--status-live); }
+.ow-danger__head .ow-h { color: var(--status-live); }
+.ow-danger__text { margin-bottom: 14px; font-size: 13px; }
+
+/* Dialogs */
+.ow-overlay { z-index: 1000; }
+.ow-modal { max-width: 440px; padding: 20px; background: var(--bg-surface); }
+.ow-modal--wide { max-width: 600px; }
+.ow-modal__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.ow-modal__title { font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+.ow-modal__title.is-danger { color: var(--status-live); }
+.ow-modal__text { margin-bottom: 14px; font-size: 13px; }
+.ow-form { display: flex; flex-direction: column; gap: 14px; }
+.ow-form__pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ow-form__static { padding: 10px 0; }
+.ow-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ow-field__label { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600; }
+.ow-field .ow-field__label { margin-bottom: 0; }
+.ow-field .form-input, .ow-form > .form-input { width: 100%; }
+.ow-color { display: flex; align-items: center; gap: 10px; }
+.ow-color input { width: 44px; height: 36px; padding: 0; background: transparent; border: 1px solid var(--border-subtle); cursor: pointer; }
+.ow-check { display: flex; align-items: center; gap: 8px; min-height: 36px; font-size: 13px; cursor: pointer; }
+.ow-modal__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.ow-modal__actions.is-split { justify-content: space-between; }
+
+@media (max-width: 900px) {
+  .ow-split, .ow-cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .ow-bar { padding: 10px 12px; }
+  .ow-bar__actions { width: 100%; }
+  .ow-bar__actions .btn { flex: 1 1 0; justify-content: center; }
+  .ow-bar__select { flex-wrap: wrap; }
+  .ow-bar__select .select { max-width: none; flex-basis: 100%; }
+  .ow-card { padding: 14px; }
+  .ow-fixture, .ow-assign { flex-wrap: wrap; }
+  .ow-fixture__body, .ow-assign__body { flex-basis: calc(100% - 6ch); }
+  .ow-player__role { display: none; }
+  .ow-form__pair { grid-template-columns: minmax(0, 1fr); }
+  .ow-modal__actions .btn { flex: 1; justify-content: center; }
+  .ow-toast { top: 56px; left: 16px; right: 16px; }
+}

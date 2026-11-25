@@ -131,6 +131,7 @@ test.describe('MatchGrid Phase 6: Role-Based Portals & End-to-End Governance Lif
         { name: `Shadow United ${suffix}`, color: '#EF4444' },
       ];
 
+      await page.getByTestId('tab-teams').click(); // the workspace opens on Overview
       for (const club of clubs) {
         await page.getByTestId('add-club-btn').click();
         await expect(page.getByTestId('add-club-modal')).toBeVisible();
