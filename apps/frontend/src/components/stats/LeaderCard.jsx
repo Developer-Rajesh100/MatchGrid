@@ -2,9 +2,12 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar } from '../common/Avatar';
 import { Trophy } from 'lucide-react';
+import { useTournament } from '../../context/TournamentContext';
+import { tPath } from '../../utils/paths';
 
 export function LeaderCard({ title, icon: Icon = Trophy, unit = '', items = [], limit = 10 }) {
   const navigate = useNavigate();
+  const { slug } = useTournament();
 
   return (
     <div className="card">
@@ -43,7 +46,7 @@ export function LeaderCard({ title, icon: Icon = Trophy, unit = '', items = [], 
           return (
             <div
               key={item.player_id || idx}
-              onClick={() => item.player_id && navigate(`/players/${item.player_id}`)}
+              onClick={() => item.player_id && navigate(tPath(slug, `players/${item.player_id}`))}
               style={{
                 display: 'flex',
                 alignItems: 'center',

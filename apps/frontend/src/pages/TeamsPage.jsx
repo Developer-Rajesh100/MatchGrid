@@ -5,6 +5,7 @@ import { Avatar } from '../components/common/Avatar';
 import { LoadingState, ErrorState, EmptyState } from '../components/common/Common';
 import { Shield, Users, ArrowRight } from 'lucide-react';
 import { useTournament } from '../context/TournamentContext';
+import { tPath } from '../utils/paths';
 
 export function TeamsPage() {
   const { tournamentId, slug } = useTournament();
@@ -41,7 +42,7 @@ export function TeamsPage() {
           <div
             key={team.id}
             className="card card-clickable"
-            onClick={() => navigate(`/teams/${team.id}`)}
+            onClick={() => navigate(tPath(slug, `teams/${team.id}`))}
             style={{
               borderLeft: `4px solid ${team.color || 'var(--brand-primary)'}`,
               display: 'flex',

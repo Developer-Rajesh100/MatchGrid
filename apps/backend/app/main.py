@@ -53,10 +53,10 @@ app = FastAPI(
     redoc_url=None if is_production else "/redoc",
     openapi_url=None if is_production else "/openapi.json",
     description=(
-        "REST API for the DCL Season 5 digital scoreboard.\n\n"
-        "All GET endpoints are public. Every other method (POST/PATCH/PUT/DELETE) requires an "
-        "admin bearer token: call POST /api/auth/login to get one, then use the 'Authorize' "
-        "button above (or an `Authorization: Bearer <token>` header) to call protected endpoints."
+        "REST API for the MatchGrid multi-tournament live scoreboard platform.\n\n"
+        "All GET endpoints are public. Every other method (POST/PATCH/PUT/DELETE) requires a "
+        "bearer token (superadmin, organizer or scorer): call POST /api/auth/login to get one, then use "
+        "the 'Authorize' button above (or an `Authorization: Bearer <token>` header) to call protected endpoints."
     ),
     lifespan=lifespan,
 )
@@ -77,6 +77,8 @@ async def add_security_headers(request, call_next):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    if is_production:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     return response
 
 

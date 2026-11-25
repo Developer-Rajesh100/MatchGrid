@@ -21,6 +21,9 @@ from app.migrations import (
     m0004_knockout_match_slots,
     m0005_multi_tenant_rbac,
     m0006_tournament_config,
+    m0007_migrate_legacy_admins,
+    m0008_player_ids_per_tournament,
+    m0009_tournament_status_enum,
 )
 
 MIGRATIONS = [
@@ -30,6 +33,9 @@ MIGRATIONS = [
     m0004_knockout_match_slots,
     m0005_multi_tenant_rbac,
     m0006_tournament_config,
+    m0007_migrate_legacy_admins,
+    m0008_player_ids_per_tournament,
+    m0009_tournament_status_enum,
 ]
 
 

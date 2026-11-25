@@ -1,4 +1,3 @@
-from app.models.admin import Admin
 from app.models.group import Group
 from app.models.group_team import GroupTeam
 from app.models.match import Match
@@ -12,7 +11,6 @@ from app.models.tournament_standing import TournamentStanding
 from app.models.user import User, UserRole
 
 DOCUMENT_MODELS = [
-    Admin,
     User,
     Tournament,
     Team,
@@ -27,7 +25,6 @@ DOCUMENT_MODELS = [
 ]
 
 __all__ = [
-    "Admin",
     "User",
     "UserRole",
     "Tournament",

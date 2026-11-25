@@ -5,10 +5,13 @@ import { Avatar } from '../components/common/Avatar';
 import { StatTile, LoadingState, ErrorState } from '../components/common/Common';
 import { ArrowLeft, Trophy, Flame, Shield, Calendar, ArrowRight } from 'lucide-react';
 import { useLiveSocket } from '../hooks/useLiveSocket';
+import { useTournament } from '../context/TournamentContext';
+import { tPath } from '../utils/paths';
 
 export function PlayerDetailPage() {
   const { playerId } = useParams();
   const navigate = useNavigate();
+  const { slug } = useTournament();
   const [player, setPlayer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -32,7 +35,7 @@ export function PlayerDetailPage() {
 
   useLiveSocket(() => {
     loadPlayer(false);
-  });
+  }, player?.tournament_id);
 
   if (loading) return <LoadingState message="Loading player profile..." />;
   if (error || !player) return <ErrorState message={error || 'Player not found'} onRetry={() => loadPlayer(true)} />;
@@ -91,7 +94,7 @@ export function PlayerDetailPage() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
             <NavLink
-              to={`/teams/${player.team_id}`}
+              to={tPath(slug, `teams/${player.team_id}`)}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--brand-primary)', fontWeight: 600, fontSize: '14px' }}
             >
               <Shield size={14} /> {player.team_name}
@@ -146,7 +149,7 @@ export function PlayerDetailPage() {
             {history.map((m, idx) => (
               <div
                 key={m.match_id || idx}
-                onClick={() => navigate(`/matches/${m.match_id}`)}
+                onClick={() => navigate(tPath(slug, `matches/${m.match_id}`))}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

@@ -6,12 +6,20 @@ from fastapi import APIRouter, Depends
 from app.core.deps import check_tournament_ownership, get_current_admin
 from app.core.errors import ConflictError, ForbiddenError, NotFoundError, ValidationAppError
 from app.core.security import hash_password
-from app.models import Group, Match, Player, Team, Tournament, User, UserRole
+from app.models import Group, Match, Tournament, User, UserRole
 from app.models.tournament import TournamentConfig
-from app.routers.matches import _to_out
+from app.routers.matches import _list_matches, _to_out
 from app.schemas.auth import ScorerCreate, UserOut
-from app.schemas.match import AssignScorerRequest, MatchOut
-from app.schemas.tournament import TournamentCreate, TournamentOut
+from app.schemas.match import AssignScorerRequest, MatchAdminOut
+from app.schemas.tournament import (
+    TournamentConfigUpdate,
+    TournamentCreate,
+    TournamentOut,
+    TournamentUpdate,
+)
+from app.services.media import release_media, validate_media_url
+from app.services.tournaments import delete_tournament_cascade
+from app.services.users import unassign_scorer_everywhere
 
 router = APIRouter(prefix="/organizer", tags=["organizer"])
 
@@ -73,6 +81,9 @@ async def create_tournament(
         counter += 1
 
     config = payload.config or TournamentConfig()
+    # The tournament has no id yet, so no R2 media can belong to it: only plain URLs here.
+    logo_url = validate_media_url(payload.logo_url, None)
+    banner_url = validate_media_url(payload.banner_url, None)
 
     t = Tournament(
         name=payload.name,
@@ -80,9 +91,9 @@ async def create_tournament(
         format_description=payload.format_description or f"{config.num_groups} groups of {config.teams_per_group} teams",
         organizer_id=admin.id,
         slug=slug,
-        status="ACTIVE",
-        logo_url=payload.logo_url,
-        banner_url=payload.banner_url,
+        status="active",
+        logo_url=logo_url,
+        banner_url=banner_url,
         config=config,
     )
     await t.insert()
@@ -94,6 +105,55 @@ async def create_tournament(
         await Group(tournament_id=t.id, name=gname).insert()
 
     return _to_tournament_out(t)
+
+
+@router.patch("/tournaments/{tournament_id}", response_model=TournamentOut)
+async def update_tournament(
+    tournament_id: str, payload: TournamentUpdate, admin: User = Depends(get_current_admin)
+) -> TournamentOut:
+    t = await check_tournament_ownership(admin, tournament_id)
+    changes = payload.model_dump(exclude_unset=True)
+    for media_field in ("logo_url", "banner_url"):
+        if media_field in changes:
+            changes[media_field] = validate_media_url(changes[media_field], t.id)
+
+    old_media = {f: getattr(t, f) for f in ("logo_url", "banner_url") if f in changes}
+    for field, value in changes.items():
+        if field == "config":
+            if value is not None:
+                t.config = TournamentConfig(**value)
+        else:
+            setattr(t, field, value)
+    await t.save()
+
+    # Replaced/cleared logo or banner no longer needed: delete it from R2 (this tournament's folder only).
+    for field, old in old_media.items():
+        if old and getattr(t, field) != old:
+            await release_media(old, t.id)
+    return _to_tournament_out(t)
+
+
+@router.patch("/tournaments/{tournament_id}/config", response_model=TournamentOut)
+async def update_tournament_config(
+    tournament_id: str, payload: TournamentConfigUpdate, admin: User = Depends(get_current_admin)
+) -> TournamentOut:
+    t = await check_tournament_ownership(admin, tournament_id)
+    config_dict = t.config.model_dump()
+    for field, val in payload.model_dump(exclude_unset=True).items():
+        if val is not None:
+            config_dict[field] = val
+    t.config = TournamentConfig(**config_dict)
+    await t.save()
+    return _to_tournament_out(t)
+
+
+@router.get("/tournaments/{tournament_id}/matches", response_model=list[MatchAdminOut])
+async def list_tournament_matches(
+    tournament_id: str, admin: User = Depends(get_current_admin)
+) -> list[MatchAdminOut]:
+    """The tournament's matches including scorer assignments (staff only; the public list omits them)."""
+    t = await check_tournament_ownership(admin, tournament_id)
+    return await _list_matches(tournament_id=str(t.id), include_scorers=True)
 
 
 @router.get("/scorers", response_model=list[UserOut])
@@ -124,10 +184,10 @@ async def create_scorer(
     return _to_user_out(scorer)
 
 
-@router.post("/matches/{match_id}/scorers", response_model=MatchOut)
+@router.post("/matches/{match_id}/scorers", response_model=MatchAdminOut)
 async def assign_scorer_to_match(
     match_id: str, payload: AssignScorerRequest, admin: User = Depends(get_current_admin)
-) -> MatchOut:
+) -> MatchAdminOut:
     try:
         mid = PydanticObjectId(match_id)
         sid = PydanticObjectId(payload.scorer_id)
@@ -144,18 +204,20 @@ async def assign_scorer_to_match(
     scorer = await User.get(sid)
     if not scorer or scorer.role != UserRole.SCORER:
         raise NotFoundError("Scorer not found")
+    if admin.role != UserRole.SUPER_ADMIN and scorer.created_by != admin.id:
+        raise ForbiddenError("You can only assign scorers you created")
 
     if scorer.id not in (match.assigned_scorer_ids or []):
         match.assigned_scorer_ids.append(scorer.id)
         await match.save()
 
-    return await _to_out(match)
+    return await _to_out(match, admin=True)
 
 
-@router.delete("/matches/{match_id}/scorers/{scorer_id}", response_model=MatchOut)
+@router.delete("/matches/{match_id}/scorers/{scorer_id}", response_model=MatchAdminOut)
 async def remove_scorer_from_match(
     match_id: str, scorer_id: str, admin: User = Depends(get_current_admin)
-) -> MatchOut:
+) -> MatchAdminOut:
     try:
         mid = PydanticObjectId(match_id)
         sid = PydanticObjectId(scorer_id)
@@ -173,7 +235,7 @@ async def remove_scorer_from_match(
         match.assigned_scorer_ids.remove(sid)
         await match.save()
 
-    return await _to_out(match)
+    return await _to_out(match, admin=True)
 
 
 @router.delete("/tournaments/{tournament_id}", status_code=204)
@@ -190,27 +252,7 @@ async def delete_tournament(
         raise NotFoundError("Tournament not found")
 
     await check_tournament_ownership(admin, t.id)
-
-    # Clean up associated media from R2
-    from app.services.storage import get_storage_service
-    storage = get_storage_service()
-    if t.logo_url:
-        await storage.delete_image(t.logo_url)
-    if t.banner_url:
-        await storage.delete_image(t.banner_url)
-    for team in await Team.find(Team.tournament_id == t.id).to_list():
-        if team.crest_url or team.logo_url:
-            await storage.delete_image(team.crest_url or team.logo_url)
-    for player in await Player.find(Player.tournament_id == t.id).to_list():
-        if player.photo_url:
-            await storage.delete_image(player.photo_url)
-
-    # Clean up associated entities
-    await Match.find(Match.tournament_id == t.id).delete()
-    await Player.find(Player.tournament_id == t.id).delete()
-    await Team.find(Team.tournament_id == t.id).delete()
-    await Group.find(Group.tournament_id == t.id).delete()
-    await t.delete()
+    await delete_tournament_cascade(t)
 
 
 @router.delete("/scorers/{scorer_id}", status_code=204)
@@ -229,10 +271,5 @@ async def delete_scorer(
     if admin.role != UserRole.SUPER_ADMIN and scorer.created_by != admin.id:
         raise ForbiddenError("You cannot delete this scorer")
 
-    matches = await Match.find({"assigned_scorer_ids": sid}).to_list()
-    for m in matches:
-        if sid in m.assigned_scorer_ids:
-            m.assigned_scorer_ids.remove(sid)
-            await m.save()
-
+    await unassign_scorer_everywhere(sid)
     await scorer.delete()

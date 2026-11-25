@@ -9,6 +9,7 @@ from app.core.security import hash_password
 from app.models import Match, Tournament, User, UserRole
 from app.schemas.auth import OrganizerCreate, UserOut, UserStatusUpdate
 from app.schemas.tournament import TournamentOut
+from app.services.users import unassign_scorer_everywhere
 
 router = APIRouter(prefix="/superadmin", tags=["superadmin"])
 
@@ -132,6 +133,15 @@ async def delete_user(user_id: str, admin: User = Depends(require_superadmin)) -
 
     if user.id == admin.id:
         raise ValidationAppError("Cannot delete your own account")
+
+    if user.role == UserRole.ORGANIZER:
+        owned = await Tournament.find(Tournament.organizer_id == user.id).count()
+        if owned:
+            raise ConflictError(
+                f"Organizer still owns {owned} tournament(s) — delete or reassign them first"
+            )
+    elif user.role == UserRole.SCORER:
+        await unassign_scorer_everywhere(user.id)
 
     await user.delete()
 

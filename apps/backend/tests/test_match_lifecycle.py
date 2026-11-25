@@ -275,11 +275,11 @@ async def test_reset_timer_succeeds_when_live(tournament, groups, teams):
     assert result.started_at is not None
 
 
-async def test_reset_timer_is_a_noop_when_not_live(tournament, groups, teams):
+async def test_reset_timer_is_rejected_when_not_live(tournament, groups, teams):
     match = await _group_match(tournament, groups, teams, status="upcoming")
-    result = await reset_timer(match)
-    assert result.status == "upcoming"
-    assert result.started_at is None
+    with pytest.raises(ConflictError):
+        await reset_timer(match)
+    assert (await Match.get(match.id)).started_at is None
 
 
 # ---- end_match after a half-time pause ----

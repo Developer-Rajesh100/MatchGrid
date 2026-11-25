@@ -12,7 +12,7 @@ from pymongo.errors import OperationFailure
 from app.core.config import get_settings
 from app.core.database import get_client
 from app.core.security import hash_password
-from app.models import Admin, Match, Player, Team, Tournament, User, UserRole
+from app.models import Match, Player, Team, Tournament, User, UserRole
 
 NAME = "0005_multi_tenant_rbac"
 
@@ -30,9 +30,9 @@ async def up() -> None:
     super_admin = await User.find_one(User.username == settings.admin_bootstrap_username)
     if super_admin is None:
         # Check if legacy Admin exists
-        legacy_admin = await Admin.find_one(Admin.username == settings.admin_bootstrap_username)
+        legacy_admin = await db["admins"].find_one({"username": settings.admin_bootstrap_username})
         password_hash = (
-            legacy_admin.password_hash
+            legacy_admin["password_hash"]
             if legacy_admin is not None
             else hash_password(settings.admin_bootstrap_password)
         )

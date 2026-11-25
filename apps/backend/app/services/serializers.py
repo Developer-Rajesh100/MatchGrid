@@ -5,11 +5,12 @@ conversion and any joined/computed fields (team name, score, etc.) are easy
 to see and adjust per resource.
 """
 
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.models import Group, GroupTeam, Match, MatchEvent, Player, Team
 from app.schemas.group import GroupOut
-from app.schemas.match import MatchOut
+from app.schemas.match import MatchAdminOut, MatchOut
 from app.schemas.match_event import MatchEventOut
 from app.schemas.player import PlayerOut
 from app.schemas.team import TeamOut
@@ -40,8 +41,10 @@ def team_to_out(
 
 
 def player_to_out(player: Player, team: Optional[Team] = None) -> PlayerOut:
+    tournament_id = player.tournament_id or (team.tournament_id if team else None)
     return PlayerOut(
         id=str(player.id),
+        tournament_id=str(tournament_id) if tournament_id else None,
         team_id=str(player.team_id),
         team_name=team.name if team else None,
         team_color=team.color if team else None,
@@ -78,10 +81,11 @@ def match_to_out(
     group_name: Optional[str] = None,
     tournament_name: Optional[str] = None,
     tournament_slug: Optional[str] = None,
+    include_scorers: bool = False,
 ) -> MatchOut:
     team1 = teams.get(match.team1_id)
     team2 = teams.get(match.team2_id)
-    return MatchOut(
+    fields = dict(
         id=str(match.id),
         tournament_id=str(match.tournament_id),
         tournament_name=tournament_name,
@@ -112,5 +116,12 @@ def match_to_out(
         ended_at=match.ended_at,
         is_half_time=match.is_half_time,
         elapsed_seconds=match.elapsed_seconds,
-        assigned_scorer_ids=[str(sid) for sid in (getattr(match, "assigned_scorer_ids", None) or [])],
+        server_now=datetime.now(timezone.utc),
     )
+    if include_scorers:
+        # Staff-only endpoints. Public responses never carry scorer account ids.
+        return MatchAdminOut(
+            **fields,
+            assigned_scorer_ids=[str(sid) for sid in (getattr(match, "assigned_scorer_ids", None) or [])],
+        )
+    return MatchOut(**fields)

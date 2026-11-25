@@ -11,15 +11,9 @@ vi.mock('../../api/tournament', () => ({
   },
 }));
 
-vi.mock('../../context/TournamentContext', () => ({
-  useTournament: () => ({
-    tournament: { id: 't-1', name: 'Champions Trophy', slug: 'champions-trophy' },
-  }),
-}));
-
 const mockTournaments = [
-  { id: 't-1', name: 'Champions Trophy', slug: 'champions-trophy', status: 'LIVE', live_matches_count: 1 },
-  { id: 't-2', name: 'Super League', slug: 'super-league', status: 'UPCOMING', live_matches_count: 0 },
+  { id: 't-1', name: 'Champions Trophy', slug: 'champions-trophy', status: 'active', live_matches_count: 1 },
+  { id: 't-2', name: 'Super League', slug: 'super-league', status: 'draft', live_matches_count: 0 },
 ];
 
 describe('TournamentSwitcher', () => {
@@ -31,13 +25,13 @@ describe('TournamentSwitcher', () => {
     tournamentApi.getPublicTournaments.mockResolvedValueOnce(mockTournaments);
 
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/t/champions-trophy/matches']}>
         <TournamentSwitcher />
       </MemoryRouter>
     );
 
     const btn = screen.getByRole('button', { name: /Select tournament/i });
-    expect(btn).toHaveTextContent('Champions Trophy');
+    await waitFor(() => expect(btn).toHaveTextContent('Champions Trophy'));
   });
 
   it('opens menu on click and lists competitions with live badge', async () => {

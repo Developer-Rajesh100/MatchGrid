@@ -3,10 +3,11 @@ import re
 from beanie import PydanticObjectId
 from pymongo.errors import DuplicateKeyError
 
-from app.core.errors import ConflictError, NotFoundError
-from app.models import GroupTeam, Match, Player, Team, Tournament
+from app.core.errors import ConflictError
+from app.models import GroupTeam, Match, Player, Team
 from app.schemas.team import TeamCreate
-from app.services.groups import assign_team_group
+from app.services.groups import assert_group_in_tournament, assign_team_group
+from app.services.media import release_media
 
 
 def _name_pattern(name: str) -> re.Pattern:
@@ -23,14 +24,11 @@ async def _assert_name_available(
         raise ConflictError(f"A team named '{name}' already exists in this tournament")
 
 
-async def create_team(payload: TeamCreate, tournament_id: PydanticObjectId | None = None) -> Team:
-    if tournament_id is None:
-        tournament = await Tournament.find_one()
-        if tournament is None:
-            raise NotFoundError("Tournament has not been created yet — run migrations first")
-        tournament_id = tournament.id
-
+async def create_team(payload: TeamCreate, tournament_id: PydanticObjectId) -> Team:
     await _assert_name_available(tournament_id, payload.name)
+    if payload.group_id:
+        # Validate before inserting so a bad group never leaves a half-created team behind.
+        await assert_group_in_tournament(PydanticObjectId(payload.group_id), tournament_id)
 
     crest_url = payload.crest_url or payload.logo_url
     team = Team(
@@ -68,5 +66,4 @@ async def delete_team(team: Team) -> None:
     await GroupTeam.find(GroupTeam.team_id == team.id).delete()
     await team.delete()
     if old_crest:
-        from app.services.storage import get_storage_service
-        await get_storage_service().delete_image(old_crest)
+        await release_media(old_crest, team.tournament_id)

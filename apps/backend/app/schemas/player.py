@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 class PlayerOut(BaseModel):
     id: str
+    tournament_id: Optional[str] = None
     team_id: str
     team_name: Optional[str] = None
     team_color: Optional[str] = None

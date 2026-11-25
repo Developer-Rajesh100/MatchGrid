@@ -5,7 +5,7 @@ admin login."""
 import pytest
 
 from app.core.security import hash_password
-from app.models import Admin
+from app.models import User, UserRole
 from app.scripts.set_admin_password import (
     MIN_PASSWORD_LENGTH,
     _PASSWORD_ALPHABET,
@@ -20,7 +20,7 @@ async def test_updates_the_existing_admins_password(admin):
 
     await set_admin_password(None, "a-brand-new-strong-password")
 
-    updated = await Admin.get(admin.id)
+    updated = await User.get(admin.id)
     assert updated.password_hash != old_hash
     assert await authenticate_admin("testadmin", "a-brand-new-strong-password") is not None
     assert await authenticate_admin("testadmin", "testpass123") is None  # old password now dead
@@ -34,21 +34,28 @@ async def test_can_also_rename_the_username_while_rotating(admin):
 
 
 async def test_creates_an_admin_if_none_exists(clean_db):
-    assert await Admin.find_all().count() == 0
+    assert await User.find(User.role == UserRole.SUPER_ADMIN).count() == 0
 
     username = await set_admin_password("admin", "a-brand-new-strong-password")
 
     assert username == "admin"
-    assert await Admin.find_all().count() == 1
+    assert await User.find(User.role == UserRole.SUPER_ADMIN).count() == 1
     assert await authenticate_admin("admin", "a-brand-new-strong-password") is not None
 
 
-async def test_refuses_to_update_if_more_than_one_admin_exists(clean_db):
-    await Admin(username="a", password_hash=hash_password("whatever-password-1")).insert()
-    await Admin(username="b", password_hash=hash_password("whatever-password-2")).insert()
+async def test_refuses_to_guess_when_several_super_admins_exist(clean_db):
+    for name in ("a", "b"):
+        await User(
+            username=name, password_hash=hash_password("whatever-password-1"), role=UserRole.SUPER_ADMIN
+        ).insert()
 
     with pytest.raises(RuntimeError):
         await set_admin_password(None, "a-brand-new-strong-password")
+
+    # naming one of them is unambiguous
+    await set_admin_password("b", "a-brand-new-strong-password")
+    assert await authenticate_admin("b", "a-brand-new-strong-password") is not None
+    assert await authenticate_admin("a", "a-brand-new-strong-password") is None
 
 
 async def test_rejects_a_too_short_password(admin):

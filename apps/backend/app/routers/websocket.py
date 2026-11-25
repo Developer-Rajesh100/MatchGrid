@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from typing import Optional
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
@@ -9,6 +10,8 @@ from app.core.websocket import manager
 logger = logging.getLogger("dcl.websocket")
 
 router = APIRouter(tags=["websocket"])
+
+_ROOM_RE = re.compile(r"^(?:[0-9a-fA-F]{24}|global)$")
 
 
 @router.websocket("/ws/live")
@@ -20,13 +23,18 @@ async def websocket_live_endpoint(
     Pushes lightweight invalidation messages (e.g. match_updated, match_event_added).
     
     Query Params:
-      - tournament_id: Optional tournament to subscribe to. If omitted, joins 'global' room.
+      - tournament_id: Optional tournament to subscribe to. If omitted, joins the 'global' (hub)
+        room, which only receives hub-level events such as match_status_changed — never another
+        tournament's goals/events.
     
     Client Message Protocol:
       - Text 'ping': responds with 'pong'.
       - JSON {"action": "subscribe", "tournament_id": "<id>"}: joins that tournament's room.
       - JSON {"action": "unsubscribe", "tournament_id": "<id>"}: leaves that tournament's room.
     """
+    if tournament_id is not None and not _ROOM_RE.match(tournament_id):
+        await websocket.close(code=1008)  # policy violation: not a valid room id
+        return
     await manager.connect(websocket, tournament_id=tournament_id)
     try:
         while True:
@@ -40,6 +48,8 @@ async def websocket_live_endpoint(
                 data = json.loads(text)
                 action = data.get("action")
                 tid = data.get("tournament_id")
+                if tid is not None and not _ROOM_RE.match(str(tid)):
+                    continue
                 if action == "subscribe" and tid:
                     await manager.subscribe_room(websocket, str(tid))
                 elif action == "unsubscribe" and tid:

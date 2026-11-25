@@ -1,21 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { matchesApi } from '../../api/matches';
 import './TournamentBracket.css';
+import { useTournament } from '../../context/TournamentContext';
+import { tPath } from '../../utils/paths';
 
 export default function TournamentBracket({ tournamentId, refreshTrigger = 0 }) {
+  const { slug } = useTournament();
   const [bracket, setBracket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const loadedTournament = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
     const fetchBracket = async () => {
       try {
-        setLoading(true);
+        // Only the first load of a tournament shows the full spinner; live refreshes update the
+        // tree in place instead of flashing it away on every WebSocket message.
+        if (loadedTournament.current !== tournamentId) {
+          setBracket(null);
+          setLoading(true);
+        }
         setError(null);
         const data = await matchesApi.getBracket(tournamentId);
         if (isMounted) {
+          loadedTournament.current = tournamentId;
           setBracket(data);
         }
       } catch (err) {
@@ -54,6 +64,16 @@ export default function TournamentBracket({ tournamentId, refreshTrigger = 0 }) 
   const rounds = bracket?.rounds || [];
   const champion = bracket?.champion;
   const hasMatches = rounds.some((r) => r.matches && r.matches.length > 0);
+
+  if (!hasMatches && bracket?.knockout_format === 'none') {
+    return (
+      <div className="bracket-empty-state" data-testid="bracket-none">
+        <div className="empty-icon">🏆</div>
+        <h3>No Knockout Stage</h3>
+        <p>This tournament is decided on the group table, so there is no bracket.</p>
+      </div>
+    );
+  }
 
   if (!hasMatches) {
     return (
@@ -128,7 +148,10 @@ export default function TournamentBracket({ tournamentId, refreshTrigger = 0 }) 
                             {m.team1 ? m.team1.name : 'TBD'}
                           </span>
                         </div>
-                        <span className="bracket-team-score">{m.score1}</span>
+                        <span className="bracket-team-score">
+                          {m.score1}
+                          {isFullTime && m.score1 === m.score2 && team1Winner ? ' (P)' : ''}
+                        </span>
                       </div>
 
                       {/* Team 2 */}
@@ -145,7 +168,10 @@ export default function TournamentBracket({ tournamentId, refreshTrigger = 0 }) 
                             {m.team2 ? m.team2.name : 'TBD'}
                           </span>
                         </div>
-                        <span className="bracket-team-score">{m.score2}</span>
+                        <span className="bracket-team-score">
+                          {m.score2}
+                          {isFullTime && m.score1 === m.score2 && team2Winner ? ' (P)' : ''}
+                        </span>
                       </div>
                     </div>
 
@@ -156,7 +182,7 @@ export default function TournamentBracket({ tournamentId, refreshTrigger = 0 }) 
                 return m.match_id ? (
                   <Link
                     key={m.bracket_slot || m.match_id}
-                    to={`/matches/${m.match_id}`}
+                    to={tPath(slug, `matches/${m.match_id}`)}
                     className="bracket-match-link"
                   >
                     {CardContent}

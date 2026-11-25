@@ -6,7 +6,7 @@ from app.core.errors import NotFoundError
 from app.models import Group, Team
 from app.schemas.standing import GroupStandingsOut, StandingOut
 from app.services.standings import sorted_group_standings
-from app.services.tournament_scope import get_active_tournament_id, resolve_tournament_id
+from app.services.tournament_scope import resolve_tournament_id
 
 router = APIRouter(prefix="/standings", tags=["standings"])
 

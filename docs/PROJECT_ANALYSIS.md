@@ -10,9 +10,9 @@
 > This document serves as the authoritative architectural audit and operational analysis of the legacy single-tenant *DCL Season 5 Digital Scoreboard* prototype from which **MatchGrid** evolved.
 > 
 > For the target multi-tenant SaaS architecture, refer to:
-> - **Master Phased Plan & Roadmap:** [`docs/plan.md`](file:///home/rajesh/Placement_Project/DCL_score_board/docs/plan.md)
-> - **System & Software Architecture Blueprint:** [`docs/system_architecture.md`](file:///home/rajesh/Placement_Project/DCL_score_board/docs/system_architecture.md)
-> - **Development Lifecycle & Quality Gates:** [`docs/DEVELOPMENT_WORKFLOW.md`](file:///home/rajesh/Placement_Project/DCL_score_board/docs/DEVELOPMENT_WORKFLOW.md)
+> - **Master Phased Plan & Roadmap:** [`docs/plan.md`](plan.md)
+> - **System & Software Architecture Blueprint:** [`docs/system_architecture.md`](system_architecture.md)
+> - **Development Lifecycle & Quality Gates:** [`docs/DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
 
 ---
 
@@ -63,32 +63,32 @@ The tournament format comprises:
 
 ### 2.1 Backend Stack
 - **Language / Runtime:** Python 3.14 (pinned in `backend/Dockerfile` and tested on Python 3.14).
-- **Web Framework:** [FastAPI](file:///home/rajesh/Placement_Project/DCL_score_board/backend/requirements.txt#L1) `v0.141.1` (async ASGI framework).
-- **ASGI Server:** [Uvicorn](file:///home/rajesh/Placement_Project/DCL_score_board/backend/requirements.txt#L2) `v0.54.0` (standard package with `uvloop`, `websockets`, `httptools`).
-- **Database ODM / Driver:** [Beanie ODM](file:///home/rajesh/Placement_Project/DCL_score_board/backend/requirements.txt#L3) `v2.0.0` over [Motor](file:///home/rajesh/Placement_Project/DCL_score_board/backend/requirements.txt#L4) `v3.7.1` (async MongoDB driver).
-- **Driver Configuration:** Initialized with `tz_aware=True` in [backend/app/core/database.py](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/core/database.py#L26) to prevent UTC vs naive datetime arithmetic bugs across timestamps.
-- **Validation & Settings:** [Pydantic](file:///home/rajesh/Placement_Project/DCL_score_board/backend/requirements.txt#L5) `v2.13.5` and [pydantic-settings](file:///home/rajesh/Placement_Project/DCL_score_board/backend/requirements.txt#L6) `v2.15.0`.
-- **Authentication & Security:** [PyJWT](file:///home/rajesh/Placement_Project/DCL_score_board/backend/requirements.txt#L7) `v2.15.1` (HMAC-SHA256 JWT tokens), [bcrypt](file:///home/rajesh/Placement_Project/DCL_score_board/backend/requirements.txt#L8) `v5.0.0` (salted password hashing).
-- **Testing Tools:** [pytest](file:///home/rajesh/Placement_Project/DCL_score_board/backend/requirements-dev.txt#L2) `v9.1.1`, [pytest-asyncio](file:///home/rajesh/Placement_Project/DCL_score_board/backend/requirements-dev.txt#L3) `v1.4.0`, [httpx](file:///home/rajesh/Placement_Project/DCL_score_board/backend/requirements-dev.txt#L4) `v0.28.1`.
+- **Web Framework:** [FastAPI](../backend/requirements.txt#L1) `v0.141.1` (async ASGI framework).
+- **ASGI Server:** [Uvicorn](../backend/requirements.txt#L2) `v0.54.0` (standard package with `uvloop`, `websockets`, `httptools`).
+- **Database ODM / Driver:** [Beanie ODM](../backend/requirements.txt#L3) `v2.0.0` over [Motor](../backend/requirements.txt#L4) `v3.7.1` (async MongoDB driver).
+- **Driver Configuration:** Initialized with `tz_aware=True` in [backend/app/core/database.py](../backend/app/core/database.py#L26) to prevent UTC vs naive datetime arithmetic bugs across timestamps.
+- **Validation & Settings:** [Pydantic](../backend/requirements.txt#L5) `v2.13.5` and [pydantic-settings](../backend/requirements.txt#L6) `v2.15.0`.
+- **Authentication & Security:** [PyJWT](../backend/requirements.txt#L7) `v2.15.1` (HMAC-SHA256 JWT tokens), [bcrypt](../backend/requirements.txt#L8) `v5.0.0` (salted password hashing).
+- **Testing Tools:** [pytest](../backend/requirements-dev.txt#L2) `v9.1.1`, [pytest-asyncio](../backend/requirements-dev.txt#L3) `v1.4.0`, [httpx](../backend/requirements-dev.txt#L4) `v0.28.1`.
 
 ### 2.2 Frontend Stack
 - **Runtime:** Node.js 20 LTS.
-- **Build Tool & Bundler:** [Vite](file:///home/rajesh/Placement_Project/DCL_score_board/frontend/package.json#L26) `v6.0.1` (`@vitejs/plugin-react` `v4.3.4`).
-- **UI Framework:** [React](file:///home/rajesh/Placement_Project/DCL_score_board/frontend/package.json#L14) `v18.3.1` & `react-dom` `v18.3.1`.
-- **Routing:** [React Router DOM](file:///home/rajesh/Placement_Project/DCL_score_board/frontend/package.json#L16) `v7.18.4` (client-side SPA routing).
-- **Icons:** [lucide-react](file:///home/rajesh/Placement_Project/DCL_score_board/frontend/package.json#L13) `v1.16.0`.
-- **Styling:** Vanilla CSS design system ([frontend/src/index.css](file:///home/rajesh/Placement_Project/DCL_score_board/frontend/src/index.css)) utilizing CSS variables, responsive typography (`Oswald` for displays, `Manrope` for body), flexbox/grid layouts, and dark theme aesthetics.
-- **Testing Tools:** [Vitest](file:///home/rajesh/Placement_Project/DCL_score_board/frontend/package.json#L27) `v4.1.11`, [JSDOM](file:///home/rajesh/Placement_Project/DCL_score_board/frontend/package.json#L25) `v25.0.1`, `@testing-library/react` `v16.1.0`, `@testing-library/jest-dom` `v6.6.3`.
+- **Build Tool & Bundler:** [Vite](../frontend/package.json#L26) `v6.0.1` (`@vitejs/plugin-react` `v4.3.4`).
+- **UI Framework:** [React](../frontend/package.json#L14) `v18.3.1` & `react-dom` `v18.3.1`.
+- **Routing:** [React Router DOM](../frontend/package.json#L16) `v7.18.4` (client-side SPA routing).
+- **Icons:** [lucide-react](../frontend/package.json#L13) `v1.16.0`.
+- **Styling:** Vanilla CSS design system ([frontend/src/index.css](../frontend/src/index.css)) utilizing CSS variables, responsive typography (`Oswald` for displays, `Manrope` for body), flexbox/grid layouts, and dark theme aesthetics.
+- **Testing Tools:** [Vitest](../frontend/package.json#L27) `v4.1.11`, [JSDOM](../frontend/package.json#L25) `v25.0.1`, `@testing-library/react` `v16.1.0`, `@testing-library/jest-dom` `v6.6.3`.
 
 ### 2.3 Database & Storage
 - **Primary Database:** MongoDB 7.0 (`mongo:7` container or DigitalOcean Managed MongoDB).
-- **Schema Management:** Custom forward migration runner ([backend/app/migrations/runner.py](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/migrations/runner.py)) storing execution state in the `schema_migrations` collection.
+- **Schema Management:** Custom forward migration runner ([backend/app/migrations/runner.py](../backend/app/migrations/runner.py)) storing execution state in the `schema_migrations` collection.
 - **Media Storage:** Static file distribution from `frontend/public/assets/` (`teams/*.png`, `players/*.jpg`).
 
 ### 2.4 Infrastructure & Networking
-- **Reverse Proxy:** Nginx 1.27 Alpine ([proxy/nginx.conf.template](file:///home/rajesh/Placement_Project/DCL_score_board/proxy/nginx.conf.template)) terminating TLS, proxying HTTP `/api/` and WebSocket `/ws/`, enforcing Content Security Policy (CSP), HTTP Strict Transport Security (HSTS), and HTTP/2.
-- **Container Orchestration:** Docker Compose ([docker-compose.yml](file:///home/rajesh/Placement_Project/DCL_score_board/docker-compose.yml)) and DigitalOcean App Platform spec ([.do/app.yaml](file:///home/rajesh/Placement_Project/DCL_score_board/.do/app.yaml)).
-- **Monorepo Dev Scripting:** [concurrently](file:///home/rajesh/Placement_Project/DCL_score_board/package.json#L18) `v9.2.5` in root `package.json`.
+- **Reverse Proxy:** Nginx 1.27 Alpine ([proxy/nginx.conf.template](../proxy/nginx.conf.template)) terminating TLS, proxying HTTP `/api/` and WebSocket `/ws/`, enforcing Content Security Policy (CSP), HTTP Strict Transport Security (HSTS), and HTTP/2.
+- **Container Orchestration:** Docker Compose ([docker-compose.yml](../docker-compose.yml)) and DigitalOcean App Platform spec ([.do/app.yaml](../.do/app.yaml)).
+- **Monorepo Dev Scripting:** [concurrently](../package.json#L18) `v9.2.5` in root `package.json`.
 
 ---
 
@@ -199,10 +199,10 @@ DCL_score_board/
 ```
 
 ### 3.1 Architectural Conventions & Design Patterns
-- **Layered Clean Architecture (Backend):** Clear separation between transport/routing ([backend/app/routers/](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/routers)), domain business logic ([backend/app/services/](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/services)), data models ([backend/app/models/](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/models)), and serialization transfer schemas ([backend/app/schemas/](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/schemas)).
-- **Materialized Write-Through Caches:** Standings ([TournamentStanding](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/models/tournament_standing.py#L8)) and player statistics ([PlayerStatistics](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/models/player_statistics.py#L8)) are calculated and stored during mutations rather than aggregated on every public read request.
-- **Fail-Fast Defense-in-Depth:** Config assertion during startup ([backend/app/core/production_safety.py](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/core/production_safety.py)) ensures the app aborts launch in `ENVIRONMENT=production` if default passwords, placeholder secrets, or `localhost` CORS origins are configured.
-- **Distributed Startup Locking:** Mongo atomic collection insertion (`startup_locks`) in [backend/app/core/bootstrap.py](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/core/bootstrap.py#L38) prevents race conditions during multi-instance rolling deploys.
+- **Layered Clean Architecture (Backend):** Clear separation between transport/routing ([backend/app/routers/](../backend/app/routers)), domain business logic ([backend/app/services/](../backend/app/services)), data models ([backend/app/models/](../backend/app/models)), and serialization transfer schemas ([backend/app/schemas/](../backend/app/schemas)).
+- **Materialized Write-Through Caches:** Standings ([TournamentStanding](../backend/app/models/tournament_standing.py#L8)) and player statistics ([PlayerStatistics](../backend/app/models/player_statistics.py#L8)) are calculated and stored during mutations rather than aggregated on every public read request.
+- **Fail-Fast Defense-in-Depth:** Config assertion during startup ([backend/app/core/production_safety.py](../backend/app/core/production_safety.py)) ensures the app aborts launch in `ENVIRONMENT=production` if default passwords, placeholder secrets, or `localhost` CORS origins are configured.
+- **Distributed Startup Locking:** Mongo atomic collection insertion (`startup_locks`) in [backend/app/core/bootstrap.py](../backend/app/core/bootstrap.py#L38) prevents race conditions during multi-instance rolling deploys.
 - **Cache-Invalidation WebSockets:** The WebSocket layer sends lightweight push notification signals (e.g. `{"type": "match_status_changed", "match_id": "..."}`) that trigger targeted re-fetching on the frontend rather than streaming large state deltas.
 
 ---
@@ -274,8 +274,8 @@ flowchart TD
 3. React executes `useEffect()` to call `standingsApi.getStandings()`.
 4. Browser issues `GET /api/standings` to Nginx proxy.
 5. Proxy forwards request to FastAPI backend (`backend:8000`).
-6. FastAPI matches route in [backend/app/routers/standings.py](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/routers/standings.py).
-7. Service reads pre-materialized [TournamentStanding](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/models/tournament_standing.py#L8) documents from MongoDB sorted by `points DESC, goal_difference DESC, goals_for DESC, name ASC`.
+6. FastAPI matches route in [backend/app/routers/standings.py](../backend/app/routers/standings.py).
+7. Service reads pre-materialized [TournamentStanding](../backend/app/models/tournament_standing.py#L8) documents from MongoDB sorted by `points DESC, goal_difference DESC, goals_for DESC, name ASC`.
 8. Serialized JSON payload is returned with security headers (`X-Content-Type-Options: nosniff`, etc.).
 
 #### Flow 2: Live Scoring Mutation Flow (Admin logs a Goal)
@@ -284,13 +284,13 @@ flowchart TD
    ```json
    { "type": "goal", "team_id": "...", "player_id": "...", "assist_player_id": "...", "minute": 24 }
    ```
-3. FastAPI dependency [get_current_admin](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/core/deps.py#L12) verifies the JWT bearer token against `JWT_SECRET`.
-4. Controller calls [app.services.match_events.add_event()](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/services/match_events.py#L15).
+3. FastAPI dependency [get_current_admin](../backend/app/core/deps.py#L12) verifies the JWT bearer token against `JWT_SECRET`.
+4. Controller calls [app.services.match_events.add_event()](../backend/app/services/match_events.py#L15).
 5. The `MatchEvent` is validated (e.g., minute $\le$ 120, player belongs to assigned team) and inserted into MongoDB.
 6. The service triggers:
-   - [recalculate_player_statistics()](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/services/player_stats.py#L14) for both the goal scorer and assist provider.
-   - If the match is a group match, [recalculate_group_standings()](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/services/standings.py#L16) is invoked if the match is marked completed or reopened.
-7. [broadcast({"type": "match_event_added", "match_id": "..."})](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/core/websocket.py#L66) is called.
+   - [recalculate_player_statistics()](../backend/app/services/player_stats.py#L14) for both the goal scorer and assist provider.
+   - If the match is a group match, [recalculate_group_standings()](../backend/app/services/standings.py#L16) is invoked if the match is marked completed or reopened.
+7. [broadcast({"type": "match_event_added", "match_id": "..."})](../backend/app/core/websocket.py#L66) is called.
 8. The in-memory WebSocket manager iterates over all connected client sockets and pushes the notification JSON frame.
 9. Connected spectator and admin browser clients receive the message and trigger non-blocking UI background refreshes.
 
@@ -298,11 +298,11 @@ flowchart TD
 - **Single-Admin Design:** The system intentionally operates with exactly one admin account seeded via migration `m0003_bootstrap_admin` or environment variable `ADMIN_BOOTSTRAP_PASSWORD`.
 - **Session Tokens:** Stateless JWT tokens signed with HMAC-SHA256 containing admin user ID `sub` and expiration timestamp (default: 12 hours / 720 minutes).
 - **Brute-Force & Denial-of-Service Defense:**
-  - Login attempts are throttled by client IP using [LoginRateLimiter](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/core/rate_limit.py#L20).
+  - Login attempts are throttled by client IP using [LoginRateLimiter](../backend/app/core/rate_limit.py#L20).
   - The first **5 failed attempts** are free (to avoid locking out an operator for an accidental typo).
   - Subsequent failures trigger exponential backoff: $1s, 2s, 4s, \dots$ up to a maximum cap of $60s$ delay per IP.
   - **Account lockout is explicitly avoided:** Locking the single tournament admin account would create a severe Denial-of-Service vulnerability during a live sporting event.
-  - **Proxy-Aware IP Resolution:** In [backend/app/routers/auth.py](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/routers/auth.py#L15), the client IP is extracted using `TRUSTED_PROXY_HOPS` (default: 1). It takes the entry appended by the trusted reverse proxy ($N$-th from the right) rather than trusting spoofable leftmost headers.
+  - **Proxy-Aware IP Resolution:** In [backend/app/routers/auth.py](../backend/app/routers/auth.py#L15), the client IP is extracted using `TRUSTED_PROXY_HOPS` (default: 1). It takes the entry appended by the trusted reverse proxy ($N$-th from the right) rather than trusting spoofable leftmost headers.
 
 ---
 
@@ -519,7 +519,7 @@ npm test
 ```
 
 ### 6.4 Production Deployment: DigitalOcean App Platform
-The application is pre-configured for DigitalOcean App Platform via [.do/app.yaml](file:///home/rajesh/Placement_Project/DCL_score_board/.do/app.yaml):
+The application is pre-configured for DigitalOcean App Platform via [.do/app.yaml](../.do/app.yaml):
 - **Pre-Deploy Job:** Automatically executes `python -m app.migrations.runner` in a temporary container before new backend instances receive live traffic.
 - **Backend Service:** Runs `docker-entrypoint.sh` executing Uvicorn with 1 worker behind the platform proxy on port 8000.
 - **Frontend Service:** Runs multi-stage Nginx container serving compiled static assets on port 80.
@@ -531,11 +531,11 @@ The application is pre-configured for DigitalOcean App Platform via [.do/app.yam
 
 ### 7.1 Architecture Strengths
 1. **Defensive Production Booting:**
-   [app/core/production_safety.py](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/core/production_safety.py) rigorously protects the deployment. If `ENVIRONMENT=production` is set with dev passwords (`replace-with-a-strong-password`, `dcl-dev-admin-password`), insecure JWT secrets ($<32$ characters), or dev CORS origins, the service intentionally refuses to start.
+   [app/core/production_safety.py](../backend/app/core/production_safety.py) rigorously protects the deployment. If `ENVIRONMENT=production` is set with dev passwords (`replace-with-a-strong-password`, `dcl-dev-admin-password`), insecure JWT secrets ($<32$ characters), or dev CORS origins, the service intentionally refuses to start.
 2. **Atomic Bootstrap Locking:**
-   [app/core/bootstrap.py](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/core/bootstrap.py) uses an atomic MongoDB lock in `startup_locks` with TTL expiration. This ensures rolling deployments do not create race conditions or duplicate inserts.
+   [app/core/bootstrap.py](../backend/app/core/bootstrap.py) uses an atomic MongoDB lock in `startup_locks` with TTL expiration. This ensures rolling deployments do not create race conditions or duplicate inserts.
 3. **Optimized Batch Querying:**
-   In [app/services/matches.py](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/services/matches.py#L26), `compute_scores_and_winners()` uses a single batched MongoDB `$in` query across goal events rather than issuing $2N$ queries per match listing. Similarly, `recalculate_group_standings()` batches all goal events across the group in one round-trip.
+   In [app/services/matches.py](../backend/app/services/matches.py#L26), `compute_scores_and_winners()` uses a single batched MongoDB `$in` query across goal events rather than issuing $2N$ queries per match listing. Similarly, `recalculate_group_standings()` batches all goal events across the group in one round-trip.
 4. **Timezone Awareness (`tz_aware=True`):**
    Initializing Motor with `tz_aware=True` guarantees that BSON UTC timestamps parsed into Python `datetime` objects maintain their timezone marker, preventing subtraction errors between naive and aware datetimes.
 5. **NoSQL Injection & Input Sanitization:**
@@ -543,7 +543,7 @@ The application is pre-configured for DigitalOcean App Platform via [.do/app.yam
 
 ### 7.2 Known Constraints & Technical Debt
 1. **Single Backend Instance Constraint:**
-   The WebSocket connection registry ([ConnectionManager](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/core/websocket.py#L10)) and the IP login rate limiter ([LoginRateLimiter](file:///home/rajesh/Placement_Project/DCL_score_board/backend/app/core/rate_limit.py#L20)) are held in Python process memory. The app must run as a **single instance** (`instance_count: 1`).
+   The WebSocket connection registry ([ConnectionManager](../backend/app/core/websocket.py#L10)) and the IP login rate limiter ([LoginRateLimiter](../backend/app/core/rate_limit.py#L20)) are held in Python process memory. The app must run as a **single instance** (`instance_count: 1`).
    > [!NOTE]
    > For horizontal scaling across multiple instances, WebSocket broadcasting would require a Redis Pub/Sub backplane, and rate limiting would need Redis distributed counters.
 2. **Duplicate Team Crest Assets:**

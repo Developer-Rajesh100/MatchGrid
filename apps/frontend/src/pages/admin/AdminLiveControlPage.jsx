@@ -2,11 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { matchesApi } from '../../api/matches';
 import { playersApi } from '../../api/players';
+import { authApi } from '../../api/auth';
 import { StatusPill } from '../../components/common/StatusPill';
 import { Avatar } from '../../components/common/Avatar';
 import { LoadingState, ErrorState } from '../../components/common/Common';
 import { useLiveSocket } from '../../hooks/useLiveSocket';
 import { formatTime } from '../../utils/time';
+import { clockOffsetMs, matchElapsedSeconds } from '../../utils/clock';
 import {
   ArrowLeft,
   Play,
@@ -59,164 +61,46 @@ export function AdminLiveControlPage() {
   const currentSecondsRef = useRef(0);
   currentSecondsRef.current = timerSeconds;
 
+  const clockOffsetRef = useRef(0);
+
   useEffect(() => {
     setTimerSeconds(0);
-    const timerStorageKey = `dcl_timer_${matchId}`;
-    try {
-      const saved = JSON.parse(localStorage.getItem(timerStorageKey) || 'null');
-      if (saved && saved.isPaused) {
-        setIsHalfTime(true);
-        setTimerSeconds(saved.elapsed || 0);
-      } else {
-        setIsHalfTime(false);
-      }
-    } catch {
-      setIsHalfTime(false);
-    }
+    setIsHalfTime(false);
     loadMatchDetails();
   }, [matchId]);
 
-  // Live Match Timer Synchronization
+  // Match clock: derived only from server fields and the server's own "now" (see utils/clock.js),
+  // so every device agrees whatever its local clock or storage says.
   useEffect(() => {
-    if (!match) return;
-
-    const timerStorageKey = `dcl_timer_${match.id}`;
-
-    // Starting a new match or upcoming/cancelled match: reset timer to 00:00
-    if (match.status === 'upcoming' || match.status === 'cancelled') {
-      setTimerSeconds(0);
-      setTimerUnknown(false);
-      setIsHalfTime(false);
-      try {
-        localStorage.removeItem(timerStorageKey);
-      } catch {
-        // ignore storage errors
-      }
-      return;
-    }
-
-    // When the match stops, stop at current time
-    if (match.status === 'full_time') {
-      setIsHalfTime(false);
-      let finalSec = null;
-      if (match.started_at && match.ended_at) {
-        finalSec = Math.max(
-          0,
-          Math.floor((new Date(match.ended_at).getTime() - new Date(match.started_at).getTime()) / 1000)
-        );
-      } else {
-        try {
-          const saved = JSON.parse(localStorage.getItem(timerStorageKey) || '{}');
-          if (typeof saved.elapsed === 'number') {
-            finalSec = saved.elapsed;
-          } else if (saved.startedAt) {
-            finalSec = (saved.elapsedBefore || 0) + Math.max(0, Math.floor((Date.now() - saved.startedAt) / 1000));
-          }
-        } catch {
-          // fallback
-        }
-        if (finalSec === null && currentSecondsRef.current) {
-          finalSec = currentSecondsRef.current;
-        }
-      }
-      const unknown = finalSec === null;
-      setTimerUnknown(unknown);
-      setTimerSeconds(unknown ? 0 : finalSec);
-      try {
-        localStorage.setItem(timerStorageKey, JSON.stringify({ elapsed: unknown ? 0 : finalSec, isRunning: false }));
-      } catch {
-        // ignore
-      }
-      return;
-    }
-
-    setTimerUnknown(false);
-
-    // When the match starts/is live, count upward from 00:00 or hold if paused at Half Time
-    if (match.status === 'live') {
-      let savedData = null;
-      try {
-        savedData = JSON.parse(localStorage.getItem(timerStorageKey) || 'null');
-      } catch {
-        savedData = null;
-      }
-
-      if (savedData && savedData.isPaused) {
-        setIsHalfTime(true);
-        setTimerSeconds(savedData.elapsed || 0);
-        return;
-      }
-
-      if (isHalfTime) {
-        return;
-      }
-
-      const getElapsed = () => {
-        let currentSaved = null;
-        try {
-          currentSaved = JSON.parse(localStorage.getItem(timerStorageKey) || 'null');
-        } catch {
-          currentSaved = null;
-        }
-
-        if (currentSaved && currentSaved.isPaused) {
-          return currentSaved.elapsed || 0;
-        }
-
-        if (currentSaved && currentSaved.startedAt) {
-          const baseMs = currentSaved.startedAt;
-          const elapsedBefore = currentSaved.elapsedBefore || 0;
-          return elapsedBefore + Math.max(0, Math.floor((Date.now() - baseMs) / 1000));
-        }
-
-        if (match.started_at) {
-          const startMs = new Date(match.started_at).getTime();
-          return Math.max(0, Math.floor((Date.now() - startMs) / 1000));
-        }
-
-        const now = Date.now();
-        const initial = { startedAt: now, elapsedBefore: 0, isRunning: true, isPaused: false };
-        try {
-          localStorage.setItem(timerStorageKey, JSON.stringify(initial));
-        } catch {
-          // ignore
-        }
-        return 0;
-      };
-
-      setTimerSeconds(getElapsed());
-
-      const interval = setInterval(() => {
-        setTimerSeconds(getElapsed());
-      }, 1000);
-
+    if (!match) return undefined;
+    const compute = () => matchElapsedSeconds(match, clockOffsetRef.current);
+    const initial = compute();
+    setTimerUnknown(initial === null);
+    setTimerSeconds(initial ?? 0);
+    setIsHalfTime(Boolean(match.is_half_time) && match.status === 'live');
+    if (match.status === 'live' && !match.is_half_time) {
+      const interval = setInterval(() => setTimerSeconds(compute() ?? 0), 1000);
       return () => clearInterval(interval);
     }
-  }, [match?.id, match?.status, match?.started_at, match?.ended_at, isHalfTime]);
+    return undefined;
+  }, [match]);
 
   const loadMatchDetails = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
       setError(null);
       const data = await matchesApi.getMatch(matchId);
+      clockOffsetRef.current = clockOffsetMs(data, Date.now());
       setMatch(data);
-      if (data.is_half_time) {
-        setIsHalfTime(true);
-        if (typeof data.elapsed_seconds === 'number') {
-          setTimerSeconds(data.elapsed_seconds);
-        }
-      } else if (data.status === 'live') {
-        setIsHalfTime(false);
-      }
       setSelectedLineup(data.lineup || []);
 
       if (data.team1_id) {
         setEventTeamId(data.team1_id);
-        const p1 = await playersApi.getPlayers({ team_id: data.team1_id });
+        const p1 = await playersApi.getPlayers({ team_id: data.team1_id, tournament_id: data.tournament_id });
         setTeam1Players(p1 || []);
       }
       if (data.team2_id) {
-        const p2 = await playersApi.getPlayers({ team_id: data.team2_id });
+        const p2 = await playersApi.getPlayers({ team_id: data.team2_id, tournament_id: data.tournament_id });
         setTeam2Players(p2 || []);
       }
     } catch (err) {
@@ -240,14 +124,6 @@ export function AdminLiveControlPage() {
   const handleStart = async () => {
     try {
       setActionLoading(true);
-      // Reset timer to 00:00 on match start
-      setTimerSeconds(0);
-      setIsHalfTime(false);
-      try {
-        localStorage.setItem(`dcl_timer_${matchId}`, JSON.stringify({ startedAt: Date.now(), elapsedBefore: 0, isRunning: true, isPaused: false }));
-      } catch {
-        // ignore
-      }
       await matchesApi.startMatch(matchId);
       showSuccess('Match started and LIVE!');
       await loadMatchDetails();
@@ -261,15 +137,6 @@ export function AdminLiveControlPage() {
   const handleEnd = async () => {
     try {
       setActionLoading(true);
-      setIsHalfTime(false);
-      // Stop timer at current time
-      const stoppedSeconds = currentSecondsRef.current;
-      setTimerSeconds(stoppedSeconds);
-      try {
-        localStorage.setItem(`dcl_timer_${matchId}`, JSON.stringify({ elapsed: stoppedSeconds, isRunning: false, isPaused: false }));
-      } catch {
-        // ignore
-      }
       await matchesApi.endMatch(matchId);
       showSuccess('Match ended! Final score and standings saved.');
       await loadMatchDetails();
@@ -295,8 +162,8 @@ export function AdminLiveControlPage() {
     try {
       setActionLoading(true);
       setError(null);
-      const currentSec = currentSecondsRef.current || 0;
-      await matchesApi.pauseHalfTime(matchId, { elapsed_seconds: currentSec });
+      // The server freezes the clock from its own started_at; the client never supplies the minute.
+      await matchesApi.pauseHalfTime(matchId);
       showSuccess('Match paused for Half Time');
       await loadMatchDetails();
     } catch (err) {
@@ -323,13 +190,6 @@ export function AdminLiveControlPage() {
   const handleReopen = async () => {
     try {
       setActionLoading(true);
-      setIsHalfTime(false);
-      const currentSec = currentSecondsRef.current;
-      try {
-        localStorage.setItem(`dcl_timer_${matchId}`, JSON.stringify({ startedAt: Date.now(), elapsedBefore: currentSec, isRunning: true, isPaused: false }));
-      } catch {
-        // ignore
-      }
       await matchesApi.reopenMatch(matchId);
       showSuccess('Match reopened to LIVE');
       await loadMatchDetails();
@@ -342,13 +202,7 @@ export function AdminLiveControlPage() {
 
   const handleResetTimer = async () => {
     if (match?.status !== 'live') {
-      try {
-        localStorage.removeItem(`dcl_timer_${matchId}`);
-      } catch {
-        // ignore — purely a stale-cache cleanup, not app state
-      }
-      setTimerSeconds(0);
-      return;
+      return; // nothing to reset: the clock is read-only outside a live match
     }
     try {
       setActionLoading(true);
@@ -449,7 +303,7 @@ export function AdminLiveControlPage() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <button onClick={() => navigate('/admin')} className="btn btn-outline btn-sm">
+        <button onClick={() => navigate(authApi.isScorer() ? '/scorer' : '/organizer')} className="btn btn-outline btn-sm">
           <ArrowLeft size={13} /> Back to Dashboard
         </button>
         <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.6px' }}>
@@ -672,14 +526,15 @@ export function AdminLiveControlPage() {
             </>
           )}
 
-          {match.status === 'full_time' && (
+          {/* Reopen and winner override are tournament-owner actions; scorers only run the live clock/events. */}
+          {match.status === 'full_time' && !authApi.isScorer() && (
             <button className="btn btn-outline" onClick={handleReopen} disabled={actionLoading}>
               <RotateCcw size={14} /> Reopen Match to LIVE
             </button>
           )}
 
           {/* Knockout Winner Override if drawn */}
-          {match.stage !== 'group' && match.status === 'full_time' && (
+          {match.stage !== 'group' && match.status === 'full_time' && !authApi.isScorer() && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '12px', color: 'var(--chalk-dim)' }}>Winner:</span>
               <button

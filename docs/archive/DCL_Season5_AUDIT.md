@@ -1,3 +1,5 @@
+> **Archived.** This is the test and production-readiness audit of the original single-event *DCL Season 5* scoreboard, kept for history. The current audit is [`../Audit.md`](../Audit.md).
+
 # DCL Season 5 Scoreboard — Test & Production-Readiness Audit
 
 ## Release retest of 2026-10-10 (latest, before pushing the match-number editing feature)

@@ -1,8 +1,11 @@
+import re
+
 from beanie import PydanticObjectId
+from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from app.core.errors import ConflictError, NotFoundError
-from app.models import Match, MatchEvent, MatchLineup, Player, PlayerStatistics, Team
+from app.models import Match, MatchEvent, MatchLineup, Player, PlayerStatistics, Team, Tournament
 from app.schemas.player import (
     GoalLogEntryOut,
     MatchHistoryEntryOut,
@@ -11,6 +14,7 @@ from app.schemas.player import (
     PlayerCreate,
     PlayerUpdate,
 )
+from app.services.media import release_media
 from app.services.serializers import player_to_out
 
 
@@ -21,14 +25,35 @@ async def _unset_other_managers(team_id: PydanticObjectId, keep_player_id: Pydan
     await Player.find(Player.id == keep_player_id).update({"$set": {"is_manager": True}})
 
 
+async def _next_player_number(tournament_id: PydanticObjectId) -> int:
+    """Atomically increments the tournament's own player counter (never the platform-wide count)."""
+    doc = await Tournament.get_pymongo_collection().find_one_and_update(
+        {"_id": tournament_id},
+        {"$inc": {"player_seq": 1}},
+        return_document=ReturnDocument.AFTER,
+    )
+    return int(doc["player_seq"])
+
+
+async def _sync_player_seq(tournament_id: PydanticObjectId) -> None:
+    highest = 0
+    async for doc in Player.get_pymongo_collection().find({"tournament_id": tournament_id}, {"dcl_id": 1}):
+        match = re.match(r"^DCL-(\d+)$", doc.get("dcl_id") or "")
+        if match:
+            highest = max(highest, int(match.group(1)))
+    await Tournament.get_pymongo_collection().update_one({"_id": tournament_id}, {"$max": {"player_seq": highest}})
+
+
 async def create_player(payload: PlayerCreate) -> Player:
     team = await Team.get(PydanticObjectId(payload.team_id))
     if team is None:
         raise NotFoundError("Team not found")
 
-    existing_count = await Player.find_all().count()
-    dcl_id = f"DCL-{existing_count + 1:03d}"
-    for attempt in range(1, 6):
+    if team.tournament_id is None:
+        raise NotFoundError("Team has no tournament")
+
+    for _attempt in range(25):
+        dcl_id = f"DCL-{await _next_player_number(team.tournament_id):03d}"
         try:
             player = Player(
                 tournament_id=team.tournament_id,
@@ -43,13 +68,14 @@ async def create_player(payload: PlayerCreate) -> Player:
             break
         except DuplicateKeyError as exc:
             if "dcl_id" in str(exc):
-                dcl_id = f"DCL-{existing_count + 1 + attempt:03d}"
+                # An id was taken by a seeded/imported player the counter never saw: catch up.
+                await _sync_player_seq(team.tournament_id)
                 continue
             raise ConflictError(
                 f"Jersey number {payload.number} is already used on this team"
             ) from exc
     else:  # pragma: no cover - defensive
-        raise ConflictError("Could not allocate a unique DCL ID, try again")
+        raise ConflictError("Could not allocate a unique player ID, try again")
 
     if payload.is_manager:
         await _unset_other_managers(team.id, player.id)
@@ -77,15 +103,18 @@ async def update_player(player: Player, payload: PlayerUpdate) -> Player:
             raise ConflictError(f"Jersey number {new_number} is already used on this team")
 
     old_photo = player.photo_url
+    tournament_id = player.tournament_id
+    if tournament_id is None:
+        team = await Team.get(player.team_id)
+        tournament_id = team.tournament_id if team else None
     for field, value in data.items():
         setattr(player, field, value)
 
     await player.save()
 
     new_photo = player.photo_url
-    if old_photo and new_photo != old_photo:
-        from app.services.storage import get_storage_service
-        await get_storage_service().delete_image(old_photo)
+    if old_photo and new_photo != old_photo and tournament_id:
+        await release_media(old_photo, tournament_id)
 
     if make_manager is True:
         await _unset_other_managers(player.team_id, player.id)
@@ -105,10 +134,11 @@ async def delete_player(player: Player) -> None:
             "Cannot remove a player who already has recorded match events or lineup entries"
         )
     old_photo = player.photo_url
+    team = await Team.get(player.team_id)
+    tournament_id = player.tournament_id or (team.tournament_id if team else None)
     await player.delete()
-    if old_photo:
-        from app.services.storage import get_storage_service
-        await get_storage_service().delete_image(old_photo)
+    if old_photo and tournament_id:
+        await release_media(old_photo, tournament_id)
 
 
 async def get_player_detail(player: Player) -> PlayerDetailOut:

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Query
 
 from app.schemas.statistics import LeaderboardsOut
 from app.services.statistics import get_leaderboards
-from app.services.tournament_scope import get_active_tournament_id, resolve_tournament_id
+from app.services.tournament_scope import resolve_tournament_id
 
 router = APIRouter(prefix="/statistics", tags=["statistics"])
 

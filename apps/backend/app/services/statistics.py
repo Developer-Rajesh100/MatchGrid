@@ -6,8 +6,8 @@ from app.schemas.statistics import LeaderboardEntryOut, LeaderboardsOut
 
 async def get_leaderboards(tournament_id: PydanticObjectId) -> LeaderboardsOut:
     rows = await PlayerStatistics.find(PlayerStatistics.tournament_id == tournament_id).to_list()
-    players = {p.id: p for p in await Player.find_all().to_list()}
-    teams = {t.id: t for t in await Team.find_all().to_list()}
+    players = {p.id: p for p in await Player.find({"_id": {"$in": [r.player_id for r in rows]}}).to_list()}
+    teams = {t.id: t for t in await Team.find({"_id": {"$in": list({r.team_id for r in rows})}}).to_list()}
 
     def entry(row: PlayerStatistics, value: int) -> LeaderboardEntryOut | None:
         player = players.get(row.player_id)

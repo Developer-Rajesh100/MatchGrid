@@ -237,14 +237,14 @@ test.describe('MatchGrid Phase 4: Room-Scoped WebSockets & Scoped Scorer Console
       await openConsoleBtn.click();
 
       // Verify navigation to live match control page
-      await expect(page).toHaveURL(`/admin/matches/${match1.id}/live`);
+      await expect(page).toHaveURL(`/scorer/matches/${match1.id}/live`);
       await expect(page.locator(`text=${team1A.name}`).first()).toBeVisible();
 
       // -----------------------------------------------------------------
       // SECTION C: Cross-Tenant / Unassigned Lockout (403 Forbidden Access Denied)
       // -----------------------------------------------------------------
       // Scorer 1 attempts to open live control console for Match 2 (assigned to Scorer 2 in T2)
-      await page.goto(`/admin/matches/${match2.id}/live`);
+      await page.goto(`/scorer/matches/${match2.id}/live`);
 
       // Match 2 details load (public info)
       await expect(page.locator(`text=${team2A.name}`).first()).toBeVisible();

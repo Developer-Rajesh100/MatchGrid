@@ -92,6 +92,52 @@ describe('status-gated lifecycle controls', () => {
     expect(await screen.findByText(/winner:/i)).toBeInTheDocument();
   });
 
+  it('derives the clock from server time, ignoring a skewed device clock and localStorage', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      // This device's clock says 12:00:00Z; the server says 14:00:00Z and the match kicked off at 13:50:00Z.
+      vi.setSystemTime(new Date('2026-01-01T12:00:00Z'));
+      localStorage.setItem(
+        'dcl_timer_m1',
+        JSON.stringify({ startedAt: Date.now() - 999000, elapsedBefore: 0, isRunning: true })
+      );
+      matchesApi.getMatch.mockResolvedValue(
+        baseMatch({
+          status: 'live',
+          started_at: '2026-01-01T13:50:00Z',
+          server_now: '2026-01-01T14:00:00Z',
+        })
+      );
+      renderPage();
+      await screen.findByTestId('timer-display');
+      await waitFor(() => expect(screen.getByTestId('timer-display')).toHaveTextContent('10:00'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows half time from the server flag and frozen elapsed, not from local storage', async () => {
+    localStorage.setItem('dcl_timer_m1', JSON.stringify({ isPaused: false, elapsed: 5, isRunning: true }));
+    matchesApi.getMatch.mockResolvedValue(
+      baseMatch({ status: 'live', is_half_time: true, elapsed_seconds: 1500 })
+    );
+    renderPage();
+    await screen.findByTestId('timer-display');
+    await waitFor(() => expect(screen.getByTestId('timer-display')).toHaveTextContent('25:00'));
+    expect(screen.getByTestId('timer-status')).toHaveTextContent(/half time/i);
+  });
+
+  it('hides Reopen and the winner override from scorers (owner-only actions)', async () => {
+    localStorage.setItem('matchgrid_role', 'SCORER');
+    matchesApi.getMatch.mockResolvedValue(
+      baseMatch({ status: 'full_time', stage: 'final', label: 'Final' })
+    );
+    renderPage();
+    await screen.findByText(/full time/i);
+    expect(screen.queryByRole('button', { name: /reopen match/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/winner:/i)).not.toBeInTheDocument();
+  });
+
   it('does not show the winner-override control for a completed group match', async () => {
     matchesApi.getMatch.mockResolvedValue(baseMatch({ status: 'full_time', stage: 'group' }));
     renderPage();
@@ -398,7 +444,7 @@ describe('match live timer', () => {
 
     await user.click(halfTimeBtn);
 
-    await waitFor(() => expect(matchesApi.pauseHalfTime).toHaveBeenCalledWith('m1', expect.any(Object)));
+    await waitFor(() => expect(matchesApi.pauseHalfTime).toHaveBeenCalledWith('m1'));
     await waitFor(() =>
       expect(screen.getByTestId('timer-status')).toHaveTextContent(/half time • timer paused/i)
     );

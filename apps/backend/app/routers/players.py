@@ -8,8 +8,9 @@ from app.core.errors import NotFoundError
 from app.models import Player, Team, User
 from app.schemas.player import PlayerCreate, PlayerDetailOut, PlayerOut, PlayerUpdate
 from app.services.players import create_player, delete_player, get_player_detail, update_player
+from app.services.media import validate_media_url
 from app.services.serializers import player_to_out
-from app.services.tournament_scope import get_active_tournament_id, resolve_tournament_id
+from app.services.tournament_scope import resolve_tournament_id
 
 router = APIRouter(prefix="/players", tags=["players"])
 
@@ -62,6 +63,7 @@ async def add_player(payload: PlayerCreate, admin: User = Depends(get_current_ad
     if team is None:
         raise NotFoundError("Team not found")
     await check_tournament_ownership(admin, team.tournament_id)
+    payload.photo_url = validate_media_url(payload.photo_url, team.tournament_id)
 
     player = await create_player(payload)
     return player_to_out(player, team)
@@ -75,6 +77,8 @@ async def edit_player(
     player = await _player_or_404(player_id)
     tid = await _resolve_player_tournament_id(player)
     await check_tournament_ownership(admin, tid)
+    if "photo_url" in payload.model_fields_set:
+        payload.photo_url = validate_media_url(payload.photo_url, tid)
 
     player = await update_player(player, payload)
     team = await Team.get(player.team_id)

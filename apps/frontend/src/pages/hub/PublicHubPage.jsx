@@ -43,7 +43,7 @@ export function PublicHubPage() {
   }, [tournaments]);
 
   const upcomingTournaments = useMemo(() => {
-    return tournaments.filter((t) => (t.status || '').toUpperCase() === 'UPCOMING');
+    return tournaments.filter((t) => (t.status || '').toUpperCase() === 'DRAFT');
   }, [tournaments]);
 
   const completedTournaments = useMemo(() => {
@@ -57,7 +57,7 @@ export function PublicHubPage() {
         const isLive = (t.live_matches_count || 0) > 0 || (t.status || '').toUpperCase() === 'LIVE';
         if (!isLive) return false;
       } else if (activeFilter === 'UPCOMING') {
-        if ((t.status || '').toUpperCase() !== 'UPCOMING') return false;
+        if ((t.status || '').toUpperCase() !== 'DRAFT') return false;
       } else if (activeFilter === 'COMPLETED') {
         if ((t.status || '').toUpperCase() !== 'COMPLETED') return false;
       }

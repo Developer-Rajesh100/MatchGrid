@@ -5,8 +5,11 @@ import { teamsApi } from '../api/teams';
 import { Avatar } from '../components/common/Avatar';
 import { LoadingState, ErrorState, EmptyState } from '../components/common/Common';
 import { Users, Search, Filter } from 'lucide-react';
+import { useTournament } from '../context/TournamentContext';
+import { tPath } from '../utils/paths';
 
 export function PlayersPage() {
+  const { tournamentId, slug } = useTournament();
   const [players, setPlayers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [searchParams] = useSearchParams();
@@ -17,15 +20,16 @@ export function PlayersPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!tournamentId) return;
     setLoading(true);
-    Promise.all([playersApi.getPlayers(), teamsApi.getTeams()])
+    Promise.all([playersApi.getPlayers({ tournament_id: tournamentId }), teamsApi.getTeams({ tournament_id: tournamentId })])
       .then(([pData, tData]) => {
         setPlayers(pData || []);
         setTeams(tData || []);
       })
       .catch((err) => setError(err.message || 'Failed to load players'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [tournamentId]);
 
   const filteredPlayers = players.filter((p) => {
     if (selectedTeam !== 'all' && p.team_id !== selectedTeam) return false;
@@ -100,7 +104,7 @@ export function PlayersPage() {
             <div
               key={player.id}
               className="card card-clickable"
-              onClick={() => navigate(`/players/${player.id}`)}
+              onClick={() => navigate(tPath(slug, `players/${player.id}`))}
               style={{
                 display: 'flex',
                 alignItems: 'center',

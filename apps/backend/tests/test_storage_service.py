@@ -100,9 +100,17 @@ def test_extract_key_from_url_safe_prefix_guard():
 
 def test_extract_tournament_id_from_key():
     storage = StorageService(Settings())
-    key = "tournaments/67448a1234567890abcdef12/crests/abc.png"
+    key = "tournaments/67448a1234567890abcdef12/crests/" + "a" * 32 + ".png"
     assert storage.extract_tournament_id_from_key(key) == "67448a1234567890abcdef12"
     assert storage.extract_tournament_id_from_key("invalid/key/path.png") is None
+    # strict shape only: wrong category / short name / traversal are not media keys
+    for bad in (
+        "tournaments/67448a1234567890abcdef12/crests/abc.png",
+        "tournaments/67448a1234567890abcdef12/other/" + "a" * 32 + ".png",
+        "tournaments/not-an-id/crests/" + "a" * 32 + ".png",
+        "tournaments/67448a1234567890abcdef12/crests/../" + "a" * 32 + ".png",
+    ):
+        assert storage.extract_tournament_id_from_key(bad) is None
 
 
 @pytest.mark.asyncio

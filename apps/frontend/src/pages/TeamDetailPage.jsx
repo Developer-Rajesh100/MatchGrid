@@ -7,10 +7,13 @@ import { Avatar } from '../components/common/Avatar';
 import { MatchRow } from '../components/match/MatchRow';
 import { LoadingState, ErrorState, EmptyState } from '../components/common/Common';
 import { ArrowLeft, Users, Calendar, Shield } from 'lucide-react';
+import { useTournament } from '../context/TournamentContext';
+import { tPath } from '../utils/paths';
 
 export function TeamDetailPage() {
   const { teamId } = useParams();
   const navigate = useNavigate();
+  const { slug, tournamentId } = useTournament();
   const [team, setTeam] = useState(null);
   const [players, setPlayers] = useState([]);
   const [teamMatches, setTeamMatches] = useState([]);
@@ -22,8 +25,8 @@ export function TeamDetailPage() {
     setError(null);
     Promise.all([
       teamsApi.getTeam(teamId),
-      playersApi.getPlayers({ team_id: teamId }),
-      matchesApi.getMatches({ team_id: teamId }),
+      playersApi.getPlayers({ team_id: teamId, tournament_id: tournamentId }),
+      matchesApi.getMatches({ team_id: teamId, tournament_id: tournamentId }),
     ])
       .then(([tData, pData, mData]) => {
         setTeam(tData);
@@ -44,7 +47,7 @@ export function TeamDetailPage() {
   return (
     <div>
       <button
-        onClick={() => navigate('/teams')}
+        onClick={() => navigate(tPath(slug, 'teams'))}
         className="btn btn-outline btn-sm"
         style={{ marginBottom: '18px' }}
       >
@@ -110,8 +113,8 @@ export function TeamDetailPage() {
                   style={{ '--squad-accent': team.color || 'var(--brand-primary)' }}
                   role="link"
                   tabIndex={0}
-                  onClick={() => navigate(`/players/${m.id}`)}
-                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/players/${m.id}`)}
+                  onClick={() => navigate(tPath(slug, `players/${m.id}`))}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(tPath(slug, `players/${m.id}`))}
                 >
                   <Avatar name={m.name} size={48} photoUrl={m.photo_url} color={team.color || '#10B981'} />
                   <div className="squad-info">
@@ -135,8 +138,8 @@ export function TeamDetailPage() {
                 style={{ '--squad-accent': team.color || 'var(--brand-primary)' }}
                 role="link"
                 tabIndex={0}
-                onClick={() => navigate(`/players/${player.id}`)}
-                onKeyDown={(e) => e.key === 'Enter' && navigate(`/players/${player.id}`)}
+                onClick={() => navigate(tPath(slug, `players/${player.id}`))}
+                onKeyDown={(e) => e.key === 'Enter' && navigate(tPath(slug, `players/${player.id}`))}
               >
                 <span className="squad-serial">{player.number || i + 1}</span>
                 <Avatar name={player.name} size={40} photoUrl={player.photo_url} color={team.color || '#10B981'} />

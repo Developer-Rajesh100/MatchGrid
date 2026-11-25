@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Trophy, Calendar, BarChart3, GitFork, Shield, Flame, Radio } from 'lucide-react';
+import { Trophy, Calendar, BarChart3, GitFork, Shield, Flame, Radio, Users } from 'lucide-react';
 import { useTournament } from '../../context/TournamentContext';
 
 export function TournamentSubNav() {
@@ -9,7 +9,7 @@ export function TournamentSubNav() {
   if (!tournament && !slug) return null;
 
   const basePath = `/t/${slug}`;
-  const status = (tournament?.status || 'UPCOMING').toUpperCase();
+  const status = (tournament?.status || 'draft').toUpperCase();
   const isLive = (tournament?.live_matches_count || 0) > 0 || status === 'LIVE';
 
   const subLinks = [
@@ -18,6 +18,7 @@ export function TournamentSubNav() {
     { to: `${basePath}/standings`, label: 'Standings', icon: BarChart3 },
     { to: `${basePath}/bracket`, label: 'Bracket', icon: GitFork },
     { to: `${basePath}/teams`, label: 'Teams', icon: Shield },
+    { to: `${basePath}/players`, label: 'Players', icon: Users },
     { to: `${basePath}/stats`, label: 'Stats', icon: Flame },
   ];
 

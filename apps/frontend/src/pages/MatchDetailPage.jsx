@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, NavLink } from 'react-router-dom';
 import { matchesApi } from '../api/matches';
 import { playersApi } from '../api/players';
@@ -9,15 +9,20 @@ import { LoadingState, ErrorState } from '../components/common/Common';
 import { Calendar, Clock, MapPin, Award, ArrowLeft, Settings, Shield } from 'lucide-react';
 import { useLiveSocket } from '../hooks/useLiveSocket';
 import { formatTime } from '../utils/time';
+import { clockOffsetMs, matchElapsedSeconds } from '../utils/clock';
+import { useTournament } from '../context/TournamentContext';
+import { tPath } from '../utils/paths';
 
 export function MatchDetailPage() {
   const { matchId } = useParams();
   const navigate = useNavigate();
+  const { slug: contextSlug } = useTournament();
   const [match, setMatch] = useState(null);
   const [playersMap, setPlayersMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
+  const clockOffsetRef = useRef(0);
   // True only for a full_time match with no recorded duration anywhere (audit finding L-4)
   const [timerUnknown, setTimerUnknown] = useState(false);
   const isAdmin = authApi.isAuthenticated();
@@ -27,11 +32,12 @@ export function MatchDetailPage() {
       if (showLoading) setLoading(true);
       setError(null);
       const data = await matchesApi.getMatch(matchId);
+      clockOffsetRef.current = clockOffsetMs(data, Date.now());
       setMatch(data);
 
       // Scoped fetch for only this match's two teams to prevent unnecessary load
       const teamIds = [data.team1_id, data.team2_id].filter(Boolean);
-      const rosters = await Promise.all(teamIds.map((teamId) => playersApi.getPlayers({ team_id: teamId })));
+      const rosters = await Promise.all(teamIds.map((teamId) => playersApi.getPlayers({ team_id: teamId, tournament_id: data.tournament_id })));
       const pMap = {};
       rosters.flat().forEach((p) => {
         pMap[p.id] = p;
@@ -52,88 +58,20 @@ export function MatchDetailPage() {
     if (!msg.match_id || msg.match_id === matchId) {
       loadMatch(false);
     }
-  });
+  }, match?.tournament_id);
 
-  // Public Match Timer Synchronization
+  // Public match clock: server fields + the server's own "now" only (see utils/clock.js).
   useEffect(() => {
-    if (!match) return;
-
-    const timerStorageKey =
-      localStorage.getItem(`matchgrid_timer_${match.id}`)
-        ? `matchgrid_timer_${match.id}`
-        : `dcl_timer_${match.id}`;
-
-    if (match.status === 'upcoming' || match.status === 'cancelled') {
-      setTimerSeconds(0);
-      setTimerUnknown(false);
-      return;
-    }
-
-    if (match.status === 'full_time') {
-      let finalSec = null;
-      if (match.started_at && match.ended_at) {
-        finalSec = Math.max(
-          0,
-          Math.floor((new Date(match.ended_at).getTime() - new Date(match.started_at).getTime()) / 1000)
-        );
-      } else if (typeof match.elapsed_seconds === 'number') {
-        finalSec = match.elapsed_seconds;
-      } else {
-        try {
-          const saved = JSON.parse(localStorage.getItem(timerStorageKey) || '{}');
-          if (typeof saved.elapsed === 'number') finalSec = saved.elapsed;
-        } catch {
-          // ignore
-        }
-      }
-      const unknown = finalSec === null;
-      setTimerUnknown(unknown);
-      setTimerSeconds(unknown ? 0 : finalSec);
-      return;
-    }
-
-    setTimerUnknown(false);
-    if (match.status === 'live') {
-      if (match.is_half_time) {
-        let pausedSec = match.elapsed_seconds;
-        if (typeof pausedSec !== 'number') {
-          try {
-            const saved = JSON.parse(localStorage.getItem(timerStorageKey) || '{}');
-            if (typeof saved.elapsed === 'number') pausedSec = saved.elapsed;
-          } catch {
-            // ignore
-          }
-        }
-        setTimerSeconds(pausedSec || 0);
-        return;
-      }
-
-      const getElapsed = () => {
-        if (match.started_at) {
-          const startMs = new Date(match.started_at).getTime();
-          return Math.max(0, Math.floor((Date.now() - startMs) / 1000));
-        }
-        if (typeof match.elapsed_seconds === 'number') {
-          return match.elapsed_seconds;
-        }
-        try {
-          const saved = JSON.parse(localStorage.getItem(timerStorageKey) || '{}');
-          if (saved.startedAt) {
-            return Math.max(0, Math.floor((Date.now() - saved.startedAt) / 1000) + (saved.elapsedBefore || 0));
-          }
-          if (typeof saved.elapsed === 'number') return saved.elapsed;
-        } catch {
-          // ignore
-        }
-        return 0;
-      };
-
-      setTimerSeconds(getElapsed());
-      const interval = setInterval(() => {
-        setTimerSeconds(getElapsed());
-      }, 1000);
+    if (!match) return undefined;
+    const compute = () => matchElapsedSeconds(match, clockOffsetRef.current);
+    const initial = compute();
+    setTimerUnknown(initial === null);
+    setTimerSeconds(initial ?? 0);
+    if (match.status === 'live' && !match.is_half_time) {
+      const interval = setInterval(() => setTimerSeconds(compute() ?? 0), 1000);
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [match]);
 
   if (loading) return <LoadingState message="Loading match center..." />;
@@ -176,7 +114,7 @@ export function MatchDetailPage() {
   return (
     <div>
       <button
-        onClick={() => navigate('/matches')}
+        onClick={() => navigate(tPath(match?.tournament_slug || contextSlug, 'matches'))}
         className="btn btn-outline btn-sm"
         style={{ marginBottom: '18px' }}
       >
@@ -193,7 +131,7 @@ export function MatchDetailPage() {
             <StatusPill status={match.status} isHalfTime={Boolean(match.is_half_time)} />
             {isAdmin && (
               <NavLink
-                to={`/admin/matches/${match.id}/live`}
+                to={`/scorer/matches/${match.id}/live`}
                 className="btn btn-sm btn-primary"
                 style={{ fontSize: '11px', padding: '4px 10px' }}
               >
@@ -216,7 +154,7 @@ export function MatchDetailPage() {
         >
           {/* Team 1 */}
           <div
-            onClick={() => match.team1_id && navigate(`/teams/${match.team1_id}`)}
+            onClick={() => match.team1_id && navigate(tPath(match.tournament_slug || contextSlug, `teams/${match.team1_id}`))}
             style={{ textAlign: 'center', flex: '1 1 180px', cursor: match.team1_id ? 'pointer' : 'default' }}
           >
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
@@ -273,7 +211,7 @@ export function MatchDetailPage() {
 
           {/* Team 2 */}
           <div
-            onClick={() => match.team2_id && navigate(`/teams/${match.team2_id}`)}
+            onClick={() => match.team2_id && navigate(tPath(match.tournament_slug || contextSlug, `teams/${match.team2_id}`))}
             style={{ textAlign: 'center', flex: '1 1 180px', cursor: match.team2_id ? 'pointer' : 'default' }}
           >
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>

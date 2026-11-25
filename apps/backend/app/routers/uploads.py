@@ -1,12 +1,30 @@
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.core.deps import check_tournament_ownership, get_current_admin
-from app.core.errors import NotFoundError, UnprocessableEntityError
+from app.core.errors import NotFoundError, PayloadTooLargeError, UnprocessableEntityError
 from app.models import User
 from app.schemas.uploads import DeleteImageOut, DeleteImageRequest, UploadCategory, UploadImageOut
-from app.services.storage import get_storage_service
+from app.services.storage import MAX_FILE_SIZE, get_storage_service
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
+
+
+_CHUNK_SIZE = 64 * 1024
+
+
+async def _read_capped(file: UploadFile) -> bytes:
+    """Reads the upload in chunks and stops as soon as it exceeds the size cap, so an oversized
+    (or endless) body is rejected without ever being held in memory."""
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := await file.read(_CHUNK_SIZE):
+        total += len(chunk)
+        if total > MAX_FILE_SIZE:
+            raise PayloadTooLargeError(
+                f"Image file exceeds maximum permitted size of {MAX_FILE_SIZE // (1024 * 1024)} MB"
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 @router.post("/image", response_model=UploadImageOut, status_code=201)
@@ -21,7 +39,7 @@ async def upload_image(
     """
     await check_tournament_ownership(admin, tournament_id)
 
-    file_bytes = await file.read()
+    file_bytes = await _read_capped(file)
     if not file_bytes:
         raise UnprocessableEntityError("Uploaded file cannot be empty")
 
@@ -43,9 +61,12 @@ async def delete_image(
     if not key:
         raise NotFoundError("Asset not found or not a valid R2 storage URL/key")
 
+    # Only keys of the exact shape this service writes are deletable, and the caller
+    # must own the tournament named in the key (no key shape skips the check).
     tournament_id = storage.extract_tournament_id_from_key(key)
-    if tournament_id:
-        await check_tournament_ownership(admin, tournament_id)
+    if not tournament_id:
+        raise NotFoundError("Asset not found or not a valid R2 storage URL/key")
+    await check_tournament_ownership(admin, tournament_id)
 
     deleted = await storage.delete_image(key)
     return DeleteImageOut(deleted=deleted, key=key)

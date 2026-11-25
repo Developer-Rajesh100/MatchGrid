@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
+  createTournament,
   loginAsAdmin,
   createTestTeam,
   createTestPlayer,
@@ -16,6 +17,13 @@ test.describe('MatchGrid Live Match Lifecycle & Real-Time Sync', () => {
   }) => {
     const tracker = createEntityTracker();
     const token = await loginAsAdmin(request);
+    // Its own tournament: every write must name one, and cleanup cascades through it.
+    const tournament = await createTournament(request, token, {
+      name: `E2E Live ${Date.now().toString().slice(-6)}`,
+      season: '1',
+    });
+    tracker.tournamentIds.push(tournament.id);
+    const tournamentId: string = tournament.id;
 
     let spectatorContext;
     try {
@@ -23,12 +31,14 @@ test.describe('MatchGrid Live Match Lifecycle & Real-Time Sync', () => {
       const team1 = await createTestTeam(request, token, {
         name: `E2E Tigers ${Date.now().toString().slice(-4)}`,
         color: '#10B981',
+        tournament_id: tournamentId,
       });
       tracker.teamIds.push(team1.id);
 
       const team2 = await createTestTeam(request, token, {
         name: `E2E Eagles ${Date.now().toString().slice(-4)}`,
         color: '#34D399',
+        tournament_id: tournamentId,
       });
       tracker.teamIds.push(team2.id);
 
@@ -53,6 +63,7 @@ test.describe('MatchGrid Live Match Lifecycle & Real-Time Sync', () => {
         team2_id: team2.id,
         label: 'E2E Final Showcase',
         stage: 'extra',
+        tournament_id: tournamentId,
       });
       tracker.matchIds.push(match.id);
 
@@ -61,17 +72,18 @@ test.describe('MatchGrid Live Match Lifecycle & Real-Time Sync', () => {
       await page.evaluate((t) => {
         localStorage.setItem('matchgrid_admin_token', t);
         localStorage.setItem('dcl_admin_token', t);
+        localStorage.setItem('matchgrid_role', 'SUPER_ADMIN'); // a session without a role is not trusted
       }, token);
 
       // Navigate to Admin Live Scorer
-      await page.goto(`/admin/matches/${match.id}/live`);
+      await page.goto(`/scorer/matches/${match.id}/live`);
       await expect(page.locator(`text=${team1.name}`).first()).toBeVisible();
       await expect(page.locator(`text=${team2.name}`).first()).toBeVisible();
 
       // 5. Open separate Spectator browser context
       spectatorContext = await browser.newContext();
       const spectatorPage = await spectatorContext.newPage();
-      await spectatorPage.goto(`/matches/${match.id}`);
+      await spectatorPage.goto(`/t/${tournament.slug}/matches/${match.id}`);
       await expect(spectatorPage.locator(`text=${team1.name}`).first()).toBeVisible();
       await expect(spectatorPage.locator('.pill-upcoming')).toBeVisible();
 
@@ -84,7 +96,9 @@ test.describe('MatchGrid Live Match Lifecycle & Real-Time Sync', () => {
       await expect(page.locator('[data-testid="timer-status"]')).toContainText(/LIVE/i, { timeout: 6000 });
 
       // Verify spectator receives live state without manual reload
-      await expect(spectatorPage.locator('.pill-live')).toBeVisible({ timeout: 6000 });
+      // (the tournament header now also shows a LIVE pill while a match is live, so target the match's own)
+      await expect(spectatorPage.locator('.pill-live', { hasText: /^Live$/ })).toBeVisible({ timeout: 6000 });
+      await expect(spectatorPage.locator('.tournament-subnav-container .pill-live')).toBeVisible();
 
       // 7. Admin logs a goal for Team 1
       await page.selectOption('#event-player', player1.id);

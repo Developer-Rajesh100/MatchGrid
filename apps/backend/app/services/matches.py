@@ -14,9 +14,22 @@ from app.schemas.match import (
     BracketTeamNode,
     BracketTreeOut,
 )
+from app.services.bracket import (
+    _ensure_final_slot,
+    _ensure_quarter_slots,
+    _ensure_semi_slots,
+    _next_match_number,
+    assert_downstream_unstarted,
+    recompute_bracket,
+)
 from app.services.player_stats import recalculate_player_statistics
-from app.services.standings import recalculate_group_standings, sorted_group_standings
-from app.services.tournament_stage import get_match_winner, refresh_tournament_stage
+from app.services.standings import recalculate_group_standings
+from app.services.tournament_stage import (
+    KNOCKOUT_SIZES,
+    compute_knockout_pairings,
+    get_match_winner,
+    refresh_tournament_stage,
+)
 
 STAGE_RANK = {"group": 0, "quarter": 1, "semi": 2, "final": 3, "extra": 4}
 
@@ -98,43 +111,6 @@ async def start_match(match: Match) -> Match:
     return match
 
 
-async def advance_knockout_winner(match: Match) -> None:
-    """Propagates a quarter-final winner downstream to its semi-final slot."""
-    if match.stage != "quarter":
-        return
-    winner_id = await get_match_winner(match)
-    if not winner_id:
-        return
-
-    slot = match.bracket_slot
-    if not slot:
-        label = match.label or ""
-        if "Quarter-final 1" in label or "QF1" in label:
-            slot = "QF1"
-        elif "Quarter-final 2" in label or "QF2" in label:
-            slot = "QF2"
-        elif "Quarter-final 3" in label or "QF3" in label:
-            slot = "QF3"
-        elif "Quarter-final 4" in label or "QF4" in label:
-            slot = "QF4"
-
-    if not slot:
-        return
-
-    target_slot = "SF1" if slot in ("QF1", "QF2") else "SF2" if slot in ("QF3", "QF4") else None
-    target_field = "team1_id" if slot in ("QF1", "QF3") else "team2_id"
-    if target_slot:
-        downstream = await Match.find_one(
-            Match.tournament_id == match.tournament_id,
-            Match.stage == "semi",
-            {"$or": [{"bracket_slot": target_slot}, {"label": {"$regex": target_slot, "$options": "i"}}]},
-        )
-        if downstream:
-            setattr(downstream, target_field, winner_id)
-            await downstream.save()
-            await broadcast({"type": "match_updated", "match_id": str(downstream.id), "tournament_id": str(downstream.tournament_id)})
-
-
 async def end_match(match: Match) -> Match:
     if match.status != "live":
         raise ConflictError("Only a live match can be ended")
@@ -149,9 +125,10 @@ async def end_match(match: Match) -> Match:
     await match.save()
     if match.stage == "group" and match.group_id:
         await recalculate_group_standings(match.group_id)
-    if match.stage in ("quarter", "semi"):
-        await advance_knockout_winner(match)
-    await refresh_tournament_stage(match.tournament_id)
+    if match.stage in ("quarter", "semi", "final"):
+        await recompute_bracket(match.tournament_id, trigger_match=match)
+    else:
+        await refresh_tournament_stage(match.tournament_id)
     await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
@@ -186,18 +163,20 @@ async def resume_match(match: Match) -> Match:
 
 
 async def reset_timer(match: Match) -> Match:
-    if match.status == "live":
-        match.started_at = datetime.now(timezone.utc)
-        match.elapsed_seconds = 0
-        match.updated_at = datetime.now(timezone.utc)
-        await match.save()
-        await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+    if match.status != "live":
+        raise ConflictError("The timer can only be reset while the match is live")
+    match.started_at = datetime.now(timezone.utc)
+    match.elapsed_seconds = 0
+    match.updated_at = datetime.now(timezone.utc)
+    await match.save()
+    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
 
 async def reopen_match(match: Match) -> Match:
     if match.status != "full_time":
         raise ConflictError("Only a completed match can be reopened")
+    await assert_downstream_unstarted(match)
     match.status = "live"
     match.is_half_time = False
     if match.started_at and match.ended_at:
@@ -212,7 +191,11 @@ async def reopen_match(match: Match) -> Match:
     await match.save()
     if match.stage == "group" and match.group_id:
         await recalculate_group_standings(match.group_id)
-    await refresh_tournament_stage(match.tournament_id)
+    if match.stage in ("quarter", "semi", "final"):
+        # No longer a decided result: the slot it fed is cleared again.
+        await recompute_bracket(match.tournament_id, trigger_match=match)
+    else:
+        await refresh_tournament_stage(match.tournament_id)
     await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
@@ -224,6 +207,7 @@ async def cancel_match(match: Match) -> Match:
     if match.status != "upcoming":
         raise ConflictError("Only an upcoming match can be cancelled")
     match.status = "cancelled"
+    match.updated_at = datetime.now(timezone.utc)
     await match.save()
     await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
@@ -233,6 +217,7 @@ async def uncancel_match(match: Match) -> Match:
     if match.status != "cancelled":
         raise ConflictError("Match is not cancelled")
     match.status = "upcoming"
+    match.updated_at = datetime.now(timezone.utc)
     await match.save()
     await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
@@ -246,33 +231,12 @@ async def set_winner(match: Match, team_id: PydanticObjectId) -> Match:
     score1, score2 = await compute_score(match)
     if score1 != score2:
         raise ConflictError("Match was not drawn — the winner is already determined by the score")
+    await assert_downstream_unstarted(match)
     match.winner_override_id = team_id
     await match.save()
-    if match.stage in ("quarter", "semi"):
-        await advance_knockout_winner(match)
-    await refresh_tournament_stage(match.tournament_id)
+    await recompute_bracket(match.tournament_id, trigger_match=match)
     await broadcast({"type": "match_updated", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
-
-
-async def _renumber_matches(tournament_id: PydanticObjectId) -> None:
-    groups = await Group.find(Group.tournament_id == tournament_id).sort("name").to_list()
-    group_rank = {g.id: i for i, g in enumerate(groups)}
-    matches = await Match.find(Match.tournament_id == tournament_id).to_list()
-
-    def sort_key(m: Match):
-        return (STAGE_RANK.get(m.stage, 99), group_rank.get(m.group_id, 99), str(m.id))
-
-    matches.sort(key=sort_key)
-    # Pass 1: Assign temporary negative numbers to avoid unique index collision
-    for i, m in enumerate(matches, start=1):
-        m.match_number = -(50000 + i)
-        await m.save()
-
-    # Pass 2: Assign final 1-based sequential numbers
-    for i, m in enumerate(matches, start=1):
-        m.match_number = i
-        await m.save()
 
 
 def compute_circle_method_pairs(
@@ -310,6 +274,39 @@ def compute_circle_method_pairs(
     return fixtures
 
 
+async def purge_matches(matches: list[Match]) -> None:
+    """Deletes matches with their events and lineups, then recomputes everything derived from
+    them exactly once: affected players' statistics, the touched groups' standings and the
+    tournament stage."""
+    if not matches:
+        return
+    match_ids = [m.id for m in matches]
+    events = await MatchEvent.find({"match_id": {"$in": match_ids}}).to_list()
+    lineup = await MatchLineup.find({"match_id": {"$in": match_ids}}).to_list()
+    affected = (
+        {e.player_id for e in events}
+        | {e.assist_player_id for e in events if e.assist_player_id}
+        | {entry.player_id for entry in lineup}
+    )
+    group_ids = {m.group_id for m in matches if m.stage == "group" and m.group_id}
+    tournament_ids = {m.tournament_id for m in matches}
+
+    await MatchEvent.find({"match_id": {"$in": match_ids}}).delete()
+    await MatchLineup.find({"match_id": {"$in": match_ids}}).delete()
+    await Match.find({"_id": {"$in": match_ids}}).delete()
+
+    for player_id in affected:
+        stats = await recalculate_player_statistics(player_id)
+        if stats and not any(
+            [stats.goals, stats.assists, stats.yellow_cards, stats.red_cards, stats.potm_awards, stats.appearances]
+        ):
+            await stats.delete()
+    for group_id in group_ids:
+        await recalculate_group_standings(group_id)
+    for tournament_id in tournament_ids:
+        await refresh_tournament_stage(tournament_id)
+
+
 async def generate_group_fixtures(group_id: PydanticObjectId, force: bool) -> list[Match]:
     group = await Group.get(group_id)
     if group is None:
@@ -338,18 +335,24 @@ async def generate_group_fixtures(group_id: PydanticObjectId, force: bool) -> li
         raise ConflictError(
             "This group already has recorded results — pass force=true to erase them and regenerate"
         )
+    if existing_matches and await _knockout_is_seeded(group.tournament_id):
+        raise ConflictError(
+            "The knockout stage has already been seeded from these groups — delete the knockout "
+            "matches before regenerating group fixtures"
+        )
 
-    for m in existing_matches:
-        await MatchEvent.find(MatchEvent.match_id == m.id).delete()
-        await MatchLineup.find(MatchLineup.match_id == m.id).delete()
-        await m.delete()
+    # The replaced matches' numbers are reused so every other match keeps its number (and a
+    # played match is never renumbered); extra fixtures continue after the highest number.
+    freed_numbers = sorted(m.match_number for m in existing_matches)
+    await purge_matches(existing_matches)
 
     pairs = compute_circle_method_pairs(team_ids)
     new_matches: list[Match] = []
-    for idx, (t1, t2) in enumerate(pairs, start=1):
+    for t1, t2 in pairs:
+        number = freed_numbers.pop(0) if freed_numbers else await _next_match_number(group.tournament_id)
         match = Match(
             tournament_id=group.tournament_id,
-            match_number=-(10000 + idx),  # unique temporary match_number to avoid unique index violation
+            match_number=number,
             group_id=group_id,
             stage="group",
             team1_id=t1,
@@ -359,35 +362,51 @@ async def generate_group_fixtures(group_id: PydanticObjectId, force: bool) -> li
         await match.insert()
         new_matches.append(match)
 
-    await _renumber_matches(group.tournament_id)
-
-    # _renumber_matches re-fetches and re-saves every match for this
-    # tournament under its own independent Match objects, so the `new_matches`
-    # list built above is left holding stale in-memory copies — still showing
-    # each match's temporary negative match_number, not the real final one
-    # _renumber_matches just assigned. Returning those stale objects directly
-    # is a real bug: any caller that acts on the returned matches (e.g. starts
-    # one) would re-save that temporary negative match_number, and since every
-    # call to this function reuses the same temporary number range, two
-    # different groups' fixtures could then collide on the unique
-    # (tournament_id, match_number) index. Found via a test added during the
-    # Timer/Half-Time audit's Test Coverage follow-up. Re-fetching fixes it.
-    refreshed = await Match.find({"_id": {"$in": [m.id for m in new_matches]}}).to_list()
-    refreshed.sort(key=lambda m: m.match_number)
-    for m in refreshed:
+    new_matches.sort(key=lambda m: m.match_number)
+    for m in new_matches:
         await broadcast({"type": "match_updated", "match_id": str(m.id), "tournament_id": str(m.tournament_id)})
-    return refreshed
+    return new_matches
+
+
+async def _knockout_is_seeded(tournament_id: PydanticObjectId) -> bool:
+    return bool(
+        await Match.find(
+            Match.tournament_id == tournament_id, {"stage": {"$in": ["quarter", "semi", "final"]}}
+        ).count()
+        and await Match.find(
+            Match.tournament_id == tournament_id,
+            {"stage": {"$in": ["quarter", "semi", "final"]}, "team1_id": {"$ne": None}},
+        ).count()
+    )
+
+
+async def _assert_group_stage_complete(tournament_id: PydanticObjectId, what: str) -> None:
+    groups = await Group.find(Group.tournament_id == tournament_id).to_list()
+    checked = 0
+    for group in groups:
+        if not await GroupTeam.find(GroupTeam.group_id == group.id).count():
+            continue
+        group_matches = await Match.find(Match.group_id == group.id, Match.stage == "group").to_list()
+        live_matches = [m for m in group_matches if m.status != "cancelled"]
+        if not live_matches or any(m.status != "full_time" for m in live_matches):
+            raise ConflictError(f"All groups must be complete before {what}")
+        checked += 1
+    if not checked:
+        raise ConflictError(f"All groups must be complete before {what}")
+
+
+async def _config_of(tournament_id: PydanticObjectId) -> tuple[str, int]:
+    tournament = await Tournament.get(tournament_id)
+    if tournament is None:
+        raise NotFoundError("Tournament not found")
+    return tournament.config.knockout_format, tournament.config.qualifiers_per_group
 
 
 async def generate_semis(tournament_id: PydanticObjectId) -> list[Match]:
-    groups = await Group.find(Group.tournament_id == tournament_id).sort("name").to_list()
-    if len(groups) != 2:
-        raise ConflictError("Tournament must have exactly 2 groups")
-
-    for group in groups:
-        group_matches = await Match.find(Match.group_id == group.id, Match.stage == "group").to_list()
-        if not group_matches or any(m.status != "full_time" for m in group_matches):
-            raise ConflictError("Both groups must be complete before generating semi-finals")
+    fmt, qualifiers = await _config_of(tournament_id)
+    if fmt != "semis_final":
+        raise ConflictError("This tournament's knockout format does not start with semi-finals")
+    await _assert_group_stage_complete(tournament_id, "generating semi-finals")
 
     semis = await _ensure_semi_slots(tournament_id)
     if len(semis) != 2:
@@ -395,17 +414,10 @@ async def generate_semis(tournament_id: PydanticObjectId) -> list[Match]:
     if any(m.team1_id for m in semis):
         raise ConflictError("Semi-finals have already been generated")
 
-    standings_a = await sorted_group_standings(groups[0].id)
-    standings_b = await sorted_group_standings(groups[1].id)
-    if len(standings_a) < 2 or len(standings_b) < 2:
-        raise ConflictError("Each group needs at least 2 teams with standings computed")
-
-    # Per the official DCL Season 5 schedule: SF1 = Group A (2nd) vs Group B (1st),
-    # SF2 = Group B (2nd) vs Group A (1st).
-    semis[0].team1_id, semis[0].team2_id = standings_a[1].team_id, standings_b[0].team_id
-    semis[1].team1_id, semis[1].team2_id = standings_b[1].team_id, standings_a[0].team_id
-    await semis[0].save()
-    await semis[1].save()
+    pairings = await compute_knockout_pairings(tournament_id, fmt, qualifiers)
+    for slot, (team1, team2) in zip(semis, pairings):
+        slot.team1_id, slot.team2_id = team1, team2
+        await slot.save()
     await refresh_tournament_stage(tournament_id)
     for m in semis:
         await broadcast({"type": "match_updated", "match_id": str(m.id), "tournament_id": str(m.tournament_id)})
@@ -525,156 +537,12 @@ async def create_new_match(
 
 async def delete_match(match: Match) -> None:
     """Permanently deletes any match, whatever its status or stage, together with its
-    events and lineup, then recomputes everything derived from it: the affected players'
-    statistics, the group standings and the tournament stage.
+    events and lineup, then recomputes everything derived from it (see purge_matches).
 
     A deleted semi-final / final slot is re-created by "Generate semi-finals / final"."""
-    events = await MatchEvent.find(MatchEvent.match_id == match.id).to_list()
-    lineup = await MatchLineup.find(MatchLineup.match_id == match.id).to_list()
-    affected = (
-        {e.player_id for e in events}
-        | {e.assist_player_id for e in events if e.assist_player_id}
-        | {entry.player_id for entry in lineup}
-    )
-    match_id, group_id, tournament_id, stage = str(match.id), match.group_id, match.tournament_id, match.stage
-
-    await MatchEvent.find(MatchEvent.match_id == match.id).delete()
-    await MatchLineup.find(MatchLineup.match_id == match.id).delete()
-    await match.delete()
-
-    for player_id in affected:
-        stats = await recalculate_player_statistics(player_id)
-        if stats and not any(
-            [stats.goals, stats.assists, stats.yellow_cards, stats.red_cards, stats.potm_awards, stats.appearances]
-        ):
-            await stats.delete()
-    if stage == "group" and group_id:
-        await recalculate_group_standings(group_id)
-    await refresh_tournament_stage(tournament_id)
+    match_id, tournament_id = str(match.id), match.tournament_id
+    await purge_matches([match])
     await broadcast({"type": "match_updated", "match_id": match_id, "tournament_id": str(tournament_id)})
-
-
-_QUARTER_SLOTS = (
-    ("Quarter-final 1", "QF1", 1),
-    ("Quarter-final 2", "QF2", 1),
-    ("Quarter-final 3", "QF3", 1),
-    ("Quarter-final 4", "QF4", 1),
-)
-
-_SEMI_SLOTS = (
-    ("Semi-final 1", "SF1", "Group A (2nd) vs Group B (1st)"),
-    ("Semi-final 2", "SF2", "Group B (2nd) vs Group A (1st)"),
-)
-
-
-async def _next_match_number(tournament_id: PydanticObjectId) -> int:
-    last = await Match.find(Match.tournament_id == tournament_id).sort("-match_number").first_or_none()
-    return (last.match_number if last else 0) + 1
-
-
-async def _ensure_quarter_slots(tournament_id: PydanticObjectId) -> list[Match]:
-    """Returns the 4 quarter-final slots in order (QF1..QF4), creating any missing."""
-    quarters = await Match.find(Match.tournament_id == tournament_id, Match.stage == "quarter").to_list()
-    used = {m.bracket_slot or m.label for m in quarters}
-    for label, slot_name, round_ord in _QUARTER_SLOTS:
-        if len(quarters) >= 4:
-            break
-        if slot_name in used or label in used:
-            continue
-        slot = Match(
-            tournament_id=tournament_id,
-            match_number=await _next_match_number(tournament_id),
-            stage="quarter",
-            bracket_slot=slot_name,
-            round_order=round_ord,
-            label=label,
-        )
-        await slot.insert()
-        quarters.append(slot)
-    quarters.sort(key=lambda m: (m.bracket_slot or m.label or "~", m.match_number))
-    return quarters
-
-
-async def _ensure_semi_slots(tournament_id: PydanticObjectId) -> list[Match]:
-    """Returns the 2 semi-final slots in order (SF1, SF2), re-creating any that were deleted."""
-    semis = await Match.find(Match.tournament_id == tournament_id, Match.stage == "semi").to_list()
-    used = {m.bracket_slot or m.label for m in semis}
-    tournament = await Tournament.get(tournament_id)
-    has_quarters = (
-        tournament.config.knockout_format == "quarters_semis_final"
-        if tournament and getattr(tournament, "config", None)
-        else False
-    )
-    round_ord = 2 if has_quarters else 1
-
-    for label, slot_name, notes in (
-        ("Semi-final 1", "SF1", "Winner QF1 vs Winner QF2" if has_quarters else "Group A (2nd) vs Group B (1st)"),
-        ("Semi-final 2", "SF2", "Winner QF3 vs Winner QF4" if has_quarters else "Group B (2nd) vs Group A (1st)"),
-    ):
-        if len(semis) >= 2:
-            break
-        if slot_name in used or label in used:
-            continue
-        slot = Match(
-            tournament_id=tournament_id,
-            match_number=await _next_match_number(tournament_id),
-            stage="semi",
-            bracket_slot=slot_name,
-            round_order=round_ord,
-            label=label,
-            notes=notes,
-            date=next((m.date for m in semis if m.date), None),
-        )
-        await slot.insert()
-        semis.append(slot)
-
-    for i, s in enumerate(semis):
-        changed = False
-        if getattr(s, "bracket_slot", None) is None:
-            s.bracket_slot = "SF1" if i == 0 or "1" in (s.label or "") else "SF2"
-            changed = True
-        if getattr(s, "round_order", None) is None:
-            s.round_order = round_ord
-            changed = True
-        if changed:
-            await s.save()
-
-    semis.sort(key=lambda m: (m.bracket_slot or m.label or "~", m.match_number))
-    return semis
-
-
-async def _ensure_final_slot(tournament_id: PydanticObjectId) -> Match:
-    final = await Match.find_one(Match.tournament_id == tournament_id, Match.stage == "final")
-    tournament = await Tournament.get(tournament_id)
-    has_quarters = (
-        tournament.config.knockout_format == "quarters_semis_final"
-        if tournament and getattr(tournament, "config", None)
-        else False
-    )
-    round_ord = 3 if has_quarters else 2
-
-    if final is None:
-        final = Match(
-            tournament_id=tournament_id,
-            match_number=await _next_match_number(tournament_id),
-            stage="final",
-            bracket_slot="FINAL",
-            round_order=round_ord,
-            label="Final",
-            notes="Winner SF1 vs Winner SF2",
-        )
-        await final.insert()
-    else:
-        changed = False
-        if getattr(final, "bracket_slot", None) is None:
-            final.bracket_slot = "FINAL"
-            changed = True
-        if getattr(final, "round_order", None) is None:
-            final.round_order = round_ord
-            changed = True
-        if changed:
-            await final.save()
-    return final
 
 
 async def assign_match_teams(
@@ -715,11 +583,13 @@ async def assign_match_teams(
         # Lineup entries are tied to the old teams' players.
         await MatchLineup.find(MatchLineup.match_id == match.id).delete()
     await refresh_tournament_stage(match.tournament_id)
-    await broadcast({"type": "match_updated", "match_id": str(match.id)})
+    await broadcast({"type": "match_updated", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return match
 
 
 async def generate_final(tournament_id: PydanticObjectId) -> Match:
+    """Seeds the final from the semi-final winners. Normally this already happened when the
+    second semi-final ended; calling it again is harmless and returns the seeded final."""
     semis = sorted(
         await Match.find(Match.tournament_id == tournament_id, Match.stage == "semi").to_list(),
         key=lambda m: (m.label or "~", m.match_number),
@@ -732,80 +602,42 @@ async def generate_final(tournament_id: PydanticObjectId) -> Match:
         raise ConflictError("Both semi-finals must have a decided winner")
 
     final = await _ensure_final_slot(tournament_id)
-    if final.team1_id:
-        raise ConflictError("The final has already been generated")
-
-    final.team1_id, final.team2_id = winners[0], winners[1]
+    await recompute_bracket(tournament_id)
+    final = await Match.get(final.id)
     final.bracket_slot = "FINAL"
-    tournament = await Tournament.get(tournament_id)
-    final.round_order = 3 if getattr(tournament, "config", None) and tournament.config.knockout_format == "quarters_semis_final" else 2
     await final.save()
-    await refresh_tournament_stage(tournament_id)
-    await broadcast({"type": "match_updated", "match_id": str(final.id), "tournament_id": str(final.tournament_id)})
     return final
 
 
 async def seed_knockout_bracket(tournament_id: PydanticObjectId) -> list[Match]:
-    """Dynamically seeds the knockout stage according to the tournament's knockout_format."""
+    """Seeds the first knockout round according to the tournament's knockout_format and
+    qualifier settings. Later rounds fill in by themselves as results come in."""
     tournament = await Tournament.get(tournament_id)
     if tournament is None:
         raise NotFoundError("Tournament not found")
 
-    fmt = tournament.config.knockout_format if getattr(tournament, "config", None) else "semis_final"
+    fmt, qualifiers = tournament.config.knockout_format, tournament.config.qualifiers_per_group
 
     if fmt == "none":
         await refresh_tournament_stage(tournament_id)
         return []
 
-    # All group matches must be full_time
-    group_matches = await Match.find(
-        Match.tournament_id == tournament_id, Match.stage == "group"
-    ).to_list()
-    if not group_matches or any(m.status != "full_time" for m in group_matches):
-        raise ConflictError("All group stage matches must be completed before seeding knockout rounds")
-
-    groups = await Group.find(Group.tournament_id == tournament_id).sort("name").to_list()
-    standings_by_group = {g.id: await sorted_group_standings(g.id) for g in groups}
-
     if fmt == "semis_final":
         return await generate_semis(tournament_id)
-    elif fmt == "quarters_semis_final":
+
+    if fmt in KNOCKOUT_SIZES:  # quarters_semis_final
+        await _assert_group_stage_complete(tournament_id, "seeding knockout rounds")
         quarters = await _ensure_quarter_slots(tournament_id)
         await _ensure_semi_slots(tournament_id)
         await _ensure_final_slot(tournament_id)
-
         if any(m.team1_id for m in quarters):
             raise ConflictError("Quarter-finals have already been generated")
 
-        if len(groups) == 4:
-            sa, sb, sc, sd = (
-                standings_by_group[groups[0].id],
-                standings_by_group[groups[1].id],
-                standings_by_group[groups[2].id],
-                standings_by_group[groups[3].id],
-            )
-            quarters[0].team1_id, quarters[0].team2_id = sa[0].team_id, sb[1].team_id
-            quarters[1].team1_id, quarters[1].team2_id = sc[0].team_id, sd[1].team_id
-            quarters[2].team1_id, quarters[2].team2_id = sb[0].team_id, sa[1].team_id
-            quarters[3].team1_id, quarters[3].team2_id = sd[0].team_id, sc[1].team_id
-        elif len(groups) == 2:
-            sa, sb = standings_by_group[groups[0].id], standings_by_group[groups[1].id]
-            quarters[0].team1_id, quarters[0].team2_id = sa[0].team_id, sb[3].team_id
-            quarters[1].team1_id, quarters[1].team2_id = sb[1].team_id, sa[2].team_id
-            quarters[2].team1_id, quarters[2].team2_id = sb[0].team_id, sa[3].team_id
-            quarters[3].team1_id, quarters[3].team2_id = sa[1].team_id, sb[2].team_id
-        elif len(groups) == 1:
-            s = standings_by_group[groups[0].id]
-            quarters[0].team1_id, quarters[0].team2_id = s[0].team_id, s[7].team_id
-            quarters[1].team1_id, quarters[1].team2_id = s[3].team_id, s[4].team_id
-            quarters[2].team1_id, quarters[2].team2_id = s[1].team_id, s[6].team_id
-            quarters[3].team1_id, quarters[3].team2_id = s[2].team_id, s[5].team_id
-        else:
-            raise ConflictError(f"Unsupported group count ({len(groups)}) for quarter-finals seeding")
-
-        for q in quarters:
-            await q.save()
-            await broadcast({"type": "match_updated", "match_id": str(q.id), "tournament_id": str(q.tournament_id)})
+        pairings = await compute_knockout_pairings(tournament_id, fmt, qualifiers)
+        for quarter, (team1, team2) in zip(quarters, pairings):
+            quarter.team1_id, quarter.team2_id = team1, team2
+            await quarter.save()
+            await broadcast({"type": "match_updated", "match_id": str(quarter.id), "tournament_id": str(quarter.tournament_id)})
         await refresh_tournament_stage(tournament_id)
         return quarters
     return []

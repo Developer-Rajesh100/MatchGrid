@@ -8,23 +8,22 @@ assigned) -> final (once the final has both teams assigned) -> champions
 
 from beanie import PydanticObjectId
 
-from app.models import Group, Match, MatchEvent, Tournament
+from app.core.errors import ConflictError
+from app.models import Group, GroupTeam, Match, MatchEvent, Tournament
 from app.services.standings import sorted_group_standings
+
+KNOCKOUT_SIZES = {"semis_final": 4, "quarters_semis_final": 8}
 
 
 async def _determine_league_champion(tournament_id: PydanticObjectId) -> PydanticObjectId | None:
+    """A league has one champion only when it is a single table. With several groups and no
+    knockout there is no fair way to compare teams across groups, so nobody is crowned."""
     groups = await Group.find(Group.tournament_id == tournament_id).to_list()
-    if not groups:
+    populated = [g for g in groups if await GroupTeam.find(GroupTeam.group_id == g.id).count()]
+    if len(populated) != 1:
         return None
-    top_standings = []
-    for g in groups:
-        standings = await sorted_group_standings(g.id)
-        if standings:
-            top_standings.append(standings[0])
-    if not top_standings:
-        return None
-    top_standings.sort(key=lambda s: (-s.points, -s.goal_difference, -s.goals_for))
-    return top_standings[0].team_id
+    standings = await sorted_group_standings(populated[0].id)
+    return standings[0].team_id if standings else None
 
 
 async def refresh_tournament_stage(tournament_id: PydanticObjectId) -> Tournament | None:
@@ -42,7 +41,10 @@ async def refresh_tournament_stage(tournament_id: PydanticObjectId) -> Tournamen
         group_matches = await Match.find(
             Match.tournament_id == tournament_id, Match.stage == "group"
         ).to_list()
-        if group_matches and all(m.status == "full_time" for m in group_matches):
+        # A cancelled fixture will never be played, so it must not block the league from finishing.
+        if any(m.status == "full_time" for m in group_matches) and all(
+            m.status in ("full_time", "cancelled") for m in group_matches
+        ):
             stage = "champions"
             champion_team_id = await _determine_league_champion(tournament_id)
         else:
@@ -50,6 +52,7 @@ async def refresh_tournament_stage(tournament_id: PydanticObjectId) -> Tournamen
             champion_team_id = None
         tournament.stage = stage
         tournament.champion_team_id = champion_team_id
+        _sync_status(tournament)
         await tournament.save()
         return tournament
 
@@ -78,8 +81,25 @@ async def refresh_tournament_stage(tournament_id: PydanticObjectId) -> Tournamen
 
     tournament.stage = stage
     tournament.champion_team_id = champion_team_id
+    _sync_status(tournament)
     await tournament.save()
     return tournament
+
+
+def _sync_status(tournament: Tournament) -> None:
+    """A crowned champion completes the tournament; reopening a result reactivates it.
+    A draft tournament is the organizer's explicit choice and is never changed here."""
+    if tournament.status == "draft":
+        return
+    tournament.status = "completed" if tournament.stage == "champions" else "active"
+
+
+async def match_goals(match: Match) -> tuple[int, int]:
+    events = await MatchEvent.find(MatchEvent.match_id == match.id, MatchEvent.type == "goal").to_list()
+    return (
+        sum(1 for e in events if e.team_id == match.team1_id),
+        sum(1 for e in events if e.team_id == match.team2_id),
+    )
 
 
 async def get_match_winner(match: Match) -> PydanticObjectId | None:
@@ -87,11 +107,74 @@ async def get_match_winner(match: Match) -> PydanticObjectId | None:
     goal count wins; on a tie, fall back to the admin's manual override."""
     if match.status != "full_time" or not match.team1_id or not match.team2_id:
         return None
-    events = await MatchEvent.find(MatchEvent.match_id == match.id, MatchEvent.type == "goal").to_list()
-    goals1 = sum(1 for e in events if e.team_id == match.team1_id)
-    goals2 = sum(1 for e in events if e.team_id == match.team2_id)
+    goals1, goals2 = await match_goals(match)
     if goals1 > goals2:
         return match.team1_id
     if goals2 > goals1:
         return match.team2_id
     return match.winner_override_id
+
+
+# ---------------------------------------------------------------------------
+# Knockout seeding, generalised from num_groups x qualifiers_per_group
+# ---------------------------------------------------------------------------
+
+# Historical fixtures for the shapes the app always supported. Entries are (group_index, rank_index)
+# pairs in slot order (QF1..QF4 / SF1..SF2); keeping them means existing brackets seed identically.
+_LEGACY_PAIRINGS = {
+    (4, 2, 2): [((0, 1), (1, 0)), ((1, 1), (0, 0))],
+    (8, 4, 2): [((0, 0), (1, 1)), ((2, 0), (3, 1)), ((1, 0), (0, 1)), ((3, 0), (2, 1))],
+    (8, 2, 4): [((0, 0), (1, 3)), ((1, 1), (0, 2)), ((1, 0), (0, 3)), ((0, 1), (1, 2))],
+}
+
+
+def _fold_order(size: int) -> list[tuple[int, int]]:
+    """Standard seeded-bracket order of seed index pairs (0 = best): high vs low, with the
+    top two seeds on opposite halves. 4 -> (0,3),(1,2); 8 -> (0,7),(3,4),(1,6),(2,5)."""
+    if size == 4:
+        return [(0, 3), (1, 2)]
+    return [(0, 7), (3, 4), (1, 6), (2, 5)]
+
+
+async def compute_knockout_pairings(tournament_id: PydanticObjectId, fmt: str, qualifiers_per_group: int):
+    """Returns the first-round pairings [(team1_id, team2_id), ...] in slot order.
+
+    The qualifier pool is the top `qualifiers_per_group` of every populated group; if it holds
+    more than the bracket needs, the best `size` are kept (rank first, then points / goal
+    difference / goals for). Every shortfall is a 409 with an explanation, never an IndexError."""
+    size = KNOCKOUT_SIZES[fmt]
+    groups = await Group.find(Group.tournament_id == tournament_id).sort("name").to_list()
+    ranked: list[list] = []
+    for g in groups:
+        if not await GroupTeam.find(GroupTeam.group_id == g.id).count():
+            continue  # an empty group contributes nobody
+        rows = await sorted_group_standings(g.id)
+        if len(rows) < qualifiers_per_group:
+            raise ConflictError(
+                f"Group {g.name} has {len(rows)} team(s) but {qualifiers_per_group} qualify from each group"
+            )
+        ranked.append(rows)
+    if not ranked:
+        raise ConflictError("No groups with teams were found")
+
+    pool = [
+        (rank, -row.points, -row.goal_difference, -row.goals_for, g_idx, row)
+        for g_idx, rows in enumerate(ranked)
+        for rank, row in enumerate(rows[:qualifiers_per_group])
+    ]
+    if len(pool) < size:
+        raise ConflictError(
+            f"The {fmt.replace('_', ' ')} bracket needs {size} qualifiers but only {len(pool)} are available "
+            f"({len(ranked)} group(s) x {qualifiers_per_group} per group)"
+        )
+
+    legacy = _LEGACY_PAIRINGS.get((size, len(ranked), qualifiers_per_group)) if len(pool) == size else None
+    if legacy is not None:
+        return [(ranked[g1][r1].team_id, ranked[g2][r2].team_id) for (g1, r1), (g2, r2) in legacy]
+
+    # Keep the best `size` qualifiers (finishing position first, then points / goal difference /
+    # goals for), then seed them rank-major: all group winners, then all runners-up, ...
+    pool.sort(key=lambda t: t[:5])
+    chosen = sorted(pool[:size], key=lambda t: (t[0], t[4]))
+    seeds = [row.team_id for *_rest, row in chosen]
+    return [(seeds[a], seeds[b]) for a, b in _fold_order(size)]

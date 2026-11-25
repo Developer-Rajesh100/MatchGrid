@@ -30,4 +30,10 @@ class Player(Document):
                 partialFilterExpression={"player_code": {"$type": "string"}},
             ),
             IndexModel("dcl_id"),
+            # Player ids are only unique within their own tournament.
+            IndexModel(
+                [("tournament_id", 1), ("dcl_id", 1)],
+                unique=True,
+                partialFilterExpression={"dcl_id": {"$type": "string"}, "tournament_id": {"$type": "objectId"}},
+            ),
         ]

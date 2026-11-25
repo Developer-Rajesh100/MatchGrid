@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from app.models.tournament import KnockoutFormat, TournamentConfig
+from app.models.tournament import KnockoutFormat, TournamentConfig, TournamentStage, TournamentStatus
 
 
 class TournamentConfigUpdate(BaseModel):
@@ -21,11 +21,12 @@ class TournamentOut(BaseModel):
     name: str
     season: str
     format_description: str
-    stage: str
+    stage: TournamentStage
     champion_team_id: Optional[str] = None
     organizer_id: Optional[str] = None
     slug: Optional[str] = None
-    status: Optional[str] = "ACTIVE"
+    status: TournamentStatus = "active"
+    live_matches_count: int = 0
     logo_url: Optional[str] = None
     banner_url: Optional[str] = None
     config: Optional[TournamentConfig] = None
@@ -37,8 +38,8 @@ class TournamentSummaryOut(BaseModel):
     season: str
     slug: str
     format_description: str
-    stage: str
-    status: str = "ACTIVE"
+    stage: TournamentStage
+    status: TournamentStatus = "active"
     logo_url: Optional[str] = None
     banner_url: Optional[str] = None
     organizer_id: Optional[str] = None
@@ -67,7 +68,7 @@ class TournamentUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1)
     season: Optional[str] = Field(default=None, min_length=1)
     format_description: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[TournamentStatus] = None
     logo_url: Optional[str] = None
     banner_url: Optional[str] = None
     config: Optional[TournamentConfig] = None

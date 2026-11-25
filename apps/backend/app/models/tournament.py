@@ -2,10 +2,14 @@ from datetime import datetime, timezone
 from typing import Literal, Optional
 
 from beanie import Document, PydanticObjectId
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pymongo import IndexModel
 
 KnockoutFormat = Literal["none", "semis_final", "quarters_semis_final"]
+# Lifecycle of a tournament: "draft" (being set up), "active", "completed" (a champion is crowned).
+TournamentStatus = Literal["draft", "active", "completed"]
+# Competition stage derived from fixtures/results (see services/tournament_stage.py).
+TournamentStage = Literal["group", "quarters", "semis", "final", "champions"]
 
 
 class TournamentConfig(BaseModel):
@@ -45,15 +49,22 @@ class Tournament(Document):
     name: str
     slug: Optional[str] = None  # URL-friendly slug, e.g. "matchgrid-season-1"
     season: str = "1"
-    status: str = "active"  # "draft" | "active" | "completed"
+    status: TournamentStatus = "active"
     format_description: str = "Six teams, two groups of three, semi-finals and a final."
-    stage: str = "group"  # group | quarters | semis | final | champions
+    stage: TournamentStage = "group"
     champion_team_id: Optional[PydanticObjectId] = None
+    player_seq: int = 0  # last auto-assigned player number (DCL-nnn), per tournament
     config: TournamentConfig = Field(default_factory=TournamentConfig)
     logo_url: Optional[str] = None
     banner_url: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _normalize_status(cls, value):
+        # Rows written before the enum was unified hold "ACTIVE" / "Active" / ""; read them as the enum.
+        return value.strip().lower() if isinstance(value, str) and value.strip() else "active"
 
     class Settings:
         name = "tournaments"

@@ -17,6 +17,12 @@ def _settings(**overrides) -> Settings:
         jwt_secret="a-genuinely-long-random-production-secret-value-1234",
         admin_bootstrap_password="a-genuinely-strong-production-password",
         cors_origins="https://scoreboard.example.com",
+        debug=False,
+        r2_account_id="acct",
+        r2_access_key_id="key",
+        r2_secret_access_key="secret",
+        r2_bucket_name="bucket",
+        r2_public_base_url="https://cdn.example.com",
     )
     defaults.update(overrides)
     return Settings(**defaults)
@@ -89,3 +95,29 @@ def test_bootstrap_password_check_is_separate_from_runtime_check():
     settings = _settings(admin_bootstrap_password="dcl-dev-admin-password")
     assert check_runtime_config(settings) == []  # JWT/CORS are fine
     assert check_bootstrap_password(settings) != []  # but the password isn't
+
+
+def test_production_rejects_debug_mode():
+    problems = check_runtime_config(_settings(debug=True))
+    assert any("DEBUG" in p for p in problems)
+
+
+@pytest.mark.parametrize(
+    "missing",
+    ["r2_account_id", "r2_access_key_id", "r2_secret_access_key", "r2_bucket_name", "r2_public_base_url"],
+)
+def test_production_requires_every_r2_setting(missing):
+    settings = _settings(**{missing: ""})
+    problems = check_runtime_config(settings)
+    assert any(missing.upper() in p for p in problems)
+    with pytest.raises(RuntimeError):
+        assert_safe_for_production(settings)
+
+
+def test_r2_credentials_have_no_built_in_defaults():
+    """Regression (audit C1): real credentials were once baked into config.py."""
+    settings = Settings(_env_file=None)
+    assert settings.r2_account_id == ""
+    assert settings.r2_access_key_id == ""
+    assert settings.r2_secret_access_key == ""
+    assert settings.is_r2_configured is False

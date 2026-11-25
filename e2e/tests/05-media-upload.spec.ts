@@ -230,13 +230,13 @@ test.describe('MatchGrid Cloudflare R2 Media Storage & Asset Upload Pipeline', (
       }, organizerToken);
 
       // Verify Team Detail page renders the team crest cleanly
-      await page.goto(`/teams/${team.id}`);
+      await page.goto(`/t/${tournament.slug}/teams/${team.id}`);
       const crestImageLocator = page.locator(`img[src="${crestData.url}"]`);
       await expect(crestImageLocator).toBeVisible({ timeout: 8000 });
       await expect(page.locator(`text=${team.name}`).first()).toBeVisible();
 
       // Verify Player Detail page renders player headshot cleanly
-      await page.goto(`/players/${player.id}`);
+      await page.goto(`/t/${tournament.slug}/players/${player.id}`);
       const headshotImageLocator = page.locator(`img[src="${headshotData.url}"]`);
       await expect(headshotImageLocator).toBeVisible({ timeout: 8000 });
       await expect(page.locator(`text=${player.name}`).first()).toBeVisible();
@@ -268,7 +268,7 @@ test.describe('MatchGrid Cloudflare R2 Media Storage & Asset Upload Pipeline', (
       const newCrestCheck = await request.get(replacementCrestData.url);
       expect(newCrestCheck.status()).toBe(200);
 
-      await page.goto(`/teams/${team.id}`);
+      await page.goto(`/t/${tournament.slug}/teams/${team.id}`);
       const updatedCrestLocator = page.locator(`img[src="${replacementCrestData.url}"]`);
       await expect(updatedCrestLocator).toBeVisible({ timeout: 8000 });
 

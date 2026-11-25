@@ -7,6 +7,11 @@ export const organizerApi = {
       method: 'POST',
       body: data,
     }),
+  getTournamentMatches: (tournamentId) => apiClient(`/api/organizer/tournaments/${tournamentId}/matches`),
+  updateTournament: (tournamentId, data) =>
+    apiClient(`/api/organizer/tournaments/${tournamentId}`, { method: 'PATCH', body: data }),
+  updateConfig: (tournamentId, config) =>
+    apiClient(`/api/organizer/tournaments/${tournamentId}/config`, { method: 'PATCH', body: config }),
   deleteTournament: (tournamentId) =>
     apiClient(`/api/organizer/tournaments/${tournamentId}`, {
       method: 'DELETE',

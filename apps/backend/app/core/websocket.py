@@ -6,6 +6,15 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 logger = logging.getLogger("dcl.websocket")
 
+# One stalled client must never delay a broadcast (or the HTTP request that triggered it).
+SEND_TIMEOUT_SECONDS = 2.0
+# Cap on rooms one socket may join, so a client cannot grow server memory unboundedly.
+MAX_ROOMS_PER_CLIENT = 25
+
+# Message types that are also useful to hub-level ("global" room) listeners such as the
+# public tournament directory (live-match counts) and the role dashboards' match lists.
+HUB_MESSAGE_TYPES = frozenset({"match_status_changed"})
+
 
 class ConnectionManager:
     """Room-partitioned WebSocket connection registry and broadcaster.
@@ -47,6 +56,11 @@ class ConnectionManager:
         if not clean_room:
             return
         async with self._lock:
+            if (
+                clean_room not in self._client_rooms.get(websocket, set())
+                and len(self._client_rooms.get(websocket, set())) >= MAX_ROOMS_PER_CLIENT
+            ):
+                return
             self._add_to_room(websocket, clean_room)
         logger.debug(f"WebSocket dynamically subscribed to room '{clean_room}'.")
 
@@ -73,49 +87,56 @@ class ConnectionManager:
         self._client_rooms[websocket].add(room)
 
     async def broadcast_to_tournament(
-        self, tournament_id: Any, message: dict[str, Any]
+        self, tournament_id: Any, message: dict[str, Any], include_global: bool = False
     ) -> None:
-        """Broadcasts a message strictly to the specified tournament room and echoes to 'global'."""
+        """Broadcasts strictly to the tournament's room. Hub-level ("global") listeners only
+        receive it when `include_global` is set."""
         tid_str = str(tournament_id).strip()
         if "tournament_id" not in message:
             message["tournament_id"] = tid_str
 
         async with self._lock:
-            target_conns = set(self._rooms.get(tid_str, set()))
-            global_conns = set(self._rooms.get("global", set()))
-            all_conns = list(target_conns | global_conns)
+            targets = set(self._rooms.get(tid_str, set()))
+            if include_global:
+                targets |= self._rooms.get("global", set())
 
-        await self._send_to_sockets(all_conns, message)
+        await self._send_to_sockets(list(targets), message)
 
     async def broadcast(
-        self, message: dict[str, Any], tournament_id: Any = None
+        self, message: dict[str, Any], tournament_id: Any = None, include_global: bool | None = None
     ) -> None:
-        """General broadcaster: routes to tournament room if tournament_id is provided, else broadcasts to all."""
+        """Routes to the tournament room when a tournament id is known, else to everyone.
+        Status changes are mirrored to the global room by default (see HUB_MESSAGE_TYPES)."""
         tid = tournament_id or message.get("tournament_id")
         if tid:
-            await self.broadcast_to_tournament(tid, message)
+            if include_global is None:
+                include_global = message.get("type") in HUB_MESSAGE_TYPES
+            await self.broadcast_to_tournament(tid, message, include_global=include_global)
         else:
             async with self._lock:
                 all_conns = list(self._client_rooms.keys())
             await self._send_to_sockets(all_conns, message)
 
+    async def _send_one(self, connection: WebSocket, message: dict[str, Any]) -> bool:
+        try:
+            await asyncio.wait_for(connection.send_json(message), timeout=SEND_TIMEOUT_SECONDS)
+            return True
+        except asyncio.TimeoutError:
+            logger.warning("Dropping WebSocket client: send timed out")
+        except (WebSocketDisconnect, RuntimeError, ConnectionResetError) as e:
+            logger.debug(f"Client disconnected during send: {e}")
+        except Exception as e:
+            logger.warning(f"Unexpected error broadcasting to client: {e}")
+        return False
+
     async def _send_to_sockets(self, connections: list[WebSocket], message: dict[str, Any]) -> None:
+        """Sends to all sockets concurrently; slow or broken ones are dropped."""
         if not connections:
             return
-        disconnected: list[WebSocket] = []
-        for connection in connections:
-            try:
-                await connection.send_json(message)
-            except (WebSocketDisconnect, RuntimeError, ConnectionResetError) as e:
-                logger.debug(f"Client disconnected during send: {e}")
-                disconnected.append(connection)
-            except Exception as e:
-                logger.warning(f"Unexpected error broadcasting to client: {e}")
-                disconnected.append(connection)
-
-        if disconnected:
-            for conn in disconnected:
-                await self.disconnect(conn)
+        results = await asyncio.gather(*(self._send_one(c, message) for c in connections))
+        for connection, ok in zip(connections, results):
+            if not ok:
+                await self.disconnect(connection)
 
     @property
     def active_count(self) -> int:
@@ -128,9 +149,13 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-async def broadcast(message: dict[str, Any], tournament_id: Any = None) -> None:
-    await manager.broadcast(message, tournament_id=tournament_id)
+async def broadcast(
+    message: dict[str, Any], tournament_id: Any = None, include_global: bool | None = None
+) -> None:
+    await manager.broadcast(message, tournament_id=tournament_id, include_global=include_global)
 
 
-async def broadcast_to_tournament(tournament_id: Any, message: dict[str, Any]) -> None:
-    await manager.broadcast_to_tournament(tournament_id, message)
+async def broadcast_to_tournament(
+    tournament_id: Any, message: dict[str, Any], include_global: bool = False
+) -> None:
+    await manager.broadcast_to_tournament(tournament_id, message, include_global=include_global)

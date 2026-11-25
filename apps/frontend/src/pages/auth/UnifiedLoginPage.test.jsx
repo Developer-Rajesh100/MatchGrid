@@ -109,28 +109,28 @@ describe('UnifiedLoginPage Component', () => {
     });
   });
 
-  it('maintains backward compatibility by redirecting to /admin when logging in at /admin/login', async () => {
-    authApi.login.mockResolvedValueOnce({
-      access_token: 'fake-token',
-      role: 'SUPER_ADMIN',
-      username: 'legacy_admin',
-    });
+  it('returns to the page that required sign-in, and says when the session expired', async () => {
+    authApi.login.mockResolvedValueOnce({ access_token: 't', role: 'ORGANIZER', username: 'org' });
 
     render(
-      <MemoryRouter initialEntries={['/admin/login']}>
+      <MemoryRouter
+        initialEntries={[{ pathname: '/login', state: { from: { pathname: '/organizer' }, expired: true } }]}
+      >
         <Routes>
-          <Route path="/admin/login" element={<UnifiedLoginPage />} />
-          <Route path="/admin" element={<div data-testid="legacy-admin-landing">Legacy Admin Home</div>} />
+          <Route path="/login" element={<UnifiedLoginPage />} />
+          <Route path="/organizer" element={<div data-testid="back-where-i-was">Organizer</div>} />
+          <Route path="/superadmin" element={<div>wrong landing</div>} />
         </Routes>
       </MemoryRouter>
     );
 
-    fireEvent.change(screen.getByTestId('admin-username-input'), { target: { value: 'legacy_admin' } });
+    expect(screen.getByTestId('session-expired')).toHaveTextContent(/session expired/i);
+    fireEvent.change(screen.getByTestId('admin-username-input'), { target: { value: 'org' } });
     fireEvent.change(screen.getByTestId('admin-password-input'), { target: { value: 'password123' } });
     fireEvent.click(screen.getByTestId('admin-login-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('legacy-admin-landing')).toBeInTheDocument();
+      expect(screen.getByTestId('back-where-i-was')).toBeInTheDocument();
     });
   });
 

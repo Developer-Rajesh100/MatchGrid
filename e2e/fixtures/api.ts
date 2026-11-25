@@ -68,7 +68,7 @@ export async function createTestTeam(
     name: string;
     color?: string;
     group_name?: string;
-    tournament_id?: string;
+    tournament_id: string;
     crest_url?: string;
     logo_url?: string;
   }
@@ -79,7 +79,7 @@ export async function createTestTeam(
       name: data.name,
       color: data.color || '#10B981',
       group_name: data.group_name || null,
-      tournament_id: data.tournament_id || undefined,
+      tournament_id: data.tournament_id,
       crest_url: data.crest_url || undefined,
       logo_url: data.logo_url || undefined,
     },
@@ -181,7 +181,7 @@ export async function createTestMatch(
     match_number?: number;
     venue?: string;
     date?: string;
-    tournament_id?: string;
+    tournament_id: string;
   }
 ): Promise<any> {
   const response = await request.post(`${API_BASE_URL}/api/matches`, {
@@ -194,7 +194,7 @@ export async function createTestMatch(
       label: data.label || 'Friendly Test Match',
       match_number: data.match_number || Math.floor(100 + Math.random() * 800),
       venue: data.venue || 'MatchGrid Arena',
-      tournament_id: data.tournament_id || undefined,
+      tournament_id: data.tournament_id,
     },
   });
 
@@ -467,6 +467,7 @@ export async function teardownEntities(
 export async function updateTournamentConfig(
   request: APIRequestContext,
   token: string,
+  tournamentId: string,
   config: {
     num_groups?: number;
     teams_per_group?: number;
@@ -478,7 +479,7 @@ export async function updateTournamentConfig(
     half_duration_minutes?: number;
   }
 ): Promise<any> {
-  const response = await request.patch(`${API_BASE_URL}/api/tournament/config`, {
+  const response = await request.patch(`${API_BASE_URL}/api/organizer/tournaments/${tournamentId}/config`, {
     headers: { Authorization: `Bearer ${token}` },
     data: config,
   });
@@ -492,9 +493,10 @@ export async function updateTournamentConfig(
 
 export async function triggerRandomDraw(
   request: APIRequestContext,
-  token: string
+  token: string,
+  tournamentId: string
 ): Promise<any> {
-  const response = await request.post(`${API_BASE_URL}/api/groups/random-draw`, {
+  const response = await request.post(`${API_BASE_URL}/api/groups/random-draw?tournament_id=${tournamentId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -526,10 +528,11 @@ export async function generateGroupFixtures(
 export async function seedKnockoutBracket(
   request: APIRequestContext,
   token: string,
+  tournamentId: string,
   stage?: string,
   force = true
 ): Promise<any> {
-  const response = await request.post(`${API_BASE_URL}/api/matches/seed-knockout`, {
+  const response = await request.post(`${API_BASE_URL}/api/matches/seed-knockout?tournament_id=${tournamentId}`, {
     headers: { Authorization: `Bearer ${token}` },
     data: { stage, force },
   });
@@ -543,9 +546,10 @@ export async function seedKnockoutBracket(
 
 export async function generateFinal(
   request: APIRequestContext,
-  token: string
+  token: string,
+  tournamentId: string
 ): Promise<any> {
-  const response = await request.post(`${API_BASE_URL}/api/matches/generate-final`, {
+  const response = await request.post(`${API_BASE_URL}/api/matches/generate-final?tournament_id=${tournamentId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -629,8 +633,8 @@ export async function addMatchGoal(
   return response.json();
 }
 
-export async function getBracketTree(request: APIRequestContext): Promise<any> {
-  const response = await request.get(`${API_BASE_URL}/api/matches/bracket`);
+export async function getBracketTree(request: APIRequestContext, tournamentId: string): Promise<any> {
+  const response = await request.get(`${API_BASE_URL}/api/matches/bracket?tournament_id=${tournamentId}`);
 
   if (!response.ok()) {
     throw new Error(`Failed to get bracket tree: ${response.status()} ${await response.text()}`);

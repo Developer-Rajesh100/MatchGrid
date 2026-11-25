@@ -1,7 +1,7 @@
 # MatchGrid — System & Software Architecture Design
 
 **Document Version:** 1.0.0  
-**Target Path:** `docs/SYSTEM_ARCHITECTURE.md`  
+**Target Path:** `docs/system_architecture.md`  
 **System Name:** MatchGrid (Multi-Tenant Live Football Tournament & Scoreboard Platform)  
 **Architecture Style:** Layered Clean Architecture + Write-Through Materialized Views + Room-Scoped WebSockets  
 
@@ -131,7 +131,7 @@ MatchGrid/
 │
 ├── docs/                            # Architectural & operational documentation
 │   ├── plan.md                      # Master project roadmap & 7-stage lifecycle
-│   ├── SYSTEM_ARCHITECTURE.md       # Complete system & architecture blueprint (this file)
+│   ├── system_architecture.md       # Complete system & architecture blueprint (this file)
 │   └── DEVELOPMENT_WORKFLOW.md      # 7-stage engineering pipeline guide
 │
 ├── .github/workflows/ci.yml         # Automated CI/CD verification pipeline

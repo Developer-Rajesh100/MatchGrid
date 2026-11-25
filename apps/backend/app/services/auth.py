@@ -1,27 +1,22 @@
-from app.core.security import verify_password
-from app.models import Admin, User, UserRole
+from functools import lru_cache
+
+from app.core.security import hash_password, verify_password
+from app.models import User
 
 
-async def authenticate_admin(username: str, password: str) -> User | Admin | None:
-    """Authenticates by username/password across users and legacy admins."""
-    # Check Admin first so legacy admin credential changes are immediately reflected
-    admin = await Admin.find_one(Admin.username == username)
-    if admin is not None:
-        if not verify_password(password, admin.password_hash):
-            return None
-        # Keep User document in sync if present
-        user = await User.find_one(User.username == username)
-        if user is not None and user.password_hash != admin.password_hash:
-            user.password_hash = admin.password_hash
-            await user.save()
-        return admin
+@lru_cache(maxsize=1)
+def _dummy_hash() -> str:
+    """A real hash of a throwaway value, used so unknown usernames cost the same as known ones."""
+    return hash_password("timing-parity-placeholder")
 
+
+async def authenticate_admin(username: str, password: str) -> User | None:
+    """Authenticates an active user (SUPER_ADMIN, ORGANIZER or SCORER) by username/password.
+
+    A password hash is verified on every path (including unknown or inactive accounts) so response
+    time does not reveal which usernames exist."""
     user = await User.find_one(User.username == username)
-    if user is not None:
-        if not user.is_active:
-            return None
-        if not verify_password(password, user.password_hash):
-            return None
-        return user
-
-    return None
+    password_ok = verify_password(password, user.password_hash if user else _dummy_hash())
+    if user is None or not user.is_active or not password_ok:
+        return None
+    return user

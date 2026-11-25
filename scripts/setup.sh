@@ -12,7 +12,7 @@ if ! command -v bun >/dev/null 2>&1; then
 fi
 
 echo "=========================================================="
-echo "  DCL Season 5 Scoreboard — Monorepo Bootstrap Setup"
+echo "  MatchGrid — Monorepo Bootstrap Setup"
 echo "=========================================================="
 
 # 1. Environment files

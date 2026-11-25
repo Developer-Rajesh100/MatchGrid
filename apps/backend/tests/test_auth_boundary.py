@@ -11,11 +11,12 @@ DUMMY_ID = "0" * 24  # syntactically valid ObjectId-shaped string; auth must
 
 # (method, path, json body) for every mutating endpoint in the API.
 MUTATING_ENDPOINTS = [
-    ("PATCH", "/api/tournament", {"name": "X"}),
-    ("POST", "/api/teams", {"name": "X", "color": "#fff"}),
+    ("PATCH", f"/api/organizer/tournaments/{DUMMY_ID}", {"name": "X"}),
+    ("PATCH", f"/api/organizer/tournaments/{DUMMY_ID}/config", {"points_win": 2}),
+    ("POST", "/api/teams", {"name": "X", "color": "#fff", "tournament_id": DUMMY_ID}),
     ("PATCH", f"/api/teams/{DUMMY_ID}", {"name": "X"}),
     ("DELETE", f"/api/teams/{DUMMY_ID}", None),
-    ("POST", "/api/groups/random-draw", None),
+    ("POST", f"/api/groups/random-draw?tournament_id={DUMMY_ID}", None),
     ("POST", "/api/players", {"team_id": DUMMY_ID, "name": "X", "number": 1}),
     ("PATCH", f"/api/players/{DUMMY_ID}", {"name": "X"}),
     ("DELETE", f"/api/players/{DUMMY_ID}", None),
@@ -30,8 +31,8 @@ MUTATING_ENDPOINTS = [
     ("POST", f"/api/matches/{DUMMY_ID}/uncancel", None),
     ("POST", f"/api/matches/{DUMMY_ID}/winner", {"team_id": DUMMY_ID}),
     ("POST", "/api/matches/generate-group-fixtures", {"group_id": DUMMY_ID}),
-    ("POST", "/api/matches/generate-semis", None),
-    ("POST", "/api/matches/generate-final", None),
+    ("POST", f"/api/matches/generate-semis?tournament_id={DUMMY_ID}", None),
+    ("POST", f"/api/matches/generate-final?tournament_id={DUMMY_ID}", None),
     ("POST", f"/api/matches/{DUMMY_ID}/events", {"type": "goal", "team_id": DUMMY_ID, "player_id": DUMMY_ID, "minute": 1}),
     ("DELETE", f"/api/matches/{DUMMY_ID}/events/{DUMMY_ID}", None),
     ("PUT", f"/api/matches/{DUMMY_ID}/lineup", {"player_ids": []}),
@@ -39,7 +40,6 @@ MUTATING_ENDPOINTS = [
 
 # (method, path) for every public GET endpoint — must never require auth.
 PUBLIC_GET_ENDPOINTS = [
-    ("GET", "/api/tournament"),
     ("GET", "/api/teams"),
     ("GET", f"/api/teams/{DUMMY_ID}"),
     ("GET", "/api/groups"),
@@ -118,10 +118,10 @@ async def test_me_requires_auth_but_get_endpoints_generally_dont(async_client, a
 async def test_valid_token_is_accepted_on_a_real_mutating_action(async_client, auth_headers, tournament):
     """Positive-path sanity check alongside all the negative-path tests
     above — a genuinely valid token must not be rejected."""
-    response = await async_client.get("/api/tournament", headers=auth_headers)
+    response = await async_client.get(f"/api/tournaments/{tournament.id}", headers=auth_headers)
     assert response.status_code == 200
     response = await async_client.patch(
-        "/api/tournament", json={"name": "Renamed"}, headers=auth_headers
+        f"/api/organizer/tournaments/{tournament.id}", json={"name": "Renamed"}, headers=auth_headers
     )
     assert response.status_code == 200
     assert response.json()["name"] == "Renamed"

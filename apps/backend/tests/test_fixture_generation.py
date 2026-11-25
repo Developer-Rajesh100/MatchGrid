@@ -252,7 +252,7 @@ async def test_generate_final_seeds_correctly_from_semi_winners(tournament, team
     assert final.team2_id == teams["Black Panthers"].id
 
 
-async def test_generate_final_rejects_regenerating_once_already_seeded(tournament, teams, players):
+async def test_generate_final_is_idempotent_once_already_seeded(tournament, teams, players):
     semi1, semi2 = _semi_slots(tournament)
     semi1.team1_id, semi1.team2_id = teams["Red Dragons"].id, teams["Golden Hawks"].id
     semi2.team1_id, semi2.team2_id = teams["Blue Whales"].id, teams["Black Panthers"].id
@@ -268,6 +268,7 @@ async def test_generate_final_rejects_regenerating_once_already_seeded(tournamen
         await MatchEvent(match_id=semi.id, type="goal", team_id=scorer_team, player_id=scorer.id, minute=10).insert()
         await end_match(await Match.get(semi.id))
 
-    await generate_final(tournament.id)
-    with pytest.raises(ConflictError):
-        await generate_final(tournament.id)
+    first = await generate_final(tournament.id)  # already seeded automatically when the 2nd semi ended
+    again = await generate_final(tournament.id)
+    assert first.id == again.id
+    assert {again.team1_id, again.team2_id} == {teams["Red Dragons"].id, teams["Blue Whales"].id}

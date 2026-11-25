@@ -4,7 +4,7 @@
 **Target Path:** `docs/plan.md`  
 **Project Name:** MatchGrid (Evolved from DCL Season 5 Digital Scoreboard)  
 **Architecture:** Multi-Tenant, Multi-Tournament Live Football Management & Real-Time Scoreboard Platform  
-**Implementation Blueprint:** [`docs/IMPLEMENTATION_ROADMAP.md`](file:///home/rajesh/Placement_Project/DCL_score_board/docs/IMPLEMENTATION_ROADMAP.md) (7-Phase Execution Matrix with 7-Stage Lifecycle)
+**Implementation Blueprint:** [`docs/IMPLEMENTATION_ROADMAP.md`](IMPLEMENTATION_ROADMAP.md) (7-Phase Execution Matrix with 7-Stage Lifecycle)
 
 ---
 
@@ -109,68 +109,25 @@ flowchart LR
 ## 3. Entire Project Plan (Phased Roadmap)
 
 > [!TIP]
-> For the actionable, stage-by-stage engineering blueprint covering every deliverable across DB, Backend, Frontend, and Playwright E2E with Cloudflare R2 media hosting, see [`docs/IMPLEMENTATION_ROADMAP.md`](file:///home/rajesh/Placement_Project/DCL_score_board/docs/IMPLEMENTATION_ROADMAP.md).
+> The stage-by-stage engineering blueprint (DB, Backend, Frontend and Playwright E2E per phase, with test counts) is [`IMPLEMENTATION_ROADMAP.md`](IMPLEMENTATION_ROADMAP.md). This section is the summary; the roadmap is the source of truth for phase numbering.
 
-### Phase 0: Foundation, Monorepo, Rebranding & Clean Slate *(Completed)*
-* [x] Restructure repository into a **Bun workspace monorepo** (`apps/backend`, `apps/frontend`, `e2e`, `docs`).
-* [x] Configure **Docker** exclusively for `mongo:7` (`docker-compose.yml`), running FastAPI (`:8001`) and Vite (`:5173`) natively via `bun run dev`.
-* [x] Replace all legacy `DCL Season 5` branding and assets with the **MatchGrid** football-and-goalpost logo and Deep Stadium Slate + Pitch Emerald design tokens.
-* [x] Wipe all legacy DCL seed records so the database starts clean while preserving schema indexes.
-* [x] Configure **Playwright** E2E testing (`playwright.config.ts`, `e2e/`) and codify the 7-stage feature lifecycle workflow.
+| Phase | Theme | Status |
+| :--- | :--- | :--- |
+| **0** | Foundation, Bun monorepo, MatchGrid rebrand, Playwright setup, clean data slate | Completed |
+| **1** | Four-tier RBAC & multi-tenant isolation (`User` roles, `organizer_id`, `tournament_id` everywhere, `assigned_scorer_ids`) | Completed |
+| **2** | Cloudflare R2 media pipeline (`/api/uploads/image`, tournament-scoped keys, cleanup on replace/delete) | Completed |
+| **3** | Dynamic tournament engine (`TournamentConfig`, circle-method fixtures, group draw, quarters/semis/final seeding, penalty overrides) | Completed |
+| **4** | Room-scoped WebSockets (`/ws/live?tournament_id=`) and the scorer live console | Completed |
+| **5** | Public two-tier UI (`/` hub, `/t/:slug/*` tournament center, visual bracket tree) | Completed |
+| **6** | Role portals (`/superadmin`, `/organizer`, `/scorer`, unified `/login`) | Completed |
+| **Pre-7 audit** | Security, isolation, bracket-engine and legacy cleanup findings from [`Audit.md`](Audit.md) (waves 1-3) | Completed on `fix/pre-phase7-audit` |
+| **7** | Production hardening, CI/CD and zero-cost cloud launch (Atlas + Render/DigitalOcean + Cloudflare R2) | Next up |
 
-### Phase 1: Four-Tier RBAC & Multi-Tenant Data Isolation *(Next Up)*
-* **Database Layer:**
-  * Replace the single `admins` collection with a unified `users` collection supporting roles: `SUPER_ADMIN`, `ORGANIZER`, and `SCORER`.
-  * Add `organizer_id` and `slug` (unique, indexed) to `Tournament`.
-  * Add `tournament_id` (indexed) across all child collections (`Group`, `GroupTeam`, `Team`, `Player`, `Match`, `MatchEvent`, `MatchLineup`, `TournamentStanding`, `PlayerStatistics`) with compound indexes `(tournament_id, group_id, points)`.
-  * Update `Team` index from globally unique `name` to compound `(tournament_id, name)` so different tournaments can use the same team names.
-  * Update `Player` to include `tournament_id`, replacing legacy globally unique `dcl_id` with compound `(tournament_id, team_id, number)` unique index.
-  * Update `Match` model: retain existing `team1_id` / `team2_id` and `winner_override_id` (with Pydantic schema aliases for home/away), and add `assigned_scorer_ids: list[PydanticObjectId]` so Organizers can delegate matches to Scorers.
-  * Write forward migration `m0005_multi_tenant_rbac.py` and bootstrap the default `SUPER_ADMIN` account via environment variables.
-* **Test Suite Backward Compatibility Strategy:**
-  * Preserve the existing 253 backend Pytests by maintaining a default tournament bootstrap in `apps/backend/tests/conftest.py` and fallback active tournament resolution during router upgrades so test regressions are completely avoided.
-* **Backend Layer & Acceptance Criteria:**
-  * Implement FastAPI dependency guards in `app/core/deps.py`:
-    * `get_current_user`: Extracts and validates JWT, ensuring `user.is_active == True`.
-    * `require_superadmin`: Restricts access to `SUPER_ADMIN` (403 on failure).
-    * `require_tournament_owner(tournament_id)`: Allows `SUPER_ADMIN` or the `ORGANIZER` matching `tournament.organizer_id` (403 on failure).
-    * `require_match_operator(match_id)`: Allows `SUPER_ADMIN`, the parent tournament's `ORGANIZER`, or an assigned `SCORER` in `match.assigned_scorer_ids` (403 on failure).
-  * Build `/api/superadmin/*` endpoints for platform-wide user management (creating/suspending Organizers & Scorers), global tournament oversight, and platform metrics.
-  * Build `/api/organizer/scorers` endpoints allowing Organizers to create Scorer accounts and assign/unassign them to matches.
-
-### Phase 2: Dynamic Tournament, Fixture & Knockout Bracket Engine
-* **Configurable Tournament Rules:**
-  * Add `TournamentConfig` sub-document (`num_groups`, `teams_per_group`, `knockout_format`: `"none" | "semis_final" | "quarters_semis_final"`, `points_win`, `points_draw`, `points_loss`).
-* **Generalized Scheduling & Seeding Services:**
-  * Upgrade `groups.py` to execute balanced random draws across $N$ groups.
-  * Upgrade `matches.py` to generate round-robin fixtures for any group size using the circle-method scheduling algorithm.
-  * Upgrade `tournament_stage.py` to dynamically seed knockout rounds (Quarter-Finals $\rightarrow$ Semi-Finals $\rightarrow$ Final) from top group finishers, supporting cross-group seeding and penalty shootout tiebreak overrides.
-
-### Phase 3: Room-Scoped WebSockets & Scoped Live Match Console
-* **WebSocket Room Isolation:**
-  * Upgrade `ConnectionManager` (`app/core/websocket.py`) to maintain rooms keyed by `tournament_id` (`/ws/live?tournament_id=<id>`).
-  * Ensure live match events, clock transitions, and standings updates broadcast strictly to clients subscribed to that tournament room.
-* **Scorer Operational Scope:**
-  * Build `GET /api/scorer/matches` returning only the matches assigned to the logged-in `SCORER`.
-  * Lock down `/live` clock and event mutations so a Scorer receives a `403 Forbidden` if attempting to modify an unassigned match.
-
-### Phase 4: Two-Tier Frontend UI, Visual Bracket Tree & Role Portals
-* **Public Experience:**
-  * **Public Tournament Hub (`/`):** Filterable directory of *Live*, *Upcoming*, and *Completed* tournaments with live match counters and organizer metadata.
-  * **Two-Tier Navigation (`/t/:slug/...`):** Sticky global header + tournament context sub-navigation (`Overview`, `Matches`, `Standings & Bracket`, `Teams`, `Stats`) with a responsive mobile slide-over drawer.
-  * **Interactive Knockout Bracket Tree (`/t/:slug/bracket`):** Visual progression tree connecting Group Stage qualifiers through Quarter-Finals, Semi-Finals, and the Final.
-* **Role-Based Portals:**
-  * **Superadmin Console (`/superadmin`):** Platform-wide dashboard to manage all Organizers, Scorers, Tournaments, and global overrides.
-  * **Organizer Workspace (`/organizer`):** Multi-tournament switcher, Tournament Creation Wizard, Team/Squad manager, Group Draw & Fixture generator, and Scorer Match Assignment modal.
-  * **Scorer Cockpit (`/scorer`):** Focused list of assigned matches launching directly into the two-column **Live Match Control Console** (sticky clock/event pad on the left, live chronological timeline and lineup toggles on the right).
-
-### Phase 5: Full-Stack Verification, CI/CD & Production Deployment
-* **Comprehensive Test Coverage:**
-  * Expand Pytest suite (`test:backend`) to verify RBAC isolation (`403` cross-tenant & unassigned-scorer checks), dynamic bracket generation, and room-scoped WebSockets.
-  * Expand Vitest suite (`test:frontend`) and Playwright E2E suite (`test:e2e`) covering the complete multi-role lifecycle: `Superadmin creates Organizer -> Organizer creates Tournament & assigns Scorer -> Scorer runs live match -> Public Spectator watches real-time score update`.
-* **CI/CD & Cloud Hosting:**
-  * Activate `.github/workflows/ci.yml` to run `bun run test:all` on every push and pull request.
-  * Deploy to zero-cost cloud infrastructure: **MongoDB Atlas (M0)** + **Render / Koyeb** (FastAPI + WSS backend) + **Vercel / Cloudflare Pages** (React SPA frontend).
+### Conventions that hold across phases
+* **No default tournament.** Every public list endpoint takes `tournament_id` or `tournament_slug`, and every write names its tournament explicitly. Unowned (`organizer_id is None`) tournaments are superadmin-only.
+* **Public URLs live under `/t/:slug/...`.** Old single-tournament URLs (`/matches/:id`, `/teams/:id`, `/players/:id`) redirect to their tournament; `/admin` redirects to `/organizer`.
+* **Tournament lifecycle enums:** `status` is `draft | active | completed` and `stage` is `group | quarters | semis | final | champions` (a crowned champion completes the tournament).
+* **The server owns the match clock.** Responses carry `server_now`; clients derive elapsed time from server fields, never from local storage or their own clock.
 
 ---
 
@@ -178,18 +135,9 @@ flowchart LR
 
 ### 4.1 Immediate Next Actions (Step-by-Step)
 
-1. **Execute Phase 1 (4-Tier RBAC & Multi-Tenant Models):**
-   * Create the `User` Beanie document (`SUPER_ADMIN`, `ORGANIZER`, `SCORER`) and update `Tournament` and `Match` models with `organizer_id`, `slug`, and `assigned_scorer_ids`.
-   * Write migration `m0005_multi_tenant_rbac.py` and verify `SUPER_ADMIN` bootstrap on startup.
-   * Implement `require_superadmin`, `require_tournament_owner`, and `require_match_operator` guards and update all routers.
-2. **Execute Phase 2 (Dynamic Bracket & Fixture Engine):**
-   * Refactor `groups.py`, `matches.py`, and `tournament_stage.py` to support configurable group counts, team counts, custom points rules, and dynamic knockout bracket trees.
-3. **Execute Phase 3 (Room-Scoped WebSockets):**
-   * Update `ConnectionManager` and frontend `useLiveSocket.js` hook to subscribe per `tournament_id`.
-4. **Execute Phase 4 (Two-Tier UI & Role Dashboards):**
-   * Build the Public Tournament Hub (`/`), `/t/:slug/*` tournament pages, Visual Knockout Bracket component, and dedicated `/superadmin`, `/organizer`, and `/scorer` portals.
-5. **Execute Phase 5 (Regression Gate & Cloud Launch):**
-   * Run `bun run test:all` to verify 100% pass rate across Pytest, Vitest, Production Build, and Playwright E2E, then deploy to MongoDB Atlas, Render, and Vercel.
+1. **Execute Phase 7 (hardening and launch):** follow [`IMPLEMENTATION_ROADMAP.md`](IMPLEMENTATION_ROADMAP.md) Phase 7 and the runbook in [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
+2. **Before scaling out:** the WebSocket hub and the login rate limiter are in-process (see the "Scaling constraints" section of the runbook); run a single backend instance until they move to shared state.
+3. **Run the full regression gate** (`bun run test:all`) on every change, per the workflow below.
 
 ---
 

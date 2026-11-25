@@ -334,7 +334,7 @@ export function ScorerDashboardPage() {
                 {/* Action Button: Open Live Console */}
                 <div style={{ marginTop: 'auto' }}>
                   <button
-                    onClick={() => navigate(`/admin/matches/${match.id}/live`)}
+                    onClick={() => navigate(`/scorer/matches/${match.id}/live`)}
                     className={isLive ? 'btn btn-primary' : 'btn btn-outline'}
                     data-testid={`scorer-open-console-${match.id}`}
                     style={{

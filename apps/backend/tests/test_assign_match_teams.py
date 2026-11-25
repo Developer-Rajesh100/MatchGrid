@@ -26,7 +26,7 @@ async def test_requires_admin(async_client, semis, teams):
     assert r.status_code == 401
 
 
-async def test_assign_saves_and_is_publicly_visible(async_client, auth_headers, semis, teams):
+async def test_assign_saves_and_is_publicly_visible(async_client, auth_headers, semis, teams, tournament):
     r = await async_client.put(
         f"/api/matches/{semis[0].id}/teams",
         json=_body(teams["Red Dragons"], teams["Blue Whales"]),
@@ -36,7 +36,7 @@ async def test_assign_saves_and_is_publicly_visible(async_client, auth_headers, 
     assert r.json()["team1_name"] == "Red Dragons"
     assert r.json()["team2_name"] == "Blue Whales"
 
-    listed = (await async_client.get("/api/matches?stage=semi")).json()
+    listed = (await async_client.get(f"/api/matches?stage=semi&tournament_id={tournament.id}")).json()
     assert [(m["team1_name"], m["team2_name"]) for m in listed] == [
         ("Red Dragons", "Blue Whales"),
         (None, None),
