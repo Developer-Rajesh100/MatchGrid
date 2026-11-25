@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertCircle, RefreshCw, Inbox, ShieldAlert } from 'lucide-react';
+import { Skeleton } from './Skeleton';
 
 export function Stripe({ color = 'var(--brand-primary)' }) {
   return <div className="stripe" style={{ backgroundColor: color }} />;
@@ -19,11 +20,23 @@ export function StatTile({ label, value, sublabel = null }) {
   );
 }
 
-export function LoadingState({ message = 'Loading MatchGrid data...' }) {
+/**
+ * First-load placeholder: calm skeleton blocks in place of a spinner. The message stays in the DOM for
+ * screen readers. (Background refreshes never show this: pages only call it before they have data.)
+ */
+export function LoadingState({ message = 'Loading MatchGrid data...', rows = 4 }) {
   return (
-    <div className="state-container">
-      <div className="spinner"></div>
-      <p style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 500 }}>{message}</p>
+    <div className="loading-skeleton" role="status" aria-live="polite">
+      <span className="sr-only">{message}</span>
+      <div className="loading-skeleton__head" aria-hidden="true">
+        <Skeleton width="34%" height={24} />
+        <Skeleton width="54%" height={12} />
+      </div>
+      <div className="skeleton-stack" aria-hidden="true">
+        {Array.from({ length: rows }, (_, i) => (
+          <Skeleton key={i} height={56} />
+        ))}
+      </div>
     </div>
   );
 }

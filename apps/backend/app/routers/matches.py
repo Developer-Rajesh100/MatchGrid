@@ -129,6 +129,10 @@ async def _list_matches(
         filters["date"] = date
 
     matches = await Match.find(filters).sort("match_number").to_list()
+    return await _matches_to_out(matches, include_scorers)
+
+
+async def _matches_to_out(matches: list[Match], include_scorers: bool = False) -> list[MatchOut]:
     teams = await _teams_map(*matches)
     groups = await _groups_map(*matches)
     scores_and_winners = await compute_scores_and_winners(matches)
@@ -154,6 +158,14 @@ async def _list_matches(
             )
         )
     return out
+
+
+@router.get("/featured", response_model=list[MatchOut])
+async def list_featured_live(limit: int = Query(default=8, ge=1, le=24)) -> list[MatchOut]:
+    """Matches in play right now across every tournament, for the public hub's "live now" strip.
+    Deliberately platform-wide (live scores are public data); everything else stays tournament-scoped."""
+    matches = await Match.find(Match.status == "live").sort("started_at").limit(limit).to_list()
+    return await _matches_to_out(matches)
 
 
 @router.get("", response_model=list[MatchOut])

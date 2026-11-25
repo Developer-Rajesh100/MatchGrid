@@ -1,24 +1,59 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Trophy, Radio, Calendar, CheckCircle2, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Search, Trophy, Radio } from 'lucide-react';
 import { tournamentApi } from '../../api/tournament';
+import { matchesApi } from '../../api/matches';
 import { TournamentCard } from '../../components/hub/TournamentCard';
-import { LiveSpotlightBanner } from '../../components/hub/LiveSpotlightBanner';
-import { LoadingState, ErrorState } from '../../components/common/Common';
+import { LiveNowStrip } from '../../components/hub/LiveNowStrip';
+import { ErrorState } from '../../components/common/Common';
+import { Skeleton } from '../../components/common/Skeleton';
 import { useLiveSocket } from '../../hooks/useLiveSocket';
+import { clockOffsetMs } from '../../utils/clock';
+
+const isLive = (t) => (t.live_matches_count || 0) > 0 || (t.status || '').toUpperCase() === 'LIVE';
+
+function HubSkeleton() {
+  return (
+    <div className="public-hub-page" role="status" aria-live="polite">
+      <span className="sr-only">Loading Tournament Hub...</span>
+      <div className="hub-head">
+        <h1>MatchGrid Tournament Hub</h1>
+      </div>
+      <div className="directory" aria-hidden="true">
+        {Array.from({ length: 8 }, (_, i) => (
+          <div key={i} className="directory-row directory-row--skeleton">
+            <Skeleton width={44} height={44} />
+            <Skeleton width="45%" height={16} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function PublicHubPage() {
   const [tournaments, setTournaments] = useState([]);
+  const [featured, setFeatured] = useState([]);
+  const [clockOffset, setClockOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('ALL'); // ALL | LIVE | UPCOMING | COMPLETED
+  const loadedOnce = useRef(false);
 
-  const loadTournaments = useCallback(async (showLoading = true) => {
+  const loadAll = useCallback(async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
       setError(null);
-      const data = await tournamentApi.getPublicTournaments();
+      const [data, live] = await Promise.all([
+        tournamentApi.getPublicTournaments(),
+        // the strip is a bonus: the directory must still render if it fails
+        matchesApi.getFeaturedLive(8).catch(() => []),
+      ]);
       setTournaments(Array.isArray(data) ? data : []);
+      const liveList = Array.isArray(live) ? live : [];
+      setFeatured(liveList);
+      setClockOffset(clockOffsetMs(liveList[0], Date.now()));
+      loadedOnce.current = true;
     } catch (err) {
       if (showLoading) setError(err.message || 'Failed to load public competitions');
     } finally {
@@ -27,221 +62,122 @@ export function PublicHubPage() {
   }, []);
 
   useEffect(() => {
-    loadTournaments(true);
-  }, [loadTournaments]);
+    loadAll(true);
+  }, [loadAll]);
 
-  useLiveSocket(
-    useCallback(() => {
-      loadTournaments(false);
-    }, [loadTournaments])
+  // Quiet refresh on live status changes, and a gentle poll while anything is in play (goals are
+  // room-scoped, so the hub would otherwise show stale scores between status changes).
+  useLiveSocket(useCallback(() => { loadAll(false); }, [loadAll]));
+  const anyLive = featured.length > 0;
+  useEffect(() => {
+    if (!anyLive) return undefined;
+    const id = setInterval(() => loadAll(false), 30000);
+    return () => clearInterval(id);
+  }, [anyLive, loadAll]);
+
+  const liveTournaments = useMemo(() => tournaments.filter(isLive), [tournaments]);
+  const upcoming = useMemo(() => tournaments.filter((t) => (t.status || '').toUpperCase() === 'DRAFT'), [tournaments]);
+  const completed = useMemo(() => tournaments.filter((t) => (t.status || '').toUpperCase() === 'COMPLETED'), [tournaments]);
+  const liveMatchTotal = useMemo(
+    () => tournaments.reduce((n, t) => n + (t.live_matches_count || 0), 0),
+    [tournaments]
   );
 
-  const liveTournaments = useMemo(() => {
-    return tournaments.filter(
-      (t) => (t.live_matches_count || 0) > 0 || (t.status || '').toUpperCase() === 'LIVE'
-    );
-  }, [tournaments]);
-
-  const upcomingTournaments = useMemo(() => {
-    return tournaments.filter((t) => (t.status || '').toUpperCase() === 'DRAFT');
-  }, [tournaments]);
-
-  const completedTournaments = useMemo(() => {
-    return tournaments.filter((t) => (t.status || '').toUpperCase() === 'COMPLETED');
-  }, [tournaments]);
-
   const filteredTournaments = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     return tournaments.filter((t) => {
-      // 1. Tab filter
-      if (activeFilter === 'LIVE') {
-        const isLive = (t.live_matches_count || 0) > 0 || (t.status || '').toUpperCase() === 'LIVE';
-        if (!isLive) return false;
-      } else if (activeFilter === 'UPCOMING') {
-        if ((t.status || '').toUpperCase() !== 'DRAFT') return false;
-      } else if (activeFilter === 'COMPLETED') {
-        if ((t.status || '').toUpperCase() !== 'COMPLETED') return false;
-      }
-
-      // 2. Search query filter
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const nameMatch = (t.name || '').toLowerCase().includes(q);
-        const seasonMatch = (t.season || '').toLowerCase().includes(q);
-        const orgMatch = (t.organizer_name || '').toLowerCase().includes(q);
-        return nameMatch || seasonMatch || orgMatch;
-      }
-
-      return true;
+      if (activeFilter === 'LIVE' && !isLive(t)) return false;
+      if (activeFilter === 'UPCOMING' && (t.status || '').toUpperCase() !== 'DRAFT') return false;
+      if (activeFilter === 'COMPLETED' && (t.status || '').toUpperCase() !== 'COMPLETED') return false;
+      if (!q) return true;
+      return [t.name, t.season, t.organizer_name].some((v) => (v || '').toLowerCase().includes(q));
     });
   }, [tournaments, activeFilter, searchQuery]);
 
-  if (loading) {
-    return <LoadingState message="Loading Tournament Hub..." />;
-  }
+  if (loading && !loadedOnce.current) return <HubSkeleton />;
+  if (error) return <ErrorState message={error} onRetry={() => loadAll(true)} />;
 
-  if (error) {
-    return <ErrorState message={error} onRetry={() => loadTournaments(true)} />;
-  }
+  const tabs = [
+    { id: 'ALL', label: `All (${tournaments.length})` },
+    { id: 'LIVE', label: `Live (${liveTournaments.length})`, icon: true },
+    { id: 'UPCOMING', label: `Upcoming (${upcoming.length})` },
+    { id: 'COMPLETED', label: `Completed (${completed.length})` },
+  ];
 
   return (
     <div className="public-hub-page">
-      {/* Hero Header */}
-      <div className="hub-hero" style={{ marginBottom: '28px', textAlign: 'center' }}>
-        <h1
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '32px',
-            fontWeight: 800,
-            color: 'var(--text-primary)',
-            letterSpacing: '-0.5px',
-            marginBottom: '8px',
-          }}
-        >
-          MatchGrid Tournament Hub
-        </h1>
-        <p
-          style={{
-            fontSize: '15px',
-            color: 'var(--text-secondary)',
-            maxWidth: '640px',
-            margin: '0 auto',
-            lineHeight: 1.5,
-          }}
-        >
-          Discover live competitions, visual brackets, group tables, and tournament centers across all sports leagues.
-        </p>
+      <div className="hub-head">
+        <h1>MatchGrid Tournament Hub</h1>
+        <p>Live scores, tables and brackets for every competition on the platform.</p>
       </div>
 
-      {/* Live Spotlight Banner if live matches underway */}
-      <LiveSpotlightBanner liveTournaments={liveTournaments} />
+      <LiveNowStrip
+        matches={featured}
+        liveCount={liveMatchTotal || featured.length}
+        tournamentCount={liveTournaments.length}
+        offsetMs={clockOffset}
+      />
 
-      {/* Directory Filter & Search Toolbar */}
-      <div
-        className="hub-toolbar"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '16px',
-          flexWrap: 'wrap',
-          marginBottom: '24px',
-        }}
-      >
-        {/* Status Filter Tabs */}
-        <div className="filter-tabs" role="tablist" style={{ display: 'flex', gap: '8px' }}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeFilter === 'ALL'}
-            className={`filter-tab ${activeFilter === 'ALL' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('ALL')}
-          >
-            All ({tournaments.length})
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeFilter === 'LIVE'}
-            className={`filter-tab ${activeFilter === 'LIVE' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('LIVE')}
-          >
-            <Radio size={12} className="pulse-icon" style={{ display: 'inline', marginRight: '4px' }} />
-            Live ({liveTournaments.length})
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeFilter === 'UPCOMING'}
-            className={`filter-tab ${activeFilter === 'UPCOMING' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('UPCOMING')}
-          >
-            Upcoming ({upcomingTournaments.length})
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeFilter === 'COMPLETED'}
-            className={`filter-tab ${activeFilter === 'COMPLETED' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('COMPLETED')}
-          >
-            Completed ({completedTournaments.length})
-          </button>
+      <div className="hub-toolbar">
+        <div className="filter-tabs" role="tablist" aria-label="Filter competitions">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeFilter === tab.id}
+              className={`filter-tab ${activeFilter === tab.id ? 'active' : ''}`}
+              onClick={() => setActiveFilter(tab.id)}
+            >
+              {tab.icon && <Radio size={12} aria-hidden="true" />}
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Search Bar */}
-        <div style={{ position: 'relative', width: '280px', maxWidth: '100%' }}>
-          <Search
-            size={15}
-            style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-muted)',
-            }}
-          />
+        <div className="hub-search">
+          <Search size={15} aria-hidden="true" />
           <input
-            type="text"
+            type="search"
             className="input-field"
             placeholder="Search competitions..."
+            aria-label="Search competitions"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '36px', height: '38px', fontSize: '13px' }}
           />
         </div>
       </div>
 
-      {/* Tournaments Grid */}
       {filteredTournaments.length === 0 ? (
-        <div
-          className="card"
-          style={{
-            textAlign: 'center',
-            padding: '48px 24px',
-            color: 'var(--text-muted)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '12px',
-          }}
-        >
-          <Trophy size={36} style={{ opacity: 0.4 }} />
+        <div className="empty-block">
+          <Trophy size={30} aria-hidden="true" />
           {searchQuery ? (
             <>
-              <h3 style={{ fontSize: '16px', color: 'var(--text-primary)', margin: 0 }}>
-                No tournaments matching &ldquo;{searchQuery}&rdquo;
-              </h3>
-              <p style={{ fontSize: '13px', margin: 0 }}>
-                Try adjusting your search query or switching filter tabs.
-              </p>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline"
-                onClick={() => setSearchQuery('')}
-              >
-                Clear Search
+              <h3>No tournaments matching &ldquo;{searchQuery}&rdquo;</h3>
+              <p>Try a different search, or switch the filter.</p>
+              <button type="button" className="btn btn-sm btn-outline" onClick={() => setSearchQuery('')}>
+                Clear search
               </button>
             </>
           ) : (
             <>
-              <h3 style={{ fontSize: '16px', color: 'var(--text-primary)', margin: 0 }}>
-                No competitions found in this category
-              </h3>
-              <p style={{ fontSize: '13px', margin: 0 }}>
-                Check back soon or explore other filter categories.
-              </p>
+              <h3>No competitions in this category yet</h3>
+              <p>Check back soon, or look under another filter.</p>
             </>
           )}
         </div>
       ) : (
-        <div
-          className="hub-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: '20px',
-          }}
-        >
+        <div className="directory">
+          <div className="directory-head" aria-hidden="true">
+            <span>Competition</span>
+            <span>Status</span>
+            <span className="directory-head__facts">
+              <span>Stage</span>
+              <span className="num">Clubs</span>
+              <span className="num">Matches</span>
+              <span className="num">Live</span>
+            </span>
+          </div>
           {filteredTournaments.map((t) => (
             <TournamentCard key={t.id} tournament={t} />
           ))}

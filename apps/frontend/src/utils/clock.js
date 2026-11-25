@@ -31,3 +31,13 @@ export function matchElapsedSeconds(match, offsetMs = 0, nowMs = Date.now()) {
   }
   return match.elapsed_seconds || 0;
 }
+
+/** "37'" for a live match, "HT" at half time, "FT" when finished, '' before kick-off. */
+export function minuteLabel(match, offsetMs = 0, nowMs = Date.now()) {
+  if (!match) return '';
+  if (match.status === 'full_time') return 'FT';
+  if (match.status !== 'live') return '';
+  if (match.is_half_time) return 'HT';
+  const seconds = matchElapsedSeconds(match, offsetMs, nowMs) || 0;
+  return `${Math.max(1, Math.floor(seconds / 60) + 1)}'`;
+}

@@ -35,7 +35,7 @@ export function BracketPage() {
             </h2>
           </div>
           <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>
-            Single-elimination progression &bull; Live scores &bull; Penalty deciders (P) &bull; Champion honors
+            Round by round, updated live. (P) marks a match decided on penalties.
           </p>
         </div>
 
