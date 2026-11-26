@@ -27,6 +27,7 @@ export function MatchDetailPage() {
   const [error, setError] = useState(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const clockOffsetRef = useRef(0);
+  const rosterKeyRef = useRef(null);
   // True only for a full_time match with no recorded duration anywhere (audit finding L-4)
   const [timerUnknown, setTimerUnknown] = useState(false);
   const isAdmin = authApi.isAuthenticated();
@@ -39,14 +40,20 @@ export function MatchDetailPage() {
       clockOffsetRef.current = clockOffsetMs(data, Date.now());
       setMatch(data);
 
-      // Scoped fetch for only this match's two teams to prevent unnecessary load
+      // The two squads only change when the match's teams do: live updates (goals, clock) reuse them.
       const teamIds = [data.team1_id, data.team2_id].filter(Boolean);
-      const rosters = await Promise.all(teamIds.map((teamId) => playersApi.getPlayers({ team_id: teamId, tournament_id: data.tournament_id })));
-      const pMap = {};
-      rosters.flat().forEach((p) => {
-        pMap[p.id] = p;
-      });
-      setPlayersMap(pMap);
+      const rosterKey = `${data.tournament_id}:${teamIds.join(',')}`;
+      if (rosterKeyRef.current !== rosterKey) {
+        const rosters = await Promise.all(
+          teamIds.map((teamId) => playersApi.getPlayers({ team_id: teamId, tournament_id: data.tournament_id }))
+        );
+        const pMap = {};
+        rosters.flat().forEach((p) => {
+          pMap[p.id] = p;
+        });
+        setPlayersMap(pMap);
+        rosterKeyRef.current = rosterKey;
+      }
     } catch (err) {
       if (showLoading) setError(err.message || 'Failed to load match details');
     } finally {
@@ -58,11 +65,10 @@ export function MatchDetailPage() {
     loadMatch(true);
   }, [matchId]);
 
-  useLiveSocket((msg) => {
-    if (!msg.match_id || msg.match_id === matchId) {
-      loadMatch(false);
-    }
-  }, match?.tournament_id);
+  useLiveSocket(() => loadMatch(false), match?.tournament_id, {
+    enabled: Boolean(match?.tournament_id),
+    filter: (msg) => !msg.match_id || msg.match_id === matchId,
+  });
 
   // Public match clock: server fields + the server's own "now" only (see utils/clock.js).
   useEffect(() => {

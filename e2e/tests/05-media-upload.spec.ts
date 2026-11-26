@@ -18,6 +18,7 @@ import {
   updateTestPlayer,
   updateTestTeam,
   uploadTestImage,
+  signInBrowser,
 } from '../fixtures/api';
 
 test.describe('MatchGrid Cloudflare R2 Media Storage & Asset Upload Pipeline', () => {
@@ -232,12 +233,8 @@ test.describe('MatchGrid Cloudflare R2 Media Storage & Asset Upload Pipeline', (
       tracker.playerIds.push(player.id);
       expect(player.photo_url).toBe(headshotData.url);
 
-      // Set admin token in browser localStorage and navigate to team detail page
-      await page.goto('/');
-      await page.evaluate((token) => {
-        localStorage.setItem('matchgrid_admin_token', token);
-        localStorage.setItem('dcl_admin_token', token);
-      }, organizerToken);
+      // Sign the browser in as the organizer and open the team detail page
+      await signInBrowser(page, { token: organizerToken, role: 'ORGANIZER' });
 
       // Verify Team Detail page renders the team crest cleanly
       await page.goto(`/t/${tournament.slug}/teams/${team.id}`);

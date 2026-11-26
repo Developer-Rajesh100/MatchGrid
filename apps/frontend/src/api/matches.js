@@ -1,17 +1,9 @@
-import { apiClient } from './client';
+import { apiClient, withQuery } from './client';
 
 export const matchesApi = {
   getMatches: (params = {}) => {
-    const query = new URLSearchParams();
-    if (params.team_id) query.append('team_id', params.team_id);
-    if (params.status) query.append('status', params.status);
-    if (params.stage) query.append('stage', params.stage);
-    if (params.group_id) query.append('group_id', params.group_id);
-    if (params.date) query.append('date', params.date);
-    if (params.tournament_id) query.append('tournament_id', params.tournament_id);
-    if (params.tournament_slug || params.slug) query.append('tournament_slug', params.tournament_slug || params.slug);
-    const qs = query.toString();
-    return apiClient(`/api/matches${qs ? `?${qs}` : ''}`);
+    const { team_id, status, stage, group_id, date, tournament_id, tournament_slug, slug } = params;
+    return apiClient(withQuery('/api/matches', { team_id, status, stage, group_id, date, tournament_id, tournament_slug, slug }));
   },
   getFeaturedLive: (limit = 8) => apiClient(`/api/matches/featured?limit=${limit}`),
   getMatch: (matchId) => apiClient(`/api/matches/${matchId}`),
@@ -48,31 +40,19 @@ export const matchesApi = {
       body: { group_id: groupId, force },
     }),
   getGroups: (params = {}) => {
-    const q = new URLSearchParams();
-    if (params?.tournament_id) q.append('tournament_id', params.tournament_id);
-    if (params?.tournament_slug || params?.slug) q.append('tournament_slug', params.tournament_slug || params.slug);
-    const qs = q.toString();
-    return apiClient(`/api/groups${qs ? `?${qs}` : ''}`);
+    const { tournament_id, tournament_slug, slug } = params || {};
+    return apiClient(withQuery('/api/groups', { tournament_id, tournament_slug, slug }));
   },
   randomGroupDraw: (tournamentId = null) =>
-    apiClient(`/api/groups/random-draw${tournamentId ? `?tournament_id=${tournamentId}` : ''}`, { method: 'POST' }),
+    apiClient(withQuery('/api/groups/random-draw', { tournament_id: tournamentId }), { method: 'POST' }),
   seedKnockout: (tournamentId = null) =>
-    apiClient(`/api/matches/seed-knockout${tournamentId ? `?tournament_id=${tournamentId}` : ''}`, { method: 'POST' }),
+    apiClient(withQuery('/api/matches/seed-knockout', { tournament_id: tournamentId }), { method: 'POST' }),
+  // getBracket(id), getBracket(id, slug) or getBracket({ tournament_id | id, tournament_slug | slug }).
   getBracket: (tournamentIdOrParams, maybeSlug = null) => {
-    let tId = null;
-    let tSlug = null;
-    if (typeof tournamentIdOrParams === 'object' && tournamentIdOrParams !== null) {
-      tId = tournamentIdOrParams.tournament_id || tournamentIdOrParams.id;
-      tSlug = tournamentIdOrParams.tournament_slug || tournamentIdOrParams.slug;
-    } else {
-      tId = tournamentIdOrParams;
-      tSlug = maybeSlug;
-    }
-    const q = new URLSearchParams();
-    if (tId) q.append('tournament_id', tId);
-    if (tSlug) q.append('tournament_slug', tSlug);
-    const qs = q.toString();
-    return apiClient(`/api/matches/bracket${qs ? `?${qs}` : ''}`);
+    const p = typeof tournamentIdOrParams === 'object' && tournamentIdOrParams !== null
+      ? { tournament_id: tournamentIdOrParams.tournament_id || tournamentIdOrParams.id, slug: tournamentIdOrParams.tournament_slug || tournamentIdOrParams.slug }
+      : { tournament_id: tournamentIdOrParams, slug: maybeSlug };
+    return apiClient(withQuery('/api/matches/bracket', p));
   },
   getAssignedMatches: () =>
     apiClient('/api/scorer/matches'),

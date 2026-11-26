@@ -11,6 +11,7 @@ import {
   loginAsAdmin,
   loginUser,
   teardownEntities,
+  signInBrowser,
 } from '../fixtures/api';
 
 test.describe('MatchGrid Phase 4: Room-Scoped WebSockets & Scoped Scorer Console', () => {
@@ -202,16 +203,7 @@ test.describe('MatchGrid Phase 4: Room-Scoped WebSockets & Scoped Scorer Console
       // SECTION B: Scorer Cockpit Scoping (/scorer)
       // -----------------------------------------------------------------
       // Authenticate browser as Scorer 1
-      await page.goto('/');
-      await page.evaluate(
-        ({ token, username }) => {
-          localStorage.setItem('matchgrid_admin_token', token);
-          localStorage.setItem('matchgrid_admin_username', username);
-          localStorage.setItem('matchgrid_role', 'SCORER');
-          window.dispatchEvent(new Event('matchgrid-auth-changed'));
-        },
-        { token: scorer1Token, username: scorer1Creds.username }
-      );
+      await signInBrowser(page, { token: scorer1Token, role: 'SCORER', username: scorer1Creds.username });
 
       // Navigate to /scorer
       await page.goto('/scorer');

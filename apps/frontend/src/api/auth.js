@@ -1,4 +1,7 @@
 import { apiClient } from './client';
+import { clearSession, saveSession, session } from './session';
+
+const HOME_BY_ROLE = { SUPER_ADMIN: '/superadmin', ORGANIZER: '/organizer', SCORER: '/scorer' };
 
 export const authApi = {
   login: async (username, password) => {
@@ -7,55 +10,24 @@ export const authApi = {
       body: { username, password },
     });
     if (res?.access_token) {
-      const role = res.role || 'SUPER_ADMIN';
-      const userId = res.user_id || '';
-
-      localStorage.setItem('matchgrid_admin_token', res.access_token);
-      localStorage.setItem('matchgrid_admin_username', username);
-      localStorage.setItem('matchgrid_role', role);
-      localStorage.setItem('matchgrid_user_id', userId);
-
-      // Compatibility aliases
-      localStorage.setItem('dcl_admin_token', res.access_token);
-      localStorage.setItem('dcl_admin_username', username);
-
-      window.dispatchEvent(new CustomEvent('matchgrid-auth-changed', { detail: { reason: 'login' } }));
-      window.dispatchEvent(new Event('dcl-auth-changed'));
+      // The server always names the role; a response without one grants no portal at all.
+      saveSession({ token: res.access_token, username, role: res.role || '', userId: res.user_id || '' });
     }
     return res;
   },
-  logout: () => {
-    localStorage.removeItem('matchgrid_admin_token');
-    localStorage.removeItem('matchgrid_admin_username');
-    localStorage.removeItem('matchgrid_role');
-    localStorage.removeItem('matchgrid_user_id');
-    localStorage.removeItem('dcl_admin_token');
-    localStorage.removeItem('dcl_admin_username');
-
-    window.dispatchEvent(new CustomEvent('matchgrid-auth-changed', { detail: { reason: 'logout' } }));
-    window.dispatchEvent(new Event('dcl-auth-changed'));
-  },
-  getUsername: () =>
-    localStorage.getItem('matchgrid_admin_username') ||
-    localStorage.getItem('dcl_admin_username') ||
-    'Admin',
+  logout: () => clearSession('logout'),
+  getUsername: () => session.username() || 'Admin',
   // No default: a session without a stored role is not trusted to be anything (never SUPER_ADMIN).
-  getRole: () => localStorage.getItem('matchgrid_role') || '',
-  getUserId: () =>
-    localStorage.getItem('matchgrid_user_id') || '',
+  getRole: () => session.role(),
+  getUserId: () => session.userId(),
   hasRole: (allowedRoles) => {
     const role = authApi.getRole();
     if (!role) return false;
     return Array.isArray(allowedRoles) ? allowedRoles.includes(role) : role === allowedRoles;
   },
-  homePathForRole: (role = authApi.getRole()) =>
-    ({ SUPER_ADMIN: '/superadmin', ORGANIZER: '/organizer', SCORER: '/scorer' })[role] || '/login',
+  homePathForRole: (role = authApi.getRole()) => HOME_BY_ROLE[role] || '/login',
   isSuperAdmin: () => authApi.getRole() === 'SUPER_ADMIN',
   isOrganizer: () => authApi.getRole() === 'ORGANIZER',
   isScorer: () => authApi.getRole() === 'SCORER',
-  isAuthenticated: () =>
-    Boolean(
-      localStorage.getItem('matchgrid_admin_token') ||
-      localStorage.getItem('dcl_admin_token')
-    ),
+  isAuthenticated: () => Boolean(session.token()),
 };

@@ -2,10 +2,6 @@ import React from 'react';
 import { AlertCircle, RefreshCw, Inbox, ShieldAlert } from 'lucide-react';
 import { Skeleton } from './Skeleton';
 
-export function Stripe({ color = 'var(--brand-primary)' }) {
-  return <div className="stripe" style={{ backgroundColor: color }} />;
-}
-
 export function StatTile({ label, value, sublabel = null }) {
   return (
     <div className="stat-tile">
@@ -99,51 +95,5 @@ export function EmptyState({ title = 'No records found', description = 'Check ba
       </p>
       {action}
     </div>
-  );
-}
-
-export function Badge({ children, variant = 'default', style = {} }) {
-  const variantStyles = {
-    default: { background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' },
-    primary: { background: 'var(--brand-primary-tint)', color: 'var(--brand-primary)', border: '1px solid rgba(16, 185, 129, 0.3)' },
-    live: { background: 'var(--status-live-tint)', color: 'var(--status-live)', border: '1px solid rgba(239, 68, 68, 0.3)' },
-    gold: { background: 'var(--accent-gold-tint)', color: 'var(--accent-gold)', border: '1px solid rgba(245, 158, 11, 0.35)' },
-    info: { background: 'var(--status-info-tint)', color: 'var(--status-info)', border: '1px solid rgba(56, 189, 248, 0.3)' },
-  };
-
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '2px 8px',
-        borderRadius: '4px',
-        fontSize: '11px',
-        fontWeight: 700,
-        letterSpacing: '0.4px',
-        textTransform: 'uppercase',
-        ...(variantStyles[variant] || variantStyles.default),
-        ...style,
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
-export function SkeletonLoader({ height = '48px', width = '100%', borderRadius = '8px', style = {} }) {
-  return (
-    <div
-      style={{
-        height,
-        width,
-        borderRadius,
-        background: 'linear-gradient(90deg, var(--bg-surface) 25%, var(--bg-elevated) 50%, var(--bg-surface) 75%)',
-        backgroundSize: '200% 100%',
-        animation: 'brandShimmer 2s infinite linear',
-        border: '1px solid var(--border-subtle)',
-        ...style,
-      }}
-    />
   );
 }

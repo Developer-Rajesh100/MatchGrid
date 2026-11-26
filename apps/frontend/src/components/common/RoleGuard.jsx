@@ -1,6 +1,7 @@
 import React, { useEffect, useReducer, useRef } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { authApi } from '../../api/auth';
+import { AUTH_CHANGED_EVENT } from '../../api/session';
 import { ForbiddenState } from './Common';
 
 /**
@@ -27,10 +28,10 @@ export function RoleGuard({
       lastReason.current = event?.detail?.reason || 'expired';
       rerender();
     };
-    window.addEventListener('matchgrid-auth-changed', onAuthChanged);
+    window.addEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
     window.addEventListener('storage', rerender);
     return () => {
-      window.removeEventListener('matchgrid-auth-changed', onAuthChanged);
+      window.removeEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
       window.removeEventListener('storage', rerender);
     };
   }, []);

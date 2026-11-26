@@ -14,6 +14,8 @@ import {
   loginUser,
   startMatch,
   teardownEntities,
+  signInBrowser,
+  type BrowserSession,
 } from '../fixtures/api';
 
 /**
@@ -48,19 +50,6 @@ async function overflowOf(page: Page) {
     });
     return { extra: root.scrollWidth - root.clientWidth, offenders };
   });
-}
-
-async function signIn(page: Page, token: string, role: string, username: string) {
-  await page.goto('/');
-  await page.evaluate(
-    ({ token, role, username }) => {
-      localStorage.setItem('matchgrid_admin_token', token);
-      localStorage.setItem('matchgrid_admin_username', username);
-      localStorage.setItem('matchgrid_role', role);
-      window.dispatchEvent(new Event('matchgrid-auth-changed'));
-    },
-    { token, role, username }
-  );
 }
 
 test.describe('No horizontal overflow on any view', () => {
@@ -127,7 +116,7 @@ test.describe('No horizontal overflow on any view', () => {
 
       const slug = tournament.slug;
       const publicPaths = ['/', `/t/${slug}`, `/t/${slug}/matches`, `/t/${slug}/matches/${match.id}`, `/t/${slug}/standings`, `/t/${slug}/bracket`, `/t/${slug}/teams`, `/t/${slug}/stats`, '/login'];
-      const portals: Array<{ role: string; token: string; username: string; paths: string[] }> = [
+      const portals: Array<{ role: BrowserSession['role']; token: string; username: string; paths: string[] }> = [
         { role: 'SUPER_ADMIN', token: superToken, username: 'admin', paths: ['/superadmin'] },
         { role: 'ORGANIZER', token: orgToken, username: orgCreds.username, paths: ['/organizer'] },
         { role: 'SCORER', token: scorerToken, username: scorerCreds.username, paths: ['/scorer', `/scorer/matches/${match.id}/live`] },
@@ -150,7 +139,7 @@ test.describe('No horizontal overflow on any view', () => {
 
       // role portals
       for (const portal of portals) {
-        await signIn(page, portal.token, portal.role, portal.username);
+        await signInBrowser(page, { token: portal.token, role: portal.role, username: portal.username });
         for (const vp of VIEWPORTS) {
           for (const path of portal.paths) await check(path, vp);
           if (portal.role === 'ORGANIZER') {

@@ -11,14 +11,14 @@ import { RefreshCw, ChevronRight, Activity, Calendar, ChevronDown } from 'lucide
 import { clockOffsetMs, minuteLabel } from '../../utils/clock';
 import { formatWhen } from '../../utils/dates';
 import { stageLabel } from '../../utils/matchLabels';
+import { isClosed, isPlayed } from '../../utils/matchStatus';
 
-const isFinished = (m) => m.status === 'full_time' || m.status === 'completed' || m.status === 'cancelled';
 const kickoff = (m) => `${m.date || '9999-12-31'}T${m.time || '23:59'}`;
 
 function MatchCard({ match, offset, now, onOpen }) {
   const live = match.status === 'live';
-  const finished = isFinished(match);
-  const played = live || match.status === 'full_time' || match.status === 'completed';
+  const finished = isClosed(match);
+  const played = isPlayed(match);
   const title = [stageLabel(match), match.tournament_name].filter(Boolean).join(' · ');
 
   return (
@@ -106,7 +106,7 @@ export function ScorerDashboardPage() {
   const groups = useMemo(() => {
     const live = matches.filter((m) => m.status === 'live').sort((a, b) => String(a.started_at).localeCompare(String(b.started_at)));
     const upcoming = matches.filter((m) => m.status === 'upcoming').sort((a, b) => kickoff(a).localeCompare(kickoff(b)));
-    const finished = matches.filter(isFinished).sort((a, b) => kickoff(b).localeCompare(kickoff(a)));
+    const finished = matches.filter(isClosed).sort((a, b) => kickoff(b).localeCompare(kickoff(a)));
     return { live, upcoming, finished };
   }, [matches]);
 

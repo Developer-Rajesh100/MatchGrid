@@ -23,8 +23,8 @@ export function StatusBadge({ status, live }) {
       </span>
     );
   }
-  const key = (status || 'draft').toLowerCase();
-  const label = key === 'draft' ? 'Upcoming' : key === 'completed' ? 'Completed' : 'Active';
+  const key = (status || 'active').toLowerCase();
+  const label = { draft: 'Draft', completed: 'Completed' }[key] || 'Active';
   return <span className={`pill pill-${key} pill-xs`}>{label}</span>;
 }
 

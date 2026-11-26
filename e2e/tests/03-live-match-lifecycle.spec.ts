@@ -7,6 +7,7 @@ import {
   createTestMatch,
   teardownEntities,
   createEntityTracker,
+  signInBrowser,
 } from '../fixtures/api';
 
 test.describe('MatchGrid Live Match Lifecycle & Real-Time Sync', () => {
@@ -68,12 +69,7 @@ test.describe('MatchGrid Live Match Lifecycle & Real-Time Sync', () => {
       tracker.matchIds.push(match.id);
 
       // 4. Authenticate Admin browser context
-      await page.goto('/');
-      await page.evaluate((t) => {
-        localStorage.setItem('matchgrid_admin_token', t);
-        localStorage.setItem('dcl_admin_token', t);
-        localStorage.setItem('matchgrid_role', 'SUPER_ADMIN'); // a session without a role is not trusted
-      }, token);
+      await signInBrowser(page, { token, role: 'SUPER_ADMIN' });
 
       // Navigate to Admin Live Scorer
       await page.goto(`/scorer/matches/${match.id}/live`);

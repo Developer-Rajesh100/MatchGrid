@@ -30,7 +30,7 @@ export function StandingsTable({ groupName, standings = [], showLegend = true })
       </div>
 
       <div className="table-wrapper">
-        <table className="dcl-table matchgrid-table standings-table">
+        <table className="matchgrid-table standings-table">
           <thead>
             <tr>
               <th className="num" style={{ width: '40px' }}>Pos</th>

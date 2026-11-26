@@ -9,6 +9,7 @@ import { tPath } from '../../utils/paths';
 import { formatDay } from '../../utils/dates';
 import { stageLabel } from '../../utils/matchLabels';
 import { clockOffsetMs, minuteLabel } from '../../utils/clock';
+import { isPlayed } from '../../utils/matchStatus';
 
 function TeamLine({ name, color, crest, score, winner, played }) {
   return (
@@ -26,7 +27,7 @@ export function MatchRow({ match, showVenue = false }) {
   const slug = match.tournament_slug || contextSlug;
 
   const isLive = match.status === 'live';
-  const played = isLive || match.status === 'full_time' || match.status === 'completed';
+  const played = isPlayed(match);
   const offset = useMemo(() => clockOffsetMs(match, Date.now()), [match]);
   const now = useNow(isLive ? 30000 : 0);
   const open = () => navigate(tPath(slug, `matches/${match.id}`));

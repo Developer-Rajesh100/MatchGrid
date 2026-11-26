@@ -33,7 +33,7 @@ const mockTournaments = [
     name: 'Summer Invitational',
     slug: 'summer-invitational',
     season: '2026',
-    status: 'draft',
+    status: 'active',
     live_matches_count: 0,
     teams_count: 6,
     matches_count: 10,
@@ -105,13 +105,15 @@ describe('PublicHubPage', () => {
       expect(screen.getByText('Premier Cup')).toBeInTheDocument();
     });
 
-    // Click 'Upcoming' tab
-    const upcomingTab = screen.getByRole('tab', { name: /Upcoming/i });
-    fireEvent.click(upcomingTab);
-
-    expect(screen.queryByText('Premier Cup')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /Active/i }));
+    expect(screen.getByText('Premier Cup')).toBeInTheDocument();
     expect(screen.getByText('Summer Invitational')).toBeInTheDocument();
     expect(screen.queryByText('Winter Classic')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /Completed/i }));
+    expect(screen.queryByText('Premier Cup')).not.toBeInTheDocument();
+    expect(screen.queryByText('Summer Invitational')).not.toBeInTheDocument();
+    expect(screen.getByText('Winter Classic')).toBeInTheDocument();
   });
 
   it('filters tournaments by search query', async () => {

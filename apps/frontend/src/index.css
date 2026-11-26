@@ -131,15 +131,13 @@ table td.num,
 }
 
 /* Top rule: a plain 2px emerald line (no animated gradient) */
-.brand-topbar,
-.dcl-topbar {
+.brand-topbar {
   height: 2px;
   background: var(--brand-primary);
 }
 
 /* App Header & Navigation */
-.brand-nav,
-.dcl-nav {
+.brand-nav {
   position: sticky;
   top: 0;
   z-index: 60;
@@ -149,8 +147,7 @@ table td.num,
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.brand-nav-inner,
-.dcl-nav-inner {
+.brand-nav-inner {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
@@ -161,8 +158,7 @@ table td.num,
   gap: 20px;
 }
 
-.brand-logo-link,
-.dcl-logo {
+.brand-logo-link {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -185,8 +181,7 @@ table td.num,
   flex-direction: column;
 }
 
-.brand-wordmark-title,
-.dcl-logo-title {
+.brand-wordmark-title {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 20px;
@@ -201,8 +196,7 @@ table td.num,
   color: var(--brand-primary);
 }
 
-.brand-wordmark-tag,
-.dcl-logo-subtitle {
+.brand-wordmark-tag {
   font-size: 10.5px;
   letter-spacing: 0.6px;
   text-transform: uppercase;
@@ -211,15 +205,13 @@ table td.num,
 }
 
 /* Desktop Navigation Tabs */
-.brand-nav-tabs,
-.dcl-tabs {
+.brand-nav-tabs {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.brand-nav-tab,
-.dcl-tab {
+.brand-nav-tab {
   padding: 8px 14px;
   border-radius: var(--radius-sm);
   font-size: 13.5px;
@@ -234,15 +226,13 @@ table td.num,
   text-decoration: none;
 }
 
-.brand-nav-tab:hover,
-.dcl-tab:hover {
+.brand-nav-tab:hover {
   color: var(--text-primary);
   background: var(--bg-surface);
   border-color: var(--border-subtle);
 }
 
-.brand-nav-tab.active,
-.dcl-tab.active {
+.brand-nav-tab.active {
   color: var(--brand-primary);
   background: var(--brand-primary-tint);
   border-color: rgba(16, 185, 129, 0.35);
@@ -250,8 +240,7 @@ table td.num,
 }
 
 /* Header Right Area */
-.brand-nav-right,
-.dcl-nav-right {
+.brand-nav-right {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -398,8 +387,7 @@ table td.num,
 }
 
 /* Tournament Context Banner */
-.brand-banner,
-.dcl-banner {
+.brand-banner {
   text-align: center;
   font-size: 13px;
   padding: 9px 16px;
@@ -413,8 +401,7 @@ table td.num,
   flex-wrap: wrap;
 }
 
-.brand-banner-badge,
-.dcl-banner-badge {
+.brand-banner-badge {
   background: var(--brand-primary);
   color: var(--text-on-brand);
   padding: 3px 8px;
@@ -426,8 +413,7 @@ table td.num,
 }
 
 /* Main Layout Shell */
-.matchgrid-app,
-.dcl-app {
+.matchgrid-app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -856,7 +842,6 @@ main {
   background: var(--bg-surface);
 }
 
-table.dcl-table,
 table.matchgrid-table {
   width: 100%;
   border-collapse: collapse;
@@ -864,7 +849,6 @@ table.matchgrid-table {
   text-align: left;
 }
 
-table.dcl-table th,
 table.matchgrid-table th {
   font-size: 11.5px;
   color: var(--text-secondary);
@@ -877,7 +861,6 @@ table.matchgrid-table th {
   white-space: nowrap;
 }
 
-table.dcl-table td,
 table.matchgrid-table td {
   padding: 13px 14px;
   border-top: 1px solid var(--border-subtle);
@@ -885,24 +868,20 @@ table.matchgrid-table td {
   vertical-align: middle;
 }
 
-table.dcl-table tr:first-child td,
 table.matchgrid-table tr:first-child td {
   border-top: none;
 }
 
-table.dcl-table td.num, table.dcl-table th.num,
 table.matchgrid-table td.num, table.matchgrid-table th.num {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
-table.dcl-table tbody tr.clickable,
 table.matchgrid-table tbody tr.clickable {
   cursor: pointer;
   transition: background 0.15s;
 }
 
-table.dcl-table tbody tr.clickable:hover,
 table.matchgrid-table tbody tr.clickable:hover {
   background: var(--bg-elevated);
 }
@@ -1343,7 +1322,6 @@ tr.qualify-spot td:first-child {
     -webkit-overflow-scrolling: touch;
   }
 
-  table.dcl-table th, table.dcl-table td,
   table.matchgrid-table th, table.matchgrid-table td {
     padding: 10px 8px;
     font-size: 13px;
@@ -1871,8 +1849,7 @@ tr.qualify-spot td:first-child {
 /* Narrow phones: the header must fit in 375px. The logo mark stays, the tournament switcher
    absorbs the remaining width (label truncates), and the connection beacon steps aside. */
 @media (max-width: 600px) {
-  .brand-nav-inner,
-  .dcl-nav-inner {
+  .brand-nav-inner {
     padding: 0 12px;
     gap: 8px;
   }
@@ -1881,8 +1858,7 @@ tr.qualify-spot td:first-child {
     display: none;
   }
 
-  .brand-nav-right,
-  .dcl-nav-right {
+  .brand-nav-right {
     gap: 6px;
     flex-shrink: 0;
   }
@@ -2040,30 +2016,6 @@ tr.qualify-spot td:first-child {
 .score-line--md { font-size: 26px; }
 .score-line--lg { font-size: 44px; }
 .score-line--xl { font-size: clamp(52px, 12vw, 84px); }
-
-/* Match clock */
-.match-clock {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-.match-clock__time {
-  font-weight: 700;
-  line-height: 1;
-  color: var(--text-primary);
-}
-.match-clock--md .match-clock__time { font-size: 34px; }
-.match-clock--lg .match-clock__time { font-size: clamp(48px, 11vw, 72px); }
-.match-clock--sm .match-clock__time { font-size: 20px; }
-.match-clock__state {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.match-clock--live .match-clock__time { color: var(--text-primary); }
-.match-clock--live .match-clock__state { color: var(--status-live); }
-.match-clock--halftime .match-clock__time { color: var(--accent-gold); }
-.match-clock--halftime .match-clock__state { color: var(--accent-gold); }
 
 .event-icon {
   display: inline-flex;
