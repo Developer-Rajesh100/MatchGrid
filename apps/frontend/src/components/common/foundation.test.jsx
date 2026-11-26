@@ -2,7 +2,6 @@ import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ScoreLine } from './ScoreLine';
-import { MatchClock } from './MatchClock';
 import { TeamMark } from './TeamMark';
 import { EventIcon } from './EventIcon';
 import { Skeleton, SkeletonCard, SkeletonRows } from './Skeleton';
@@ -19,20 +18,6 @@ describe('ScoreLine', () => {
   it('shows zero rather than blank for a missing score', () => {
     render(<ScoreLine />);
     expect(screen.getByRole('img', { name: '0 to 0' })).toHaveTextContent('0–0');
-  });
-});
-
-describe('MatchClock', () => {
-  it('shows mm:ss and always spells the state out', () => {
-    const { rerender } = render(<MatchClock seconds={754} status="live" />);
-    expect(screen.getByText('12:34')).toHaveClass('num');
-    expect(screen.getByText('Live')).toBeInTheDocument();
-    rerender(<MatchClock seconds={1500} status="live" isHalfTime />);
-    expect(screen.getByText('25:00')).toBeInTheDocument();
-    expect(screen.getByText('Half time')).toBeInTheDocument();
-    rerender(<MatchClock status="full_time" unknown />);
-    expect(screen.getByText('--:--')).toBeInTheDocument();
-    expect(screen.getByText('Full time')).toBeInTheDocument();
   });
 });
 

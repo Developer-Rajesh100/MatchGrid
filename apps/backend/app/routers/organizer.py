@@ -1,10 +1,13 @@
 import re
+
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends
+from pydantic import ValidationError
+from pymongo.errors import DuplicateKeyError
 
 from app.core.deps import check_tournament_ownership, get_current_admin
-from app.core.errors import ConflictError, ForbiddenError, NotFoundError, ValidationAppError
+from app.core.errors import ConflictError, ForbiddenError, NotFoundError, UnprocessableEntityError
 from app.core.security import hash_password
 from app.models import Group, Match, Tournament, User, UserRole
 from app.models.tournament import TournamentConfig
@@ -18,6 +21,7 @@ from app.schemas.tournament import (
     TournamentUpdate,
 )
 from app.services.media import release_media, validate_media_url
+from app.services.serializers import tournament_to_out, user_to_out
 from app.services.tournaments import delete_tournament_cascade
 from app.services.users import unassign_scorer_everywhere
 
@@ -29,43 +33,13 @@ def _slugify(text: str) -> str:
     return cleaned or "tournament"
 
 
-def _to_user_out(user: User) -> UserOut:
-    return UserOut(
-        id=str(user.id),
-        username=user.username,
-        email=user.email,
-        role=user.role,
-        organization_name=user.organization_name,
-        created_by=str(user.created_by) if user.created_by else None,
-        is_active=user.is_active,
-        created_at=user.created_at,
-    )
-
-
-def _to_tournament_out(t: Tournament) -> TournamentOut:
-    return TournamentOut(
-        id=str(t.id),
-        name=t.name,
-        season=t.season,
-        format_description=t.format_description,
-        stage=t.stage,
-        champion_team_id=str(t.champion_team_id) if t.champion_team_id else None,
-        organizer_id=str(t.organizer_id) if t.organizer_id else None,
-        slug=t.slug,
-        status=t.status,
-        logo_url=t.logo_url,
-        banner_url=t.banner_url,
-        config=t.config,
-    )
-
-
 @router.get("/tournaments", response_model=list[TournamentOut])
 async def list_my_tournaments(admin: User = Depends(get_current_admin)) -> list[TournamentOut]:
     if admin.role == UserRole.SUPER_ADMIN:
         tournaments = await Tournament.find_all().to_list()
     else:
         tournaments = await Tournament.find(Tournament.organizer_id == admin.id).to_list()
-    return [_to_tournament_out(t) for t in tournaments]
+    return [tournament_to_out(t) for t in tournaments]
 
 
 @router.post("/tournaments", response_model=TournamentOut, status_code=201)
@@ -96,7 +70,10 @@ async def create_tournament(
         banner_url=banner_url,
         config=config,
     )
-    await t.insert()
+    try:
+        await t.insert()
+    except DuplicateKeyError as exc:  # another tournament took the slug since the check above
+        raise ConflictError(f"The tournament address '{slug}' is already taken, try again") from exc
 
     # Pre-create Groups dynamically based on config.num_groups (A, B, C, D...)
     num_groups = config.num_groups if config else 2
@@ -104,7 +81,7 @@ async def create_tournament(
         gname = chr(ord("A") + i)
         await Group(tournament_id=t.id, name=gname).insert()
 
-    return _to_tournament_out(t)
+    return tournament_to_out(t)
 
 
 @router.patch("/tournaments/{tournament_id}", response_model=TournamentOut)
@@ -130,7 +107,7 @@ async def update_tournament(
     for field, old in old_media.items():
         if old and getattr(t, field) != old:
             await release_media(old, t.id)
-    return _to_tournament_out(t)
+    return tournament_to_out(t)
 
 
 @router.patch("/tournaments/{tournament_id}/config", response_model=TournamentOut)
@@ -142,9 +119,13 @@ async def update_tournament_config(
     for field, val in payload.model_dump(exclude_unset=True).items():
         if val is not None:
             config_dict[field] = val
-    t.config = TournamentConfig(**config_dict)
+    try:
+        # The merged settings must still form a feasible tournament (e.g. qualifiers <= teams).
+        t.config = TournamentConfig(**config_dict)
+    except ValidationError as exc:
+        raise UnprocessableEntityError("; ".join(e["msg"].removeprefix("Value error, ") for e in exc.errors()))
     await t.save()
-    return _to_tournament_out(t)
+    return tournament_to_out(t)
 
 
 @router.get("/tournaments/{tournament_id}/matches", response_model=list[MatchAdminOut])
@@ -153,7 +134,7 @@ async def list_tournament_matches(
 ) -> list[MatchAdminOut]:
     """The tournament's matches including scorer assignments (staff only; the public list omits them)."""
     t = await check_tournament_ownership(admin, tournament_id)
-    return await _list_matches(tournament_id=str(t.id), include_scorers=True)
+    return await _list_matches(tournament_id=str(t.id), include_scorers=True, viewer=admin)
 
 
 @router.get("/scorers", response_model=list[UserOut])
@@ -162,7 +143,7 @@ async def list_scorers(admin: User = Depends(get_current_admin)) -> list[UserOut
         scorers = await User.find(User.role == UserRole.SCORER).to_list()
     else:
         scorers = await User.find(User.role == UserRole.SCORER, User.created_by == admin.id).to_list()
-    return [_to_user_out(s) for s in scorers]
+    return [user_to_out(s) for s in scorers]
 
 
 @router.post("/scorers", response_model=UserOut, status_code=201)
@@ -180,8 +161,11 @@ async def create_scorer(
         created_by=admin.id,
         is_active=True,
     )
-    await scorer.insert()
-    return _to_user_out(scorer)
+    try:
+        await scorer.insert()
+    except DuplicateKeyError as exc:  # two requests raced past the check above
+        raise ConflictError(f"Username '{payload.username}' is already in use") from exc
+    return user_to_out(scorer)
 
 
 @router.post("/matches/{match_id}/scorers", response_model=MatchAdminOut)

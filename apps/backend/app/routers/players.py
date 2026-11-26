@@ -3,14 +3,14 @@ from typing import Optional
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, Query
 
-from app.core.deps import check_tournament_ownership, get_current_admin
+from app.core.deps import check_tournament_ownership, get_current_admin, get_optional_user
 from app.core.errors import NotFoundError
 from app.models import Player, Team, User
 from app.schemas.player import PlayerCreate, PlayerDetailOut, PlayerOut, PlayerUpdate
 from app.services.players import create_player, delete_player, get_player_detail, update_player
 from app.services.media import validate_media_url
 from app.services.serializers import player_to_out
-from app.services.tournament_scope import resolve_tournament_id
+from app.services.tournament_scope import ensure_tournament_visible, resolve_tournament_id
 
 router = APIRouter(prefix="/players", tags=["players"])
 
@@ -34,8 +34,9 @@ async def list_players(
     team_id: Optional[str] = Query(default=None),
     tournament_id: Optional[str] = Query(default=None),
     tournament_slug: Optional[str] = Query(default=None),
+    viewer: Optional[User] = Depends(get_optional_user),
 ) -> list[PlayerOut]:
-    resolved_tid = await resolve_tournament_id(tournament_id, tournament_slug)
+    resolved_tid = await resolve_tournament_id(tournament_id, tournament_slug, viewer)
     teams = {t.id: t for t in await Team.find(Team.tournament_id == resolved_tid).to_list()}
 
     if team_id:
@@ -51,8 +52,12 @@ async def list_players(
 
 
 @router.get("/{player_id}", response_model=PlayerDetailOut)
-async def get_player(player_id: str) -> PlayerDetailOut:
+async def get_player(player_id: str, viewer: Optional[User] = Depends(get_optional_user)) -> PlayerDetailOut:
     player = await _player_or_404(player_id)
+    try:
+        await ensure_tournament_visible(await _resolve_player_tournament_id(player), viewer)
+    except NotFoundError:
+        raise NotFoundError("Player not found")
     return await get_player_detail(player)
 
 

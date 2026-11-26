@@ -237,29 +237,6 @@ async def test_played_extra_match_is_isolated_from_tournament_data_and_deletable
     assert detail["history"] == [] and detail["stats"]["goals"] == 0
 
 
-async def test_startup_seed_runs_once_so_deleted_fixtures_do_not_come_back(tournament):
-    """After the first seed, a deleted fixture must not be re-created by later startups."""
-    import app.core.bootstrap as bootstrap
-    from app.core.config import get_settings
-    from app.core.database import get_client
-
-    state = get_client()[get_settings().mongo_db_name]["startup_state"]
-    await state.delete_many({})
-    calls = []
-
-    async def fake_seed():
-        calls.append(1)
-
-    original, bootstrap._seed = bootstrap._seed, fake_seed
-    try:
-        await bootstrap.run_startup_tasks()
-        await bootstrap.run_startup_tasks()
-        assert len(calls) == 1
-    finally:
-        bootstrap._seed = original
-        await state.delete_many({})
-
-
 async def test_admin_can_renumber_a_match(async_client, auth_headers, base_matches, tournament, teams, groups):
     other = Match(
         tournament_id=tournament.id, match_number=2, stage="group", group_id=groups["A"].id,

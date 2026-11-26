@@ -5,6 +5,7 @@ import { TeamMark } from '../../../components/common/TeamMark';
 import { formatWhen } from '../../../utils/dates';
 import { stageLabel } from '../../../utils/matchLabels';
 import { NavLink } from 'react-router-dom';
+import { isFullTime } from '../../../utils/matchStatus';
 
 const STAGE_NAMES = { group: 'Group stage', quarters: 'Quarter-finals', semis: 'Semi-finals', final: 'Final', champions: 'Completed' };
 const KNOCKOUT_NAMES = { semis_final: 'Semi-finals & final', quarters_semis_final: 'Quarters, semis & final', none: 'League only' };
@@ -12,7 +13,7 @@ const KNOCKOUT_NAMES = { semis_final: 'Semi-finals & final', quarters_semis_fina
 /** Where the competition stands and what to do next. Everything here is derived from data the workspace already loaded. */
 export function TournamentOverviewTab({ ws }) {
   const { activeTournament: t, teams, groups, matches, scorers, setTab } = ws;
-  const played = matches.filter((m) => m.status === 'full_time' || m.status === 'completed');
+  const played = matches.filter(isFullTime);
   const live = matches.filter((m) => m.status === 'live');
   const upcoming = matches
     .filter((m) => m.status === 'upcoming')

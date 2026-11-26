@@ -6,6 +6,7 @@ import { LoadingState, ErrorState, EmptyState } from '../components/common/Commo
 import { useLiveSocket } from '../hooks/useLiveSocket';
 import TournamentBracket from '../components/bracket/TournamentBracket';
 import { useTournament } from '../context/TournamentContext';
+import { isFullTime } from '../utils/matchStatus';
 
 export function MatchesPage() {
   const { tournamentId, slug } = useTournament();
@@ -37,18 +38,18 @@ export function MatchesPage() {
 
   useLiveSocket(() => {
     fetchMatches(false);
-  }, tournamentId);
+  }, tournamentId, { enabled: Boolean(tournamentId) });
 
   const filteredMatches = matches.filter((m) => {
     if (filterStage !== 'all' && m.stage !== filterStage) return false;
     if (filterStatus === 'live' && m.status !== 'live') return false;
     if (filterStatus === 'upcoming' && m.status !== 'upcoming') return false;
-    if (filterStatus === 'completed' && (m.status !== 'full_time' && m.status !== 'completed')) return false;
+    if (filterStatus === 'completed' && !isFullTime(m)) return false;
     return true;
   });
 
   const liveCount = matches.filter((m) => m.status === 'live').length;
-  const completedCount = matches.filter((m) => m.status === 'full_time' || m.status === 'completed').length;
+  const completedCount = matches.filter(isFullTime).length;
 
   return (
     <div>

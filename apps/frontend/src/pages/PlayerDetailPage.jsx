@@ -36,7 +36,7 @@ export function PlayerDetailPage() {
 
   useLiveSocket(() => {
     loadPlayer(false);
-  }, player?.tournament_id);
+  }, player?.tournament_id, { enabled: Boolean(player?.tournament_id) });
 
   if (loading) return <LoadingState message="Loading player profile..." />;
   if (error || !player) return <ErrorState message={error || 'Player not found'} onRetry={() => loadPlayer(true)} />;

@@ -141,11 +141,10 @@ export function AdminLiveControlPage() {
     }
   };
 
-  useLiveSocket((msg) => {
-    if (!msg.match_id || msg.match_id === matchId) {
-      loadMatchDetails(false);
-    }
-  }, match?.tournament_id);
+  useLiveSocket(() => loadMatchDetails(false), match?.tournament_id, {
+    enabled: Boolean(match?.tournament_id),
+    filter: (msg) => !msg.match_id || msg.match_id === matchId,
+  });
 
   const showSuccess = (msg) => {
     setSuccessMsg(msg);

@@ -16,6 +16,11 @@ class Team(Document):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+    @property
+    def crest(self) -> Optional[str]:
+        """The team's image: crest_url, falling back to the legacy logo_url alias."""
+        return self.crest_url or self.logo_url
+
     class Settings:
         name = "teams"
         indexes = [

@@ -11,7 +11,6 @@ mocks — so these are integration-style tests against a real (test) MongoDB.
 import os
 
 os.environ["MONGO_DB_NAME"] = "dcl_scoreboard_test"
-os.environ["AUTO_SEED"] = "true"
 # Never talk to a real R2 bucket from tests: individual tests opt in with a mocked client.
 for _name in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME", "R2_PUBLIC_BASE_URL"):
     os.environ[_name] = ""

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Trophy, Shield, LogOut, Lock, Menu, X, Activity } from 'lucide-react';
 import { authApi } from '../../api/auth';
+import { AUTH_CHANGED_EVENT } from '../../api/session';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { TournamentSwitcher } from './TournamentSwitcher';
 
@@ -19,11 +20,11 @@ export function NavBar() {
       setIsAdmin(authApi.isAuthenticated());
       setRole(authApi.getRole());
     };
-    window.addEventListener('matchgrid-auth-changed', handleAuthChange);
-    window.addEventListener('dcl-auth-changed', handleAuthChange);
+    window.addEventListener(AUTH_CHANGED_EVENT, handleAuthChange);
+    window.addEventListener('storage', handleAuthChange); // sign-in/out in another tab
     return () => {
-      window.removeEventListener('matchgrid-auth-changed', handleAuthChange);
-      window.removeEventListener('dcl-auth-changed', handleAuthChange);
+      window.removeEventListener(AUTH_CHANGED_EVENT, handleAuthChange);
+      window.removeEventListener('storage', handleAuthChange);
     };
   }, []);
 
@@ -50,7 +51,7 @@ export function NavBar() {
           {/* Logo & Wordmark */}
           <NavLink to="/" className="brand-logo-link">
             <img
-              src="/assets/brand/matchgrid-logo.png"
+              src="/brand/matchgrid-logo.png"
               alt="MatchGrid Logo"
               className="brand-logo-img"
             />
@@ -163,7 +164,7 @@ export function NavBar() {
       <aside className={`mobile-drawer ${mobileMenuOpen ? 'open' : ''}`} aria-label="Mobile navigation">
         <div className="mobile-drawer-header">
           <div className="brand-logo-link">
-            <img src="/assets/brand/matchgrid-logo.png" alt="MatchGrid" className="brand-logo-img" />
+            <img src="/brand/matchgrid-logo.png" alt="MatchGrid" className="brand-logo-img" />
             <div className="brand-wordmark">
               <span className="brand-wordmark-title">
                 Match<span>Grid</span>

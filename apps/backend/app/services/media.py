@@ -42,11 +42,15 @@ async def release_media(url: Optional[str], tournament_id: PydanticObjectId) -> 
     if not key or storage.extract_tournament_id_from_key(key) != str(tournament_id).lower():
         return False
 
-    pattern = {"$regex": re.escape(key)}
+    # validate_media_url only lets a tournament reference keys in its own folder, so only this
+    # tournament's rows can still point at the object: scope the lookup (indexed) to them, and
+    # anchor the key at the end of the stored URL (optionally followed by a query or fragment).
+    tid = PydanticObjectId(str(tournament_id))
+    pattern = {"$regex": re.escape(key) + r"(?:[?#].*)?$"}
     still_used = (
-        await Team.find({"$or": [{"crest_url": pattern}, {"logo_url": pattern}]}).count()
-        or await Player.find({"photo_url": pattern}).count()
-        or await Tournament.find({"$or": [{"logo_url": pattern}, {"banner_url": pattern}]}).count()
+        await Team.find({"tournament_id": tid, "$or": [{"crest_url": pattern}, {"logo_url": pattern}]}).count()
+        or await Player.find({"tournament_id": tid, "photo_url": pattern}).count()
+        or await Tournament.find({"_id": tid, "$or": [{"logo_url": pattern}, {"banner_url": pattern}]}).count()
     )
     if still_used:
         return False

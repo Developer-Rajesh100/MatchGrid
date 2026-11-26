@@ -12,7 +12,7 @@ export function BracketPage() {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
-  useLiveSocket(handleRefresh, tournamentId);
+  useLiveSocket(handleRefresh, tournamentId, { enabled: Boolean(tournamentId) });
 
   return (
     <div className="tournament-bracket-page">

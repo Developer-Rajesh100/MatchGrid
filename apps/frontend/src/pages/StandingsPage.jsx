@@ -54,7 +54,7 @@ export function StandingsPage() {
 
   useLiveSocket(() => {
     fetchStandings(false);
-  }, tournamentId);
+  }, tournamentId, { enabled: Boolean(tournamentId) });
 
   return (
     <div>

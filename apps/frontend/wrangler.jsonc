@@ -1,0 +1,19 @@
+// Cloudflare Workers static-assets deployment of the MatchGrid SPA.
+//
+// Workers Builds (Cloudflare dashboard → Workers & Pages → matchgrid → Settings → Builds):
+//   Root directory   apps/frontend
+//   Build command    cd ../.. && bun install --frozen-lockfile && cd apps/frontend && bun run build
+//   Deploy command   npx wrangler deploy
+//   Build variables  VITE_API_URL=https://matchgrid-api.onrender.com
+//                    VITE_WS_URL=wss://matchgrid-api.onrender.com
+// The VITE_* values are baked into the bundle at build time: changing them needs a rebuild.
+// Security and cache headers live in public/_headers (copied into dist/ by Vite).
+{
+  "name": "matchgrid",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    // Deep links (/login, /t/:slug/bracket, ...) and reloads serve index.html; React Router takes over.
+    "not_found_handling": "single-page-application"
+  }
+}

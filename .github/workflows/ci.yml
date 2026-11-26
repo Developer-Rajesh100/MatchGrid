@@ -46,7 +46,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -54,14 +54,14 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Cache Bun packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -91,7 +91,6 @@ jobs:
             echo "JWT_SECRET=ci-test-secret-key-for-automated-playwright-runs"
             echo "ADMIN_BOOTSTRAP_USERNAME=admin"
             echo "ADMIN_BOOTSTRAP_PASSWORD=replace-with-a-strong-password"
-            echo "AUTO_SEED=false"
             echo "CORS_ORIGINS=http://localhost:5173"
             echo "TOURNAMENT_NAME=MatchGrid"
             echo "TOURNAMENT_SEASON=1"
@@ -125,9 +124,16 @@ jobs:
       - name: Run Full-Stack Regression Gate (Pytest, Vitest, Build, Playwright)
         run: bun run test:all
 
+      # The production frontend is served by Cloudflare Workers static assets: the build must carry
+      # its headers file, and the Worker config must keep the SPA fallback (deep links / reloads).
+      - name: Cloudflare deploy files are in place
+        run: |
+          grep -q "Content-Security-Policy" apps/frontend/dist/_headers
+          node -e "const c=JSON.parse(require('fs').readFileSync('apps/frontend/wrangler.jsonc','utf8').replace(/^\s*\/\/.*$/mg,'')); if (c.assets?.not_found_handling !== 'single-page-application') { console.error('wrangler.jsonc lost the SPA fallback'); process.exit(1); }"
+
       - name: Upload Playwright Report on Failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |
@@ -141,7 +147,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Build API image (root context)
         run: docker build -f apps/backend/Dockerfile -t matchgrid-api:ci .

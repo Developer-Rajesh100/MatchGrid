@@ -9,7 +9,11 @@ import { Skeleton } from '../../components/common/Skeleton';
 import { useLiveSocket } from '../../hooks/useLiveSocket';
 import { clockOffsetMs } from '../../utils/clock';
 
-const isLive = (t) => (t.live_matches_count || 0) > 0 || (t.status || '').toUpperCase() === 'LIVE';
+const isLive = (t) => (t.live_matches_count || 0) > 0;
+// The public directory never contains drafts (they stay private until published).
+const hasStatus = (status) => (t) => (t.status || '').toLowerCase() === status;
+const isActive = hasStatus('active');
+const isCompleted = hasStatus('completed');
 
 function HubSkeleton() {
   return (
@@ -76,8 +80,8 @@ export function PublicHubPage() {
   }, [anyLive, loadAll]);
 
   const liveTournaments = useMemo(() => tournaments.filter(isLive), [tournaments]);
-  const upcoming = useMemo(() => tournaments.filter((t) => (t.status || '').toUpperCase() === 'DRAFT'), [tournaments]);
-  const completed = useMemo(() => tournaments.filter((t) => (t.status || '').toUpperCase() === 'COMPLETED'), [tournaments]);
+  const active = useMemo(() => tournaments.filter(isActive), [tournaments]);
+  const completed = useMemo(() => tournaments.filter(isCompleted), [tournaments]);
   const liveMatchTotal = useMemo(
     () => tournaments.reduce((n, t) => n + (t.live_matches_count || 0), 0),
     [tournaments]
@@ -87,8 +91,8 @@ export function PublicHubPage() {
     const q = searchQuery.toLowerCase().trim();
     return tournaments.filter((t) => {
       if (activeFilter === 'LIVE' && !isLive(t)) return false;
-      if (activeFilter === 'UPCOMING' && (t.status || '').toUpperCase() !== 'DRAFT') return false;
-      if (activeFilter === 'COMPLETED' && (t.status || '').toUpperCase() !== 'COMPLETED') return false;
+      if (activeFilter === 'ACTIVE' && !isActive(t)) return false;
+      if (activeFilter === 'COMPLETED' && !isCompleted(t)) return false;
       if (!q) return true;
       return [t.name, t.season, t.organizer_name].some((v) => (v || '').toLowerCase().includes(q));
     });
@@ -100,7 +104,7 @@ export function PublicHubPage() {
   const tabs = [
     { id: 'ALL', label: `All (${tournaments.length})` },
     { id: 'LIVE', label: `Live (${liveTournaments.length})`, icon: true },
-    { id: 'UPCOMING', label: `Upcoming (${upcoming.length})` },
+    { id: 'ACTIVE', label: `Active (${active.length})` },
     { id: 'COMPLETED', label: `Completed (${completed.length})` },
   ];
 

@@ -1,5 +1,6 @@
 import React from 'react';
 
+
 export function StatusPill({ status, isHalfTime = false }) {
   if (status === 'live') {
     if (isHalfTime) {
@@ -17,7 +18,7 @@ export function StatusPill({ status, isHalfTime = false }) {
       </span>
     );
   }
-  if (status === 'full_time' || status === 'completed') {
+  if (status === 'full_time') {
     return (
       <span className="pill pill-full-time">
         <span className="pill-dot"></span>

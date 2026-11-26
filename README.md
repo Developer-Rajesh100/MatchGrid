@@ -62,7 +62,7 @@ This single command automatically:
 3. Creates the Python virtual environment in `apps/backend/.venv` and installs all dependencies (`requirements-dev.txt`).
 4. Installs Bun workspace dependencies across the monorepo (`bun install`).
 5. Executes database schema migrations (`app.migrations.runner`).
-6. Seeds initial tournament roster and fixtures (`app.scripts.seed_data`).
+6. Leaves the database empty apart from the bootstrap superadmin and the default tournament; run `bun run seed:demo` for a realistic demo dataset.
 
 ---
 
@@ -128,7 +128,7 @@ This automatically:
 
 ## Demo data
 
-`bun run seed:demo` fills the dev database with a busy, realistic platform: ~50 tournaments (completed with champions, active at every stage with matches live and at half time right now, and upcoming drafts), 400+ clubs, 3,000+ players, ~770 matches with lineups, events and the materialized standings and statistics, plus 8 organizers and 20 scorers.
+`bun run seed:demo` fills the dev database with a busy, realistic platform: ~50 tournaments (completed with champions, active at every stage with matches live and at half time right now, and private drafts that only their organizers see), 400+ clubs, 3,000+ players, ~770 matches with lineups, events and the materialized standings and statistics, plus 8 organizers and 20 scorers.
 
 * Safe to re-run: it does nothing once seeded. `bun run seed:demo -- --reset` removes exactly what it created (accounts named `demo_*` and their tournaments) and rebuilds it; other data is never touched.
 * It never uses Cloudflare R2 (crests, logos and banners are inline SVGs) and refuses the test database and `ENVIRONMENT=production`.

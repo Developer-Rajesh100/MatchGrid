@@ -24,7 +24,6 @@ def _settings(**overrides) -> Settings:
         r2_bucket_name="bucket",
         r2_public_base_url="https://cdn.example.com",
         mongo_uri="mongodb+srv://matchgrid_user:s3cr3t-Pass@cluster0.abcde.mongodb.net/?retryWrites=true&w=majority",
-        auto_seed=False,
         trusted_proxy_hops=1,
     )
     defaults.update(overrides)
@@ -187,10 +186,6 @@ def test_production_rejects_replica_set_with_one_local_member():
     assert any("MONGO_URI" in p for p in check_runtime_config(_settings(mongo_uri=uri)))
 
 
-def test_production_rejects_auto_seed():
-    assert any("AUTO_SEED" in p for p in check_runtime_config(_settings(auto_seed=True)))
-
-
 @pytest.mark.parametrize("hops", [0, -1])
 def test_production_requires_at_least_one_trusted_proxy_hop(hops):
     assert any("TRUSTED_PROXY_HOPS" in p for p in check_runtime_config(_settings(trusted_proxy_hops=hops)))
@@ -211,11 +206,11 @@ def test_bootstrap_password_may_not_equal_the_username():
 
 
 def test_all_problems_are_listed_together_in_the_startup_error():
-    settings = _settings(debug=True, auto_seed=True, trusted_proxy_hops=0, cors_origins="*")
+    settings = _settings(debug=True, trusted_proxy_hops=0, cors_origins="*")
     with pytest.raises(RuntimeError) as exc:
         assert_safe_for_production(settings)
     message = str(exc.value)
-    for needle in ("DEBUG", "AUTO_SEED", "TRUSTED_PROXY_HOPS", "CORS_ORIGINS"):
+    for needle in ("DEBUG", "TRUSTED_PROXY_HOPS", "CORS_ORIGINS"):
         assert needle in message
 
 
@@ -227,7 +222,7 @@ def test_the_ci_and_dev_values_in_this_repo_can_never_pass_in_production():
         mongo_uri="mongodb://dcl_admin:change-me-strong-password@localhost:27017/?authSource=admin",
         admin_bootstrap_password="replace-with-a-strong-password",
         debug=True,
-        auto_seed=True,
     )
-    assert len(check_runtime_config(settings)) >= 4
+    # http CORS origin, localhost Mongo, DEBUG (and the weak bootstrap password below).
+    assert len(check_runtime_config(settings)) >= 3
     assert check_bootstrap_password(settings)

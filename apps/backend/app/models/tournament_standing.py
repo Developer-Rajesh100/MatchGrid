@@ -29,4 +29,7 @@ class TournamentStanding(Document):
 
     class Settings:
         name = "tournament_standings"
-        indexes = [IndexModel([("group_id", 1), ("team_id", 1)], unique=True)]
+        indexes = [
+            IndexModel([("group_id", 1), ("team_id", 1)], unique=True),
+            IndexModel("tournament_id"),  # tournament deletion
+        ]

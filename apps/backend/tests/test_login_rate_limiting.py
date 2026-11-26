@@ -107,3 +107,48 @@ async def test_different_real_clients_behind_the_proxy_are_throttled_separately(
         headers={"X-Forwarded-For": "198.51.100.2"},
     )
     assert good.status_code == 200
+
+
+async def test_client_ip_header_keeps_one_client_stable_across_rotating_proxies(async_client, admin, monkeypatch):
+    """Behind Cloudflare + Render the proxy addresses in X-Forwarded-For change between requests;
+    with CLIENT_IP_HEADER=cf-connecting-ip the throttle must still see one client."""
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "client_ip_header", "cf-connecting-ip")
+    bad = {"username": "testadmin", "password": "wrong-password"}
+    statuses = []
+    for i in range(10):
+        r = await async_client.post(
+            "/api/auth/login",
+            json=bad,
+            headers={"CF-Connecting-IP": "203.0.113.50", "X-Forwarded-For": f"203.0.113.50, 172.70.0.{i}"},
+        )
+        statuses.append(r.status_code)
+    assert 429 in statuses
+    # A different real client is not caught by that throttle.
+    other = await async_client.post(
+        "/api/auth/login",
+        json={"username": "testadmin", "password": "testpass123"},
+        headers={"CF-Connecting-IP": "203.0.113.51"},
+    )
+    assert other.status_code == 200
+
+
+def test_client_ip_header_is_ignored_unless_configured(monkeypatch):
+    from starlette.requests import Request
+
+    from app.core.config import get_settings
+    from app.core.rate_limit import client_key
+
+    def request(headers):
+        return Request({"type": "http", "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()], "client": ("10.9.9.9", 1)})
+
+    spoofed = {"CF-Connecting-IP": "1.1.1.1", "X-Forwarded-For": "198.51.100.7"}
+    monkeypatch.setattr(get_settings(), "client_ip_header", "")
+    monkeypatch.setattr(get_settings(), "trusted_proxy_hops", 1)
+    assert client_key(request(spoofed)) == "198.51.100.7"
+    monkeypatch.setattr(get_settings(), "client_ip_header", "CF-Connecting-IP")
+    assert client_key(request(spoofed)) == "1.1.1.1"
+    # Configured but absent: fall back to X-Forwarded-For, then the socket peer.
+    assert client_key(request({"X-Forwarded-For": "198.51.100.7"})) == "198.51.100.7"
+    assert client_key(request({})) == "10.9.9.9"

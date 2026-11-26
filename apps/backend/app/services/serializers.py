@@ -8,12 +8,45 @@ to see and adjust per resource.
 from datetime import datetime, timezone
 from typing import Optional
 
-from app.models import Group, GroupTeam, Match, MatchEvent, Player, Team
+from app.models import Group, GroupTeam, Match, MatchEvent, Player, Team, Tournament, TournamentConfig, User
+from app.schemas.auth import UserOut
 from app.schemas.group import GroupOut
 from app.schemas.match import MatchAdminOut, MatchOut
 from app.schemas.match_event import MatchEventOut
 from app.schemas.player import PlayerOut
 from app.schemas.team import TeamOut
+from app.schemas.tournament import TournamentOut
+
+
+def user_to_out(user: User) -> UserOut:
+    return UserOut(
+        id=str(user.id),
+        username=user.username,
+        email=user.email,
+        role=user.role,
+        organization_name=user.organization_name,
+        created_by=str(user.created_by) if user.created_by else None,
+        is_active=user.is_active,
+        created_at=user.created_at,
+    )
+
+
+def tournament_to_out(t: Tournament, live_matches_count: int = 0) -> TournamentOut:
+    return TournamentOut(
+        id=str(t.id),
+        name=t.name,
+        season=t.season,
+        format_description=t.format_description,
+        stage=t.stage,
+        champion_team_id=str(t.champion_team_id) if t.champion_team_id else None,
+        organizer_id=str(t.organizer_id) if t.organizer_id else None,
+        slug=t.slug,
+        status=t.status,
+        logo_url=t.logo_url,
+        banner_url=t.banner_url,
+        config=t.config or TournamentConfig(),
+        live_matches_count=live_matches_count,
+    )
 
 
 def group_to_out(group: Group) -> GroupOut:
@@ -26,7 +59,7 @@ def team_to_out(
     group: Optional[Group] = None,
     player_count: Optional[int] = None,
 ) -> TeamOut:
-    crest = team.crest_url or team.logo_url
+    crest = team.crest
     return TeamOut(
         id=str(team.id),
         tournament_id=str(team.tournament_id),
@@ -104,11 +137,11 @@ def match_to_out(
         notes=match.notes,
         team1_id=str(match.team1_id) if match.team1_id else None,
         team1_name=team1.name if team1 else None,
-        team1_crest_url=(team1.crest_url or team1.logo_url) if team1 else None,
+        team1_crest_url=team1.crest if team1 else None,
         team1_color=team1.color if team1 else None,
         team2_id=str(match.team2_id) if match.team2_id else None,
         team2_name=team2.name if team2 else None,
-        team2_crest_url=(team2.crest_url or team2.logo_url) if team2 else None,
+        team2_crest_url=team2.crest if team2 else None,
         team2_color=team2.color if team2 else None,
         status=match.status,
         score1=score1,

@@ -4,7 +4,7 @@ from app.core.errors import ConflictError, NotFoundError, ValidationAppError
 from app.core.websocket import broadcast
 from app.models import Match, MatchEvent, Player
 from app.schemas.match_event import MatchEventCreate
-from app.services.player_stats import recalculate_player_statistics
+from app.services.player_stats import recalculate_players_statistics
 from app.services.bracket import assert_downstream_unstarted, recompute_bracket
 from app.services.standings import recalculate_group_standings
 from app.services.tournament_stage import refresh_tournament_stage
@@ -26,8 +26,7 @@ async def _validate_team_and_player(
 async def _after_mutation(match: Match, affected_player_ids: set[PydanticObjectId]) -> None:
     if match.stage == "group" and match.group_id:
         await recalculate_group_standings(match.group_id)
-    for player_id in affected_player_ids:
-        await recalculate_player_statistics(player_id)
+    await recalculate_players_statistics(affected_player_ids)
     if match.stage in ("quarter", "semi", "final"):
         # A changed score can change the winner: move (or withdraw) it in the bracket.
         await recompute_bracket(match.tournament_id, trigger_match=match)

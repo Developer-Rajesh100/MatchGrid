@@ -1,7 +1,7 @@
-from typing import Any
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends
+from pymongo.errors import DuplicateKeyError
 
 from app.core.deps import require_superadmin
 from app.core.errors import ConflictError, NotFoundError, ValidationAppError
@@ -9,31 +9,16 @@ from app.core.security import hash_password
 from app.models import DOCUMENT_MODELS, Match, Tournament, User, UserRole
 from app.schemas.auth import OrganizerCreate, UserOut, UserStatusUpdate
 from app.schemas.tournament import TournamentOut
+from app.services.serializers import tournament_to_out, user_to_out
 from app.services.users import unassign_scorer_everywhere
 
 router = APIRouter(prefix="/superadmin", tags=["superadmin"])
 
 
-def _to_user_out(user: User) -> UserOut:
-    return UserOut(
-        id=str(user.id),
-        username=user.username,
-        email=user.email,
-        role=user.role,
-        organization_name=user.organization_name,
-        created_by=str(user.created_by) if user.created_by else None,
-        is_active=user.is_active,
-        created_at=user.created_at,
-    )
-
-
 @router.get("/users", response_model=list[UserOut])
 async def list_users(_admin: User = Depends(require_superadmin)) -> list[UserOut]:
     users = await User.find_all().to_list()
-    return [_to_user_out(u) for u in users]
-
-
-from pymongo.errors import DuplicateKeyError
+    return [user_to_out(u) for u in users]
 
 
 @router.post("/organizers", response_model=UserOut, status_code=201)
@@ -60,7 +45,7 @@ async def create_organizer(
         await user.insert()
     except DuplicateKeyError as exc:
         raise ConflictError(f"A user with username '{payload.username}' or email already exists") from exc
-    return _to_user_out(user)
+    return user_to_out(user)
 
 
 @router.patch("/users/{user_id}/status", response_model=UserOut)
@@ -81,27 +66,12 @@ async def update_user_status(
 
     user.is_active = payload.is_active
     await user.save()
-    return _to_user_out(user)
+    return user_to_out(user)
 
 
 @router.get("/tournaments", response_model=list[TournamentOut])
 async def list_all_tournaments(_admin: User = Depends(require_superadmin)) -> list[TournamentOut]:
-    tournaments = await Tournament.find_all().to_list()
-    return [
-        TournamentOut(
-            id=str(t.id),
-            name=t.name,
-            season=t.season,
-            format_description=t.format_description,
-            stage=t.stage,
-            champion_team_id=str(t.champion_team_id) if t.champion_team_id else None,
-            organizer_id=str(t.organizer_id) if t.organizer_id else None,
-            slug=t.slug,
-            status=t.status,
-            logo_url=t.logo_url,
-        )
-        for t in tournaments
-    ]
+    return [tournament_to_out(t) for t in await Tournament.find_all().to_list()]
 
 
 @router.get("/stats")

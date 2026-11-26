@@ -62,7 +62,7 @@ async def delete_team(team: Team) -> None:
         raise ConflictError(
             "Cannot remove a team that already has players and/or scheduled matches"
         )
-    old_crest = team.crest_url or team.logo_url
+    old_crest = team.crest
     await GroupTeam.find(GroupTeam.team_id == team.id).delete()
     await team.delete()
     if old_crest:

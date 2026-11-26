@@ -5,6 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from app.core.config import get_settings
 from app.core.bootstrap import run_startup_tasks
@@ -70,7 +71,6 @@ app.add_middleware(
 )
 
 
-
 @app.middleware("http")
 async def add_security_headers(request, call_next):
     response = await call_next(request)
@@ -89,6 +89,16 @@ register_exception_handlers(app)
 @app.exception_handler(RequestValidationError)
 async def handle_validation_error(request, exc: RequestValidationError) -> JSONResponse:
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
+
+
+@app.exception_handler(ValidationError)
+async def handle_model_validation_error(request, exc: ValidationError) -> JSONResponse:
+    # A model built inside a handler (e.g. merged settings) that fails its own validators is the
+    # client's invalid input, never a 500.
+    return JSONResponse(
+        status_code=422,
+        content={"detail": jsonable_encoder(exc.errors(include_url=False, include_context=False))},
+    )
 
 
 app.include_router(health.router)

@@ -1,9 +1,21 @@
 import { buildApiUrl } from '../config';
+import { clearSession, session } from './session';
+
+/**
+ * `path` plus a query string built from `params`, skipping empty values. `slug` is accepted as an
+ * alias of `tournament_slug`, and a bare string means a tournament id.
+ */
+export function withQuery(path, params = {}) {
+  const source = typeof params === 'string' ? { tournament_id: params } : params || {};
+  const { slug, ...rest } = source;
+  const entries = Object.entries({ ...rest, tournament_slug: rest.tournament_slug || slug })
+    .filter(([, value]) => value !== undefined && value !== null && value !== '');
+  const qs = new URLSearchParams(entries).toString();
+  return qs ? `${path}?${qs}` : path;
+}
 
 export async function apiClient(endpoint, options = {}) {
-  const token =
-    localStorage.getItem('matchgrid_admin_token') ||
-    localStorage.getItem('dcl_admin_token');
+  const token = session.token();
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers = {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
@@ -22,14 +34,9 @@ export async function apiClient(endpoint, options = {}) {
 
   const response = await fetch(buildApiUrl(endpoint), config);
 
-  if (response.status === 401) {
-    // Auth expired or invalid
-    localStorage.removeItem('matchgrid_admin_token');
-    localStorage.removeItem('matchgrid_admin_username');
-    localStorage.removeItem('dcl_admin_token');
-    localStorage.removeItem('dcl_admin_username');
-    window.dispatchEvent(new CustomEvent('matchgrid-auth-changed', { detail: { reason: 'expired' } }));
-    window.dispatchEvent(new Event('dcl-auth-changed'));
+  if (response.status === 401 && token) {
+    // The session expired or was revoked (e.g. the account was deactivated).
+    clearSession('expired');
   }
 
   if (!response.ok) {

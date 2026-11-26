@@ -3,7 +3,7 @@ from beanie import PydanticObjectId
 from app.core.errors import ValidationAppError
 from app.core.websocket import broadcast
 from app.models import Match, MatchLineup, Player
-from app.services.player_stats import recalculate_player_statistics
+from app.services.player_stats import recalculate_players_statistics
 
 
 async def set_lineup(match: Match, player_ids: list[str]) -> list[MatchLineup]:
@@ -42,9 +42,7 @@ async def set_lineup(match: Match, player_ids: list[str]) -> list[MatchLineup]:
     new_entries: list[MatchLineup] = kept + to_add
     new_entries.sort(key=lambda e: ids.index(e.player_id))
 
-    affected = previous_player_ids | set(ids)
-    for player_id in affected:
-        await recalculate_player_statistics(player_id)
+    await recalculate_players_statistics(previous_player_ids | set(ids))
 
     await broadcast({"type": "match_updated", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
     return new_entries

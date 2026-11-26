@@ -1,4 +1,4 @@
-import { APIRequestContext } from '@playwright/test';
+import { APIRequestContext, Page } from '@playwright/test';
 
 export const ADMIN_CREDENTIALS = {
   username: process.env.ADMIN_BOOTSTRAP_USERNAME || 'admin',
@@ -641,4 +641,28 @@ export async function getBracketTree(request: APIRequestContext, tournamentId: s
   }
 
   return response.json();
+}
+
+export interface BrowserSession {
+  token: string;
+  role: 'SUPER_ADMIN' | 'ORGANIZER' | 'SCORER';
+  username?: string;
+}
+
+/**
+ * Puts a signed-in session into the browser the way the app's login does (same localStorage keys
+ * as apps/frontend/src/api/session.js), then announces it so mounted components re-read it.
+ * Every key is set together: a session without a role is not trusted by the app.
+ */
+export async function signInBrowser(page: Page, { token, role, username = 'e2e-user' }: BrowserSession): Promise<void> {
+  await page.goto('/');
+  await page.evaluate(
+    ({ token, role, username }) => {
+      localStorage.setItem('matchgrid_admin_token', token);
+      localStorage.setItem('matchgrid_admin_username', username);
+      localStorage.setItem('matchgrid_role', role);
+      window.dispatchEvent(new CustomEvent('matchgrid-auth-changed', { detail: { reason: 'login' } }));
+    },
+    { token, role, username }
+  );
 }

@@ -19,6 +19,7 @@ import { clockOffsetMs, minuteLabel } from '../../utils/clock';
 import { formatDay, formatWhen } from '../../utils/dates';
 import { stageLabel } from '../../utils/matchLabels';
 import { tPath } from '../../utils/paths';
+import { isFullTime } from '../../utils/matchStatus';
 
 const STAGE_NAMES = {
   group: 'Group stage',
@@ -97,13 +98,13 @@ export function TournamentOverviewPage() {
     loadData(true);
   }, [loadData]);
 
-  useLiveSocket(useCallback(() => { loadData(false); }, [loadData]), tournamentId);
+  useLiveSocket(useCallback(() => { loadData(false); }, [loadData]), tournamentId, { enabled: Boolean(tournamentId) });
 
   const { liveMatches, upcomingMatches, completedMatches } = useMemo(
     () => ({
       liveMatches: matches.filter((m) => m.status === 'live'),
       upcomingMatches: matches.filter((m) => m.status === 'upcoming'),
-      completedMatches: matches.filter((m) => m.status === 'full_time' || m.status === 'completed'),
+      completedMatches: matches.filter(isFullTime),
     }),
     [matches]
   );

@@ -12,6 +12,7 @@ import {
   loginAsAdmin,
   loginUser,
   teardownEntities,
+  signInBrowser,
 } from '../fixtures/api';
 
 test.describe('MatchGrid Four-Tier RBAC & Multi-Tenant Data Isolation', () => {
@@ -165,12 +166,7 @@ test.describe('MatchGrid Four-Tier RBAC & Multi-Tenant Data Isolation', () => {
       expect(matchIds).not.toContain(match2.id);
 
       // Scorer accesses Live Scorer UI for Match 1
-      await page.goto('/');
-      await page.evaluate((token) => {
-        localStorage.setItem('matchgrid_admin_token', token);
-        localStorage.setItem('dcl_admin_token', token);
-        localStorage.setItem('matchgrid_role', 'SCORER'); // a session without a role is not trusted
-      }, scorerToken);
+      await signInBrowser(page, { token: scorerToken, role: 'SCORER' });
 
       await page.goto(`/scorer/matches/${match1.id}/live`);
       await expect(page.locator(`text=${team1.name}`).first()).toBeVisible({ timeout: 8000 });

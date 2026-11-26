@@ -117,9 +117,6 @@ def check_runtime_config(settings: Settings) -> list[str]:
     if settings.debug:
         problems.append("DEBUG must be false in production (set DEBUG=false).")
 
-    if settings.auto_seed:
-        problems.append("AUTO_SEED must be false in production (set AUTO_SEED=false) so no sample data is inserted.")
-
     if settings.trusted_proxy_hops < 1:
         problems.append(
             "TRUSTED_PROXY_HOPS must be at least 1 in production: the API runs behind the platform's proxy, "

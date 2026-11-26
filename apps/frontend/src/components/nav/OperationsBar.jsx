@@ -24,7 +24,7 @@ export function OperationsBar() {
     <header className="ops-bar">
       <div className="ops-bar__inner">
         <Link to="/scorer" className="ops-bar__brand" aria-label="MatchGrid scorer cockpit">
-          <img src="/assets/brand/matchgrid-logo.png" alt="" className="brand-logo-img" />
+          <img src="/brand/matchgrid-logo.png" alt="" className="brand-logo-img" />
           <span className="ops-bar__wordmark">
             Match<span>Grid</span>
           </span>

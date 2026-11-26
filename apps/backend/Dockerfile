@@ -22,11 +22,10 @@ WORKDIR /app
 COPY apps/backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Only the actual application package and its runtime data files — no
+# Only the actual application package — no
 # tests/, venv/, .env, or docs (excluded by ../.dockerignore regardless,
 # this is an explicit second layer of the same guarantee).
 COPY apps/backend/app ./app
-COPY apps/backend/data ./data
 COPY apps/backend/docker-entrypoint.sh ./
 
 RUN chmod +x docker-entrypoint.sh && chown -R app:app /app

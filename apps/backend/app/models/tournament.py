@@ -76,5 +76,6 @@ class Tournament(Document):
             ),
             IndexModel([("organizer_id", 1), ("status", 1)]),
             IndexModel("name"),
+            IndexModel("status"),  # the public directory hides drafts
         ]
 

@@ -50,12 +50,13 @@ export function TournamentProvider({ children, slugOverride = null }) {
     }
   }, [slug, fetchTournament]);
 
-  // Connect live socket scoped to tournament ID
+  // Joins the tournament's room once its id is known (never the global room in the meantime).
   useLiveSocket(
     useCallback(() => {
       fetchTournament(false);
     }, [fetchTournament]),
-    tournament?.id || null
+    tournament?.id || null,
+    { enabled: Boolean(tournament?.id) }
   );
 
   const value = {

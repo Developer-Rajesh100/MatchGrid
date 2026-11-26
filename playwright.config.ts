@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// E2E_BASE_URL points the browser at an already running frontend (and skips starting local
+// servers); set API_BASE_URL alongside it for the API fixtures. Default: local dev servers.
+const externalBaseUrl = process.env.E2E_BASE_URL;
+
 /**
  * Playwright E2E configuration for MatchGrid Bun monorepo.
  * See https://playwright.dev/docs/test-configuration.
@@ -20,7 +24,7 @@ export default defineConfig({
     ['html', { open: 'never' }],
   ],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: externalBaseUrl || 'http://localhost:5173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -34,7 +38,7 @@ export default defineConfig({
   ],
 
   /* Automatically ensure backend and frontend servers are reachable */
-  webServer: [
+  webServer: externalBaseUrl ? undefined : [
     {
       command: 'cd apps/backend && ./.venv/bin/uvicorn app.main:app --port 8001',
       url: 'http://localhost:8001/health',

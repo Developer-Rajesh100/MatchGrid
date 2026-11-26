@@ -51,7 +51,7 @@ export function UnifiedLoginPage() {
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div style={{ display: 'inline-flex', marginBottom: '14px' }}>
             <img
-              src="/assets/brand/matchgrid-logo.png"
+              src="/brand/matchgrid-logo.png"
               alt="MatchGrid Logo"
               style={{ width: '56px', height: '56px', objectFit: 'contain' }}
             />

@@ -9,6 +9,7 @@ from app.core.deps import (
     check_tournament_ownership,
     get_current_admin,
     get_current_user,
+    get_optional_user,
 )
 from app.core.errors import ConflictError, NotFoundError
 from app.core.websocket import broadcast
@@ -52,7 +53,7 @@ from app.services.matches import (
     uncancel_match,
 )
 from app.services.serializers import match_event_to_out, match_to_out
-from app.services.tournament_scope import resolve_tournament_id
+from app.services.tournament_scope import ensure_tournament_visible, hidden_tournament_ids, resolve_tournament_id
 from app.services.tournament_stage import get_match_winner
 
 router = APIRouter(prefix="/matches", tags=["matches"])
@@ -104,6 +105,16 @@ async def _to_out(match: Match, admin: bool = False) -> MatchOut:
     )
 
 
+async def _visible_match(match_id: str, viewer: Optional[User]) -> Match:
+    """A match of a draft tournament is 404 to anyone who may not see that tournament."""
+    match = await get_match_or_404(PydanticObjectId(match_id))
+    try:
+        await ensure_tournament_visible(match.tournament_id, viewer)
+    except NotFoundError:
+        raise NotFoundError("Match not found")
+    return match
+
+
 async def _list_matches(
     team_id: Optional[str] = None,
     stage: Optional[str] = None,
@@ -113,8 +124,9 @@ async def _list_matches(
     tournament_id: Optional[str] = None,
     tournament_slug: Optional[str] = None,
     include_scorers: bool = False,
+    viewer: Optional[User] = None,
 ) -> list[MatchOut]:
-    resolved_tid = await resolve_tournament_id(tournament_id, tournament_slug)
+    resolved_tid = await resolve_tournament_id(tournament_id, tournament_slug, viewer)
     filters: dict = {"tournament_id": resolved_tid}
     if team_id:
         tid = PydanticObjectId(team_id)
@@ -164,7 +176,13 @@ async def _matches_to_out(matches: list[Match], include_scorers: bool = False) -
 async def list_featured_live(limit: int = Query(default=8, ge=1, le=24)) -> list[MatchOut]:
     """Matches in play right now across every tournament, for the public hub's "live now" strip.
     Deliberately platform-wide (live scores are public data); everything else stays tournament-scoped."""
-    matches = await Match.find(Match.status == "live").sort("started_at").limit(limit).to_list()
+    hidden = await hidden_tournament_ids()
+    matches = (
+        await Match.find({"status": "live", "tournament_id": {"$nin": hidden}})
+        .sort("started_at")
+        .limit(limit)
+        .to_list()
+    )
     return await _matches_to_out(matches)
 
 
@@ -177,47 +195,52 @@ async def list_matches(
     date: Optional[str] = Query(default=None),
     tournament_id: Optional[str] = Query(default=None),
     tournament_slug: Optional[str] = Query(default=None),
+    viewer: Optional[User] = Depends(get_optional_user),
 ) -> list[MatchOut]:
-    return await _list_matches(team_id, stage, group_id, status, date, tournament_id, tournament_slug)
+    return await _list_matches(team_id, stage, group_id, status, date, tournament_id, tournament_slug, viewer=viewer)
 
 
 @router.get("/upcoming", response_model=list[MatchOut])
 async def list_upcoming(
     tournament_id: Optional[str] = Query(default=None),
     tournament_slug: Optional[str] = Query(default=None),
+    viewer: Optional[User] = Depends(get_optional_user),
 ) -> list[MatchOut]:
-    return await _list_matches(status="upcoming", tournament_id=tournament_id, tournament_slug=tournament_slug)
+    return await _list_matches(status="upcoming", tournament_id=tournament_id, tournament_slug=tournament_slug, viewer=viewer)
 
 
 @router.get("/live", response_model=list[MatchOut])
 async def list_live(
     tournament_id: Optional[str] = Query(default=None),
     tournament_slug: Optional[str] = Query(default=None),
+    viewer: Optional[User] = Depends(get_optional_user),
 ) -> list[MatchOut]:
-    return await _list_matches(status="live", tournament_id=tournament_id, tournament_slug=tournament_slug)
+    return await _list_matches(status="live", tournament_id=tournament_id, tournament_slug=tournament_slug, viewer=viewer)
 
 
 @router.get("/completed", response_model=list[MatchOut])
 async def list_completed(
     tournament_id: Optional[str] = Query(default=None),
     tournament_slug: Optional[str] = Query(default=None),
+    viewer: Optional[User] = Depends(get_optional_user),
 ) -> list[MatchOut]:
-    return await _list_matches(status="full_time", tournament_id=tournament_id, tournament_slug=tournament_slug)
+    return await _list_matches(status="full_time", tournament_id=tournament_id, tournament_slug=tournament_slug, viewer=viewer)
 
 
 @router.get("/bracket", response_model=BracketTreeOut)
 async def get_bracket(
     tournament_id: Optional[str] = Query(default=None),
     tournament_slug: Optional[str] = Query(default=None),
+    viewer: Optional[User] = Depends(get_optional_user),
 ) -> BracketTreeOut:
-    """Returns the visual bracket tree for the active or specified tournament."""
-    tid = await resolve_tournament_id(tournament_id, tournament_slug)
+    """Returns the visual bracket tree of the given tournament."""
+    tid = await resolve_tournament_id(tournament_id, tournament_slug, viewer)
     return await build_tournament_bracket(tid)
 
 
 @router.get("/{match_id}", response_model=MatchDetailOut)
-async def get_match(match_id: str) -> MatchDetailOut:
-    match = await get_match_or_404(PydanticObjectId(match_id))
+async def get_match(match_id: str, viewer: Optional[User] = Depends(get_optional_user)) -> MatchDetailOut:
+    match = await _visible_match(match_id, viewer)
     base = await _to_out(match)
 
     events = await MatchEvent.find(MatchEvent.match_id == match.id).sort("minute").to_list()
@@ -393,18 +416,15 @@ async def winner(
 async def generate_fixtures(
     payload: GenerateGroupFixturesRequest, admin: User = Depends(get_current_admin)
 ) -> list[MatchOut]:
-    """(Re)generate a group's 3 round-robin matches from its 3 assigned teams.
-    If the group already has recorded results, pass force=true to erase and regenerate."""
+    """(Re)generate a group's round-robin fixtures (circle method) from its assigned teams; the
+    group must hold exactly teams_per_group teams. If it already has recorded results, pass
+    force=true to erase and regenerate."""
     group = await Group.get(PydanticObjectId(payload.group_id))
-    if group:
-        await check_tournament_ownership(admin, group.tournament_id)
-    matches = await generate_group_fixtures(PydanticObjectId(payload.group_id), payload.force)
-    teams = await _teams_map(*matches)
-    groups = await _groups_map(*matches)
-    return [
-        match_to_out(m, teams, 0, 0, group_name=groups[m.group_id].name if m.group_id in groups else None)
-        for m in matches
-    ]
+    if group is None:
+        raise NotFoundError("Group not found")
+    await check_tournament_ownership(admin, group.tournament_id)
+    matches = await generate_group_fixtures(group.id, payload.force)
+    return await _matches_to_out(matches)
 
 
 @router.post("/generate-semis", response_model=list[MatchOut])
@@ -412,11 +432,11 @@ async def do_generate_semis(
     tournament_id: str = Query(..., pattern=r"^[0-9a-fA-F]{24}$"),
     admin: User = Depends(get_current_admin),
 ) -> list[MatchOut]:
-    """Seed the 2 semi-finals from final group standings: SF1 = A2 vs B1, SF2 = B2 vs A1.
-    Requires both groups fully complete and no semis generated yet."""
+    """Legacy alias of seed-knockout for the semis_final format: seeds the 2 semi-finals from the
+    final group standings. Requires every group complete and no semis generated yet."""
     tid = (await check_tournament_ownership(admin, tournament_id)).id
     matches = await generate_semis(tid)
-    return [await _to_out(m) for m in matches]
+    return await _matches_to_out(matches)
 
 
 @router.post("/generate-final", response_model=MatchOut)
@@ -439,15 +459,15 @@ async def do_seed_knockout(
     """Universal knockout seeder: seeds Quarters, Semis, or crowns Champion based on tournament config."""
     tid = (await check_tournament_ownership(admin, tournament_id)).id
     matches = await seed_knockout_bracket(tid)
-    return [await _to_out(m) for m in matches]
+    return await _matches_to_out(matches)
 
 
 # ---- Match events ----
 
 
 @router.get("/{match_id}/events", response_model=list[MatchEventOut])
-async def list_events(match_id: str) -> list[MatchEventOut]:
-    match = await get_match_or_404(PydanticObjectId(match_id))
+async def list_events(match_id: str, viewer: Optional[User] = Depends(get_optional_user)) -> list[MatchEventOut]:
+    match = await _visible_match(match_id, viewer)
     events = await MatchEvent.find(MatchEvent.match_id == match.id).sort("minute").to_list()
     players = await _players_map(match)
     return [match_event_to_out(e, players) for e in events]
@@ -478,8 +498,8 @@ async def delete_event(
 
 
 @router.get("/{match_id}/lineup", response_model=list[LineupEntryOut])
-async def get_lineup(match_id: str) -> list[LineupEntryOut]:
-    match = await get_match_or_404(PydanticObjectId(match_id))
+async def get_lineup(match_id: str, viewer: Optional[User] = Depends(get_optional_user)) -> list[LineupEntryOut]:
+    match = await _visible_match(match_id, viewer)
     entries = await MatchLineup.find(MatchLineup.match_id == match.id).to_list()
     players = await _players_map(match)
     return [

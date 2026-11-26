@@ -10,6 +10,7 @@ from beanie import PydanticObjectId
 
 from app.core.errors import ConflictError
 from app.models import Group, GroupTeam, Match, MatchEvent, Tournament
+from app.services.scoring import count_goals, winner_from_score
 from app.services.standings import sorted_group_standings
 
 KNOCKOUT_SIZES = {"semis_final": 4, "quarters_semis_final": 8}
@@ -95,24 +96,16 @@ def _sync_status(tournament: Tournament) -> None:
 
 
 async def match_goals(match: Match) -> tuple[int, int]:
+    if not match.team1_id or not match.team2_id:
+        return 0, 0
     events = await MatchEvent.find(MatchEvent.match_id == match.id, MatchEvent.type == "goal").to_list()
-    return (
-        sum(1 for e in events if e.team_id == match.team1_id),
-        sum(1 for e in events if e.team_id == match.team2_id),
-    )
+    return count_goals(match, events)
 
 
 async def get_match_winner(match: Match) -> PydanticObjectId | None:
-    """Same precedence as the reference prototype's getMatchWinnerId(): higher
-    goal count wins; on a tie, fall back to the admin's manual override."""
     if match.status != "full_time" or not match.team1_id or not match.team2_id:
         return None
-    goals1, goals2 = await match_goals(match)
-    if goals1 > goals2:
-        return match.team1_id
-    if goals2 > goals1:
-        return match.team2_id
-    return match.winner_override_id
+    return winner_from_score(match, *await match_goals(match))
 
 
 # ---------------------------------------------------------------------------
