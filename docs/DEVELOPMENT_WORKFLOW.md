@@ -53,7 +53,7 @@ flowchart TD
    - Design forward migrations in `apps/backend/app/migrations/mXXXX_<description>.py`.
 2. **Backend API & WebSocket Contracts**:
    - Pydantic models in `apps/backend/app/schemas/`.
-   - Endpoints in `apps/backend/app/routers/` with appropriate 4-tier auth boundaries (`get_current_user`, `require_superadmin`, `require_tournament_owner`, `require_match_operator`).
+   - Endpoints in `apps/backend/app/routers/` with appropriate 4-tier auth boundaries (`get_current_user`, `get_optional_user`, `require_superadmin`, `get_current_admin`, plus `check_tournament_ownership` / `check_match_operator` in the handler).
    - Real-time broadcast messages in `apps/backend/app/core/websocket.py`.
 3. **Frontend Component Tree & Styling**:
    - React components in `apps/frontend/src/components/` and routes in `apps/frontend/src/pages/`.

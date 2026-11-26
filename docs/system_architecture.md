@@ -47,7 +47,7 @@ flowchart TD
     end
 
     subgraph Edge["2. Edge, CDN & Reverse Proxy Tier"]
-        CDN["Global Edge / Reverse Proxy\n(Vercel CDN / Render Edge / Nginx TLS)\nHTTPS, WSS Upgrade, CSP & HSTS"]
+        CDN["Global Edge / Reverse Proxy\n(Cloudflare Workers SPA / Render Edge / Nginx TLS)\nHTTPS, WSS Upgrade, CSP & HSTS"]
     end
 
     subgraph FrontendApp["3. Frontend Tier (React 18 + Vite SPA)"]
@@ -182,27 +182,27 @@ Tier 4: PUBLIC (Spectators & Fans)
 | Control Live Match Clock (Start, HT, Resume, End, Reopen) | **Full** | Own Tournaments | **Assigned Matches** | Blocked (`401`) |
 | Set Match Lineups & Log Events (Goals, Cards, POTM) | **Full** | Own Tournaments | **Assigned Matches** | Blocked (`401`) |
 | Read Live Scores, Standings, Brackets & Leaderboards | **Full** | **Full** | **Full** | **Full (`GET`)** |
+| Read a `draft` (unpublished) tournament | **Full** | Own Only | Assigned Matches' Tournament | Hidden (`404`) |
+
+A `draft` tournament is private while its organizer sets it up: it is absent from `/api/tournaments/public` and the live-now strip, and every public read addressed to it (by id, slug or a child entity) answers `404`, exactly like a tournament that does not exist. Public `GET` endpoints accept an optional bearer token (`get_optional_user`) so the organizer workspace and the scorer console keep reading through them.
 
 ### 4.2 FastAPI Authorization Guards (`app/core/deps.py`)
 
-Authorization is enforced declaratively via composable FastAPI dependencies:
+Authorization is enforced by FastAPI dependencies plus explicit ownership checks inside each handler:
 
-1. **`get_current_user`**: Extracts the `Authorization: Bearer <jwt>` header, validates the HMAC-SHA256 signature and expiration (`JWT_SECRET`), loads the active `User` document, and verifies `user.is_active == True`.
-2. **`require_superadmin`**: Asserts `current_user.role == UserRole.SUPER_ADMIN`. Raises `403 Forbidden` otherwise.
-3. **`require_tournament_owner(tournament_id)`**:
-   * If `current_user.role == UserRole.SUPER_ADMIN`: Grants immediate access.
-   * If `current_user.role == UserRole.ORGANIZER`: Fetches `Tournament` and asserts `tournament.organizer_id == current_user.id`.
-   * Otherwise: Raises `403 Forbidden`.
-4. **`require_match_operator(match_id)`**:
-   * Fetches `Match` and parent `Tournament`.
-   * Grants access if `current_user.role == UserRole.SUPER_ADMIN`, **or** (`current_user.role == UserRole.ORGANIZER` and `tournament.organizer_id == current_user.id`), **or** (`current_user.role == UserRole.SCORER` and `current_user.id in match.assigned_scorer_ids`).
-   * Otherwise: Raises `403 Forbidden`.
+1. **`get_current_user`**: Extracts the `Authorization: Bearer <jwt>` header, validates the HMAC-SHA256 signature and expiration (`JWT_SECRET`), loads the `User` document, and requires `user.is_active == True` (deactivation takes effect on the next request).
+2. **`get_optional_user`**: The same, but a missing/invalid/expired token means "anonymous" (`None`) instead of `401`. Used by public `GET`s to decide draft visibility.
+3. **`require_superadmin`**: Asserts `current_user.role == UserRole.SUPER_ADMIN`, else `403`.
+4. **`get_current_admin`**: Admits `SUPER_ADMIN` or `ORGANIZER` (tenant management routes), else `403`.
+5. **`check_tournament_ownership(user, tournament_id)`**: `SUPER_ADMIN` passes; an `ORGANIZER` must be `tournament.organizer_id` (an unowned tournament is superadmin-only); anyone else gets `403`. There is no default tournament: a missing id is a `404`.
+6. **`check_match_tournament_owner(user, match_id)`**: Ownership of the match's tournament (schedule edits, cancel, winner override, reopen). Scorers are refused even when assigned.
+7. **`check_match_operator(user, match_id)`**: Live operation (clock, lineup, events). `SUPER_ADMIN`, the owning `ORGANIZER`, or a `SCORER` listed in `match.assigned_scorer_ids`; otherwise `403`.
 
 ### 4.3 Authentication, Rate Limiting & Production Hardening
 
 * **Password & Token Security:** Passwords are salted and hashed with `bcrypt`. Stateless JWTs embed `sub` (user ObjectId), `role`, and `exp` (default 12 hours).
 * **Proxy-Aware Exponential Backoff Rate Limiter (`app/core/rate_limit.py`):**
-  * Extracts client IP from `X-Forwarded-For` using `TRUSTED_PROXY_HOPS` (taking the $N$-th entry from the right appended by trusted edge proxies so spoofed leftmost headers are ignored).
+  * Keys on the client IP: the opt-in `CLIENT_IP_HEADER` (e.g. `cf-connecting-ip` on Render, whose Cloudflare edge overwrites it) when set and present, otherwise `X-Forwarded-For` using `TRUSTED_PROXY_HOPS` (the $N$-th entry from the right, appended by trusted proxies, so spoofed leftmost entries are ignored).
   * Allows $5$ free login attempts per IP to tolerate operator typos. For attempt $k > 5$, enforces an exponential cooldown delay:
     $$\text{Delay}(k) = \min\left(60,\; 2^{k - 6}\right) \text{ seconds}$$
   * **Zero Account Lockout Policy:** Accounts are never locked out globally, preventing an attacker from triggering a Denial-of-Service against a live match scorer during a tournament.
@@ -239,35 +239,35 @@ erDiagram
 
 ### 5.2 Collection & Index Specifications
 
-All tenant-scoped child collections carry an indexed `tournament_id` field to ensure complete multi-tournament isolation and sub-millisecond query execution.
+Tenant-owned collections carry an indexed `tournament_id`. Match-owned rows (`match_events`, `match_lineups`) are scoped through their `match_id` instead: a match belongs to exactly one tournament, and every read or write of them goes through that match.
 
 | Collection | Model Class | Key Fields | Critical Indexes |
 | :--- | :--- | :--- | :--- |
 | `users` | `User` | `username`, `email`, `password_hash`, `role` (`SUPER_ADMIN` \| `ORGANIZER` \| `SCORER`), `organization_name`, `created_by`, `is_active` | `username` (unique), `email` (unique sparse), `role` |
 | `tournaments` | `Tournament` | `organizer_id`, `name`, `slug`, `season`, `status` (`draft` \| `active` \| `completed`), `stage`, `champion_team_id`, `config` (`TournamentConfig`) | `slug` (unique), `(organizer_id, status)` |
-| `groups` | `Group` | `tournament_id`, `name` (e.g., `Group A`, `Group B`), `display_order` | `(tournament_id, name)` (unique) |
-| `group_teams` | `GroupTeam` | `tournament_id`, `group_id`, `team_id` | `(tournament_id, team_id)` (unique), `(tournament_id, group_id)` |
-| `teams` | `Team` | `tournament_id`, `name`, `short_name`, `color` (hex), `crest_url` | `(tournament_id, name)` (unique) |
-| `players` | `Player` | `tournament_id`, `team_id`, `name`, `number`, `player_code` (optional), `is_manager`, `photo_url` | `(tournament_id, team_id, number)` (unique), `(tournament_id, player_code)` (sparse unique) |
-| `matches` | `Match` | `tournament_id`, `match_number`, `stage` (`group` \| `quarter_final` \| `semi_final` \| `final` \| `friendly`), `group_id`, `bracket_slot`, `team1_id` *(home)*, `team2_id` *(away)*, `assigned_scorer_ids`, `status`, `started_at`, `elapsed_seconds`, `is_half_time`, `winner_override_id` | `(tournament_id, status, scheduled_at)`, `(tournament_id, stage)`, `assigned_scorer_ids`, `(tournament_id, match_number)` (unique) |
-| `match_events` | `MatchEvent` | `tournament_id`, `match_id`, `team_id`, `player_id`, `assist_player_id`, `type` (`goal` \| `yellow` \| `red` \| `potm`), `minute` | `(tournament_id, match_id, minute)`, `(tournament_id, player_id)` |
-| `match_lineups` | `MatchLineup` | `tournament_id`, `match_id`, `team_id`, `player_ids` | `(tournament_id, match_id, team_id)` (unique) |
-| `tournament_standings` | `TournamentStanding` | `tournament_id`, `group_id`, `team_id`, `played`, `won`, `drawn`, `lost`, `goals_for`, `goals_against`, `goal_difference`, `points` | `(tournament_id, group_id, points, goal_difference, goals_for)` |
-| `player_statistics` | `PlayerStatistics` | `tournament_id`, `player_id`, `team_id`, `appearances`, `goals`, `assists`, `yellow_cards`, `red_cards`, `potm_awards` | `(tournament_id, goals)`, `(tournament_id, assists)`, `(tournament_id, potm_awards)` |
-| `schema_migrations` | `SchemaMigration` | `migration_id`, `applied_at` | `migration_id` (unique) |
-| `startup_locks` | `StartupLock` | `lock_name`, `owner_id`, `expires_at` | `lock_name` (unique), `expires_at` (TTL) |
+| `groups` | `Group` | `tournament_id`, `name` (`A`, `B`, ...) | `(tournament_id, name)` (unique) |
+| `group_teams` | `GroupTeam` | `tournament_id`, `group_id`, `team_id` | `team_id` (unique: one group per team), `(group_id, team_id)` (unique) |
+| `teams` | `Team` | `tournament_id`, `name`, `short_name`, `color` (hex), `crest_url` (`logo_url` legacy alias) | `(tournament_id, name)` (unique), `tournament_id` |
+| `players` | `Player` | `tournament_id`, `team_id`, `name`, `number`, `dcl_id` (per-tournament registration id), `player_code`, `is_manager`, `photo_url` | `(team_id, number)` (unique), `(tournament_id, dcl_id)` (partial unique), `(tournament_id, player_code)` (partial unique), `tournament_id`, `team_id` |
+| `matches` | `Match` | `tournament_id`, `match_number`, `stage` (`group` \| `quarter` \| `semi` \| `final` \| `extra`), `group_id`, `bracket_slot`, `round_order`, `team1_id` *(home)*, `team2_id` *(away)*, `assigned_scorer_ids`, `status` (`upcoming` \| `live` \| `full_time` \| `cancelled`), `started_at`, `elapsed_seconds`, `is_half_time`, `winner_override_id` | `(tournament_id, match_number)` (unique), `(tournament_id, status)`, `tournament_id`, `(stage, group_id)`, `status`, `date`, `assigned_scorer_ids` |
+| `match_events` | `MatchEvent` | `match_id`, `team_id`, `player_id`, `assist_player_id`, `type` (`goal` \| `yellow` \| `red` \| `potm`), `minute` | `match_id`, `(match_id, type)`, `player_id`, `assist_player_id` |
+| `match_lineups` | `MatchLineup` | `match_id`, `team_id`, `player_id`, `is_starting` | `(match_id, player_id)` (unique), `match_id`, `player_id` |
+| `tournament_standings` | `TournamentStanding` | `tournament_id`, `group_id`, `team_id`, `played`, `won`, `drawn`, `lost`, `goals_for`, `goals_against`, `goal_difference`, `points` | `(group_id, team_id)` (unique), `tournament_id` |
+| `player_statistics` | `PlayerStatistics` | `tournament_id`, `player_id`, `team_id`, `appearances`, `goals`, `assists`, `yellow_cards`, `red_cards`, `potm_awards` | `player_id` (unique), `tournament_id` |
+| `schema_migrations` | (raw) | `_id` = migration name, `applied_at` | `_id` |
+| `startup_locks` | (raw) | `_id` = lock name, `expires_at` | `_id` (a stale lock past `expires_at` is taken over) |
 
 #### Embedded `TournamentConfig` Sub-Document (`Tournament.config`)
 ```json
 {
   "num_groups": 2,
-  "teams_per_group": 4,
+  "teams_per_group": 3,
   "qualifiers_per_group": 2,
   "knockout_format": "semis_final",
   "points_win": 3,
   "points_draw": 1,
   "points_loss": 0,
-  "half_duration_minutes": 45
+  "half_duration_minutes": 25
 }
 ```
 
@@ -279,7 +279,7 @@ goal_events = await MatchEvent.find(
     MatchEvent.type == EventType.GOAL,
 ).to_list()
 ```
-Scores and match winners are aggregated in an $O(E)$ in-memory pass over the returned events, reducing database network round-trips from $O(N)$ to $O(1)$.
+Scores and match winners are aggregated in an $O(E)$ in-memory pass over the returned events (one shared rule, `app/services/scoring.py`), reducing database network round-trips from $O(N)$ to $O(1)$. Every list of matches, the scorer cockpit included, goes through this batched conversion; player statistics are likewise recomputed in one batch for any number of players.
 
 ---
 
@@ -333,7 +333,7 @@ where $\text{Points} = (W \times P_{\text{win}}) + (D \times P_{\text{draw}}) + 
 
 #### C. Dynamic Knockout Seeding & Penalty Shootout Tiebreaks
 Once all `group` stage matches reach `full_time`, the bracket engine reads `tournament.config.knockout_format` and seeds cross-group knockout pairings so top finishers from the same group cannot meet until the Final:
-* **`semis_final` (4 Teams):** $\text{SF1} = (A_1 \text{ vs } B_2)$, $\text{SF2} = (B_1 \text{ vs } A_2)$ $\rightarrow$ $\text{Final} = (\text{Winner SF1} \text{ vs } \text{Winner SF2})$.
+* **`semis_final` (4 Teams):** $\text{SF1} = (A_2 \text{ vs } B_1)$, $\text{SF2} = (B_2 \text{ vs } A_1)$ $\rightarrow$ $\text{Final} = (\text{Winner SF1} \text{ vs } \text{Winner SF2})$.
 * **`quarters_semis_final` (8 Teams):** Cross-seeds top 2 from 4 groups ($A_1 \text{ vs } B_2$, $C_1 \text{ vs } D_2$, $B_1 \text{ vs } A_2$, $D_1 \text{ vs } C_2$) $\rightarrow$ Semi-Finals $\rightarrow$ Final.
 * **Knockout Winner Resolution:** If a knockout match ends level in regular/extra time ($\text{Score}_{\text{home}} = \text{Score}_{\text{away}}$), the Scorer or Organizer records the penalty shootout winner via `winner_override_team_id`, unlocking downstream bracket progression.
 
@@ -391,7 +391,7 @@ sequenceDiagram
     WS-->>Spectator: Connection ACK (Subscribed to Room T1)
 
     Scorer->>API: POST /api/matches/M1/events (Goal by Player P1)
-    API->>API: require_match_operator(M1) verifies Scorer assignment
+    API->>API: check_match_operator(user, M1) verifies Scorer assignment
     API->>Svc: add_match_event(M1, Goal)
     Svc->>DB: Insert MatchEvent (T1, M1, P1)
     Svc->>DB: Write-Through Update PlayerStatistics (P1.goals + 1)
@@ -408,12 +408,14 @@ sequenceDiagram
 
 | Event `type` | Trigger Action | Frontend Subscriber Reaction |
 | :--- | :--- | :--- |
-| `match_status_changed` | Match started, half-time paused, resumed, ended, reopened, or cancelled | Re-fetches match details, syncs `started_at`/`elapsed_seconds`, refreshes standings & bracket |
+| `match_status_changed` | Match started, half-time paused, resumed, timer reset, ended, reopened, cancelled or restored. Also mirrored to the hub-level `global` room. | Re-fetches match details, syncs `started_at`/`elapsed_seconds`, refreshes standings, bracket and hub live counts |
 | `match_event_added` | Goal, Yellow Card, Red Card, or POTM logged | Re-fetches live scoreboard, match event timeline, and player leaderboards |
-| `match_event_deleted` | Mis-recorded event removed by Scorer/Organizer | Re-fetches live scoreboard, rolls back timeline & player leaderboards |
-| `lineup_updated` | Match lineup saved | Re-fetches match lineups and player appearance counts |
-| `standings_updated` | Group draw, fixture generation, or knockout seeding executed | Re-fetches group standings tables and visual knockout bracket tree |
+| `match_event_removed` | Mis-recorded event removed by Scorer/Organizer | Re-fetches live scoreboard, rolls back timeline & player leaderboards |
+| `match_updated` | Match created, edited, deleted or re-teamed; lineup saved; winner override; group fixtures generated; knockout slots seeded or a winner moved forward | Re-fetches the affected lists, bracket and (on the match page) the match itself |
 
+Half-time and resume are idempotent: repeating either (a double click, two scorers, a retried request) neither rewinds the clock nor counts the break as playing time.
+
+Clients (`useLiveSocket`) only join a tournament room once that tournament is known, may filter frames per match, and collapse each burst of frames (a goal can also move bracket slots) into a single background re-fetch.
 ---
 
 ## 8. Frontend Architecture & Two-Tier UI Topology
@@ -432,9 +434,11 @@ The React 18 SPA uses a **two-tier navigation shell** separating cross-tournamen
 │       ├── /t/:slug               → Match Center Overview (Featured Live Match & Stage Banner)
 │       ├── /t/:slug/matches       → Filterable Fixtures & Live/Completed Results
 │       ├── /t/:slug/matches/:id   → Live Match Detail (Synced Clock, Event Timeline & Lineups)
-│       ├── /t/:slug/standings     → Group Standings Tables & Interactive Knockout Bracket Tree
-│       ├── /t/:slug/teams         → Participating Squads & Roster Cards
-│       └── /t/:slug/stats         → Leaderboards (Top Scorers, Assists, Discipline, POTM)
+│       ├── /t/:slug/standings     → Group Standings Tables
+│       ├── /t/:slug/bracket       → Interactive Knockout Bracket Tree
+│       ├── /t/:slug/teams[/:id]   → Participating Squads & Roster Cards
+│       ├── /t/:slug/players[/:id] → Player Directory & Profile (stats, match history, goal log)
+│       └── /t/:slug/stats         → Leaderboards (Top Scorers, Assists, POTM, Appearances)
 │
 └── Authenticated Role Portals (Protected by RoleGuard)
     ├── /superadmin                → Superadmin Command Center (All Organizers, Scorers, Tournaments & Overrides)
@@ -468,7 +472,7 @@ Every feature branch must pass four sequential quality gates before merging into
 
 ```mermaid
 flowchart LR
-    Users["🌍 End Users\n(Web & Mobile)"] -->|HTTPS / CDN| Vercel["▲ Vercel / Cloudflare Pages\n(React 18 Static SPA)"]
+    Users["🌍 End Users\n(Web & Mobile)"] -->|HTTPS / CDN| CF["🟧 Cloudflare Workers\n(React 18 Static SPA)"]
     Users <-->|HTTPS REST & WSS| Render["⚡ Render / Koyeb\n(FastAPI + Uvicorn ASGI)"]
     Render <-->|TLS mongodb+srv://| Atlas["🍃 MongoDB Atlas (M0)\n(Persistent Cluster + Indexes)"]
 ```

@@ -121,7 +121,8 @@ flowchart LR
 | **5** | Public two-tier UI (`/` hub, `/t/:slug/*` tournament center, visual bracket tree) | Completed |
 | **6** | Role portals (`/superadmin`, `/organizer`, `/scorer`, unified `/login`) | Completed |
 | **Pre-7 audit** | Security, isolation, bracket-engine and legacy cleanup findings from [`Audit.md`](Audit.md) (waves 1-3) | Completed on `fix/pre-phase7-audit` |
-| **7** | Production hardening, CI/CD and zero-cost cloud launch (Atlas + Render/DigitalOcean + Cloudflare R2) | Next up |
+| **7** | Production hardening, CI/CD and zero-cost cloud launch (Atlas + Render + Cloudflare Workers + Cloudflare R2) | Completed |
+| **Post-launch audit** | Cloudflare SPA/headers config, stable login-throttle key, private draft tournaments, clock idempotency, N+1 removal, dead-code cleanup | Completed on `fix/audit-remediation` |
 
 ### Conventions that hold across phases
 * **No default tournament.** Every public list endpoint takes `tournament_id` or `tournament_slug`, and every write names its tournament explicitly. Unowned (`organizer_id is None`) tournaments are superadmin-only.
@@ -135,7 +136,7 @@ flowchart LR
 
 ### 4.1 Immediate Next Actions (Step-by-Step)
 
-1. **Execute Phase 7 (hardening and launch):** follow [`IMPLEMENTATION_ROADMAP.md`](IMPLEMENTATION_ROADMAP.md) Phase 7 and the runbook in [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
+1. **Operate and verify the launch:** the runbook is [`../DEPLOYMENT.md`](../DEPLOYMENT.md); after every deploy run `scripts/smoke.sh <api> <web> --full`.
 2. **Before scaling out:** the WebSocket hub and the login rate limiter are in-process (see the "Scaling constraints" section of the runbook); run a single backend instance until they move to shared state.
 3. **Run the full regression gate** (`bun run test:all`) on every change, per the workflow below.
 
@@ -170,4 +171,4 @@ Upon completing all phases, **MatchGrid** will be a complete, production-deploye
 ### 5.2 Engineering & Portfolio Artifacts
 * **Clean Bun Monorepo:** Organized across `apps/backend`, `apps/frontend`, `e2e`, `docs`, and `docker-compose.yml` (MongoDB 7.0) with single-command startup (`bun run dev`).
 * **Automated Quality Assurance:** A comprehensive test suite (`bun run test:all`) combining **250+ backend Pytest tests**, **frontend Vitest component tests**, and **Playwright E2E multi-role browser tests**, automated via **GitHub Actions CI**.
-* **Live Production Deployment:** Publicly accessible URLs hosted on **Vercel** (Frontend SPA), **Render / Koyeb** (FastAPI + WebSocket server), and **MongoDB Atlas** (Persistent database) ready for live demonstrations and technical interviews.
+* **Live Production Deployment:** Publicly accessible URLs hosted on **Cloudflare Workers** (Frontend SPA), **Render** (FastAPI + WebSocket server), and **MongoDB Atlas** (Persistent database) ready for live demonstrations and technical interviews.
