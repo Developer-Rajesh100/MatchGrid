@@ -1,10 +1,14 @@
+import hashlib
+
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pymongo.errors import DuplicateKeyError
 
 from app.core.deps import require_superadmin
+from app.core.config import get_settings
 from app.core.errors import ConflictError, NotFoundError, ValidationAppError
+from app.core.rate_limit import client_ip_headers, resolve_client
 from app.core.security import hash_password
 from app.models import DOCUMENT_MODELS, Match, Tournament, User, UserRole
 from app.schemas.auth import OrganizerCreate, UserOut, UserStatusUpdate
@@ -132,3 +136,26 @@ async def delete_any_tournament(
 
     await org_delete_tournament(tournament_id, admin)
 
+
+
+@router.get("/debug/client-ip")
+async def debug_client_ip(request: Request, _admin: User = Depends(require_superadmin)) -> dict:
+    """Which value keys the login throttle for THIS request, so a deployment can be verified
+    (is CLIENT_IP_HEADER reaching the app? does the key stay the same across requests?).
+
+    The address itself is never returned: only a short hash of it (`key_id`, equal for equal
+    keys) and the source. Call it twice from the same machine: the same `key_id` means one stable
+    throttle bucket; a changing one means the key is not stable behind your proxies."""
+    key, source = resolve_client(request)
+    configured = client_ip_headers()
+    forwarded = [p for p in request.headers.get("x-forwarded-for", "").split(",") if p.strip()]
+    return {
+        "key_id": hashlib.sha256(key.encode()).hexdigest()[:12],
+        "source": source,
+        "configured_headers": {name: bool(request.headers.get(name, "").strip()) for name in configured},
+        "x_forwarded_for_entries": len(forwarded),
+        "trusted_proxy_hops": get_settings().trusted_proxy_hops,
+        "forwarding_headers_present": sorted(
+            h for h in request.headers.keys() if h in {"x-forwarded-for", "x-real-ip", "cf-connecting-ip", "true-client-ip", "forwarded"}
+        ),
+    }

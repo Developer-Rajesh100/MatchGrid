@@ -34,8 +34,9 @@ class Settings(BaseSettings):
     trusted_proxy_hops: int = 1
 
     # Opt-in: a header that an edge proxy always overwrites with the real client IP, e.g.
-    # "cf-connecting-ip" when every request passes through Cloudflare (Render does this). When set
-    # and present it wins over X-Forwarded-For. Only set it if clients cannot reach the app around
+    # "cf-connecting-ip" when every request passes through Cloudflare (Render does this). A
+    # comma-separated list ("cf-connecting-ip,true-client-ip") is tried in order. The first one
+    # present wins over X-Forwarded-For. GET /api/superadmin/debug/client-ip shows what is keyed. Only set it if clients cannot reach the app around
     # that proxy, or they could forge the header to dodge the login throttle.
     client_ip_header: str = ""
 

@@ -12,27 +12,36 @@ from starlette.requests import Request
 from app.core.config import get_settings
 
 
-def client_key(request: Request) -> str:
-    """The client IP used for login throttling.
+def client_ip_headers() -> list[str]:
+    """CLIENT_IP_HEADER as an ordered, lowercase list: a single header or a comma-separated
+    fallback list such as "cf-connecting-ip,true-client-ip"."""
+    return [h.strip().lower() for h in get_settings().client_ip_header.split(",") if h.strip()]
 
-    1. CLIENT_IP_HEADER (opt-in), e.g. Cloudflare's cf-connecting-ip: one value the edge
-       proxy always overwrites, so it is stable per client even when the request crosses
-       several proxies whose own addresses vary between requests.
+
+def resolve_client(request: Request) -> tuple[str, str]:
+    """(client address, source) used for login throttling.
+
+    1. Each CLIENT_IP_HEADER entry in order (opt-in), e.g. Cloudflare's cf-connecting-ip: a value
+       the edge proxy overwrites, so it is stable per client even when the request crosses
+       several proxies whose own addresses vary between requests. Source: "header:<name>".
     2. Otherwise X-Forwarded-For, which is client-controlled except for what our own proxies
        append: the trustworthy entry is the one `trusted_proxy_hops` places from the right
-       (never the leftmost, which an attacker can set to any value).
-    3. Otherwise the socket peer."""
-    settings = get_settings()
-    header = settings.client_ip_header.strip().lower()
-    if header:
-        value = request.headers.get(header, "").split(",")[0].strip()
+       (never the leftmost, which an attacker can set to any value). Source: "x-forwarded-for".
+    3. Otherwise the socket peer. Source: "socket"."""
+    for name in client_ip_headers():
+        value = request.headers.get(name, "").split(",")[0].strip()
         if value:
-            return value
-    hops = settings.trusted_proxy_hops
+            return value, f"header:{name}"
+    hops = get_settings().trusted_proxy_hops
     forwarded = [part.strip() for part in request.headers.get("x-forwarded-for", "").split(",") if part.strip()]
     if hops > 0 and len(forwarded) >= hops:
-        return forwarded[-hops]
-    return request.client.host if request.client else "unknown"
+        return forwarded[-hops], "x-forwarded-for"
+    return (request.client.host if request.client else "unknown"), "socket"
+
+
+def client_key(request: Request) -> str:
+    """The client address used as the login throttle key (see resolve_client)."""
+    return resolve_client(request)[0]
 
 
 FREE_ATTEMPTS = 5  # this many failures from one IP cost nothing
