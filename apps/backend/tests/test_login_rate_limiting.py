@@ -152,3 +152,47 @@ def test_client_ip_header_is_ignored_unless_configured(monkeypatch):
     # Configured but absent: fall back to X-Forwarded-For, then the socket peer.
     assert client_key(request({"X-Forwarded-For": "198.51.100.7"})) == "198.51.100.7"
     assert client_key(request({})) == "10.9.9.9"
+
+
+def _request(headers, peer="10.9.9.9"):
+    from starlette.requests import Request
+
+    return Request({"type": "http", "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()], "client": (peer, 1)})
+
+
+def test_client_ip_header_accepts_an_ordered_fallback_list(monkeypatch):
+    from app.core.config import get_settings
+    from app.core.rate_limit import resolve_client
+
+    monkeypatch.setattr(get_settings(), "client_ip_header", " CF-Connecting-IP , True-Client-IP ")
+    monkeypatch.setattr(get_settings(), "trusted_proxy_hops", 1)
+    both = {"cf-connecting-ip": "1.1.1.1", "true-client-ip": "2.2.2.2", "x-forwarded-for": "9.9.9.9"}
+    assert resolve_client(_request(both)) == ("1.1.1.1", "header:cf-connecting-ip")
+    assert resolve_client(_request({"true-client-ip": "2.2.2.2", "x-forwarded-for": "9.9.9.9"})) == ("2.2.2.2", "header:true-client-ip")
+    assert resolve_client(_request({"x-forwarded-for": "8.8.8.8, 9.9.9.9"})) == ("9.9.9.9", "x-forwarded-for")
+    assert resolve_client(_request({})) == ("10.9.9.9", "socket")
+    # An empty value is skipped and the next source is used.
+    assert resolve_client(_request({"cf-connecting-ip": " ", "true-client-ip": "2.2.2.2"}))[1] == "header:true-client-ip"
+
+
+async def test_debug_client_ip_is_superadmin_only_and_never_returns_the_address(async_client, admin, auth_headers, monkeypatch):
+    from app.core.config import get_settings
+    from app.core.security import create_access_token, hash_password
+    from app.models import User, UserRole
+
+    monkeypatch.setattr(get_settings(), "client_ip_header", "cf-connecting-ip,true-client-ip")
+    assert (await async_client.get("/api/superadmin/debug/client-ip")).status_code == 401
+    org = User(username="dbg_org", password_hash=hash_password("Password123!"), role=UserRole.ORGANIZER)
+    await org.insert()
+    token, _ = create_access_token(str(org.id))
+    assert (await async_client.get("/api/superadmin/debug/client-ip", headers={"Authorization": f"Bearer {token}"})).status_code == 403
+
+    hdrs = {**auth_headers, "CF-Connecting-IP": "203.0.113.50", "X-Forwarded-For": "203.0.113.50, 172.70.0.1"}
+    first = (await async_client.get("/api/superadmin/debug/client-ip", headers=hdrs)).json()
+    hdrs["X-Forwarded-For"] = "203.0.113.50, 172.70.0.2"
+    second = (await async_client.get("/api/superadmin/debug/client-ip", headers=hdrs)).json()
+    assert first["source"] == "header:cf-connecting-ip"
+    assert first["key_id"] == second["key_id"]  # stable although the proxy hop changed
+    assert first["configured_headers"] == {"cf-connecting-ip": True, "true-client-ip": False}
+    assert first["x_forwarded_for_entries"] == 2
+    assert "203.0.113.50" not in str(first)

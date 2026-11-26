@@ -39,7 +39,7 @@ flowchart LR
 | `ADMIN_BOOTSTRAP_PASSWORD` | ≥ 12 random characters | **Secret.** Not a placeholder, not the username. |
 | `CORS_ORIGINS` | `https://matchgrid.<account>.workers.dev` | Comma-separated exact origins. Also gates the WebSocket handshake. `https` only, no wildcard, no path, no localhost. |
 | `TRUSTED_PROXY_HOPS` | `1` (verify, §4.4) | How many proxies append to `X-Forwarded-For` in front of the app. Must be ≥ 1. |
-| `CLIENT_IP_HEADER` | `cf-connecting-ip` | Render fronts every request with Cloudflare, whose proxy addresses in `X-Forwarded-For` change between requests. This header (always overwritten by Cloudflare) gives the login throttle one stable address per client. Leave empty where clients can reach the API around such a proxy. |
+| `CLIENT_IP_HEADER` | `cf-connecting-ip,true-client-ip` | Render fronts every request with Cloudflare, whose proxy addresses in `X-Forwarded-For` change between requests. This header (always overwritten by Cloudflare) gives the login throttle one stable address per client. A comma-separated list is tried in order. Leave empty where clients can reach the API around such a proxy. Verify with `GET /api/superadmin/debug/client-ip` (superadmin token; §4.4). |
 | `AUTO_MIGRATE` | `true` | Runs the migrations at start, under a database lock. |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_BASE_URL` | from Cloudflare | **Secrets** (except the bucket name). `R2_PUBLIC_BASE_URL` must be `https://`. All five are required. |
 | `PORT` | *set by Render (10000)* | Do not set it yourself. |
@@ -153,7 +153,7 @@ It reads `SMOKE_ADMIN_USER` / `SMOKE_ADMIN_PASSWORD` from `~/.matchgrid-smoke.en
 The migrations create a default **"MatchGrid"** tournament (with its three knockout placeholder matches) owned by the superadmin. No other data is ever inserted at startup (demo data is a manual, local-only `bun run seed:demo`). Delete it from *Superadmin → Global Tournament Oversight* if you do not want it on the public hub.
 
 ### 4.4 Check the login throttle's client address
-On Render set `CLIENT_IP_HEADER=cf-connecting-ip` (§1.1): the smoke test's last step must then report HTTP 429 after a few bad logins. Without it, the throttle keys on an `X-Forwarded-For` entry, and a wrong hop count fails silently, so test it once:
+On Render set `CLIENT_IP_HEADER=cf-connecting-ip,true-client-ip` (§1.1). Check it took effect: call `GET /api/superadmin/debug/client-ip` with a superadmin token twice from your machine. `source` must be `header:…` and `key_id` identical both times (the address itself is never returned). A `source` of `x-forwarded-for` or a changing `key_id` means the key is not stable. Then: the smoke test's last step must then report HTTP 429 after a few bad logins. Without it, the throttle keys on an `X-Forwarded-For` entry, and a wrong hop count fails silently, so test it once:
 - **Too low** (everyone shares one throttle, usually the CDN's address): trigger 6 bad logins from your laptop, then try one bad login from your phone on mobile data. If the phone is throttled immediately, raise `TRUSTED_PROXY_HOPS` to `2` (a CDN in front of Render).
 - **Too high** (a client can dodge the throttle): send 8 bad logins, each with a different made-up header, e.g. `curl -H "X-Forwarded-For: 10.0.0.$i" …`. You must still get HTTP 429; if you do not, lower the value.
 
