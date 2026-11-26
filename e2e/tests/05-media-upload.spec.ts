@@ -25,11 +25,19 @@ test.describe('MatchGrid Cloudflare R2 Media Storage & Asset Upload Pipeline', (
     page,
     request,
   }) => {
+    // This spec uploads to, and checks purging from, a REAL Cloudflare R2 bucket. CI only runs it
+    // when the workflow was given R2 credentials (E2E_R2=1): never on fork PRs, which get no secrets.
+    test.skip(!!process.env.CI && !process.env.E2E_R2, 'R2 credentials are not available in this CI run');
     const tracker = createEntityTracker();
     const superadminToken = await loginAsAdmin(request);
     const suffix = Date.now().toString().slice(-5);
     // The database may already hold other data (e.g. the demo seed): the test must leave it exactly as found.
-    const baseline = (await (await request.get(`${API_BASE_URL}/health/db`)).json()).collections;
+    const dbStats = () =>
+      request
+        .get(`${API_BASE_URL}/api/superadmin/db-stats`, { headers: { Authorization: `Bearer ${superadminToken}` } })
+        .then((r) => r.json())
+        .then((j) => j.collections);
+    const baseline = await dbStats();
 
     const organizerCreds = {
       username: `e2e_media_org_${suffix}`,
@@ -300,8 +308,10 @@ test.describe('MatchGrid Cloudflare R2 Media Storage & Asset Upload Pipeline', (
       expect(healthDbRes.ok()).toBeTruthy();
       const healthDb = await healthDbRes.json();
       expect(healthDb.status).toBe('connected');
-      expect(healthDb.collections.teams).toBe(baseline.teams);
-      expect(healthDb.collections.players).toBe(baseline.players);
+      expect(healthDb.collections).toBeUndefined(); // the public probe never exposes document counts
+      const after = await dbStats();
+      expect(after.teams).toBe(baseline.teams);
+      expect(after.players).toBe(baseline.players);
     }
   });
 });

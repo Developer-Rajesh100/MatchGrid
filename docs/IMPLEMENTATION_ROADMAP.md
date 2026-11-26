@@ -20,7 +20,7 @@
 | **Phase 4** | **Room WebSockets & Scorer Console** | Room-partitioned `ConnectionManager` (`/ws/live?tournament_id=...`), scorer match scoping (`GET /api/scorer/matches`), 12-endpoint mutation lock matrix, Scorer Cockpit UI. | Pytest (289) + Vitest (58) + Build + Playwright (11) | **COMPLETED** |
 | **Phase 5** | **Public Two-Tier UI & Bracket Tree** | Global Discovery Header + `/t/:slug/*` Context Sub-Navbar + mobile drawer, Tournament Hub (`/`), Match Center, Standings, Visual Knockout Bracket Tree, R2 Media squads. | Pytest (292) + Vitest (69) + Build + Playwright (12) | **COMPLETED** |
 | **Phase 6** | **Dedicated Role Portals** | Superadmin Command Center (`/superadmin`), Organizer Workspace (`/organizer`), Scorer Cockpit (`/scorer`) + Live Match Console, unified role-based `/login`. | Pytest (296) + Vitest (79) + Build + Playwright (13) | **COMPLETED** |
-| **Phase 7** | **CI/CD Hardening & Cloud Launch** | Complete E2E regression suite, GitHub Actions CI matrix, production safety checks (`production_safety.py`), deployment to Atlas (M0) + Render + Vercel + R2. | `bun run test:all` (100% pass) + Cloud smoke checks | **PLANNED** |
+| **Phase 7** | **CI/CD Hardening & Cloud Launch** | GitHub Actions gate (pinned Bun, frozen lockfile, caches, MongoDB 7, Docker image checks), strict production safety checks, WebSocket origin check, trimmed public health probe, cross-origin `VITE_API_URL`/`VITE_WS_URL`, fixed Dockerfiles + nginx proxy, Vercel config with CSP, `scripts/smoke.sh`, and the Atlas + R2 + Render + Vercel runbook. | Pytest (445) + Vitest (145) + Build + Playwright (17) + Docker image builds | **COMPLETED** *(code and runbook; the live cloud deploy is performed from `DEPLOYMENT.md` and verified with `scripts/smoke.sh`)* |
 
 ---
 
@@ -544,7 +544,7 @@ flowchart TD
 
 ---
 
-### Phase 7: Full-Stack Hardening, CI/CD & Zero-Cost Cloud Launch
+### Phase 7: Full-Stack Hardening, CI/CD & Zero-Cost Cloud Launch (COMPLETED)
 
 #### Objective
 Execute end-to-end security hardening, verify production fail-safe assertions, automate multi-role CI checks in GitHub Actions, and deploy the complete platform to zero-cost cloud infrastructure: **MongoDB Atlas (M0)** + **Render / Koyeb** (FastAPI) + **Vercel / Cloudflare Pages** (React SPA) + **Cloudflare R2** (Media).
@@ -577,6 +577,14 @@ flowchart LR
   - Asserts bootstrap passwords are non-default.
   - Validates `CORS_ORIGINS` contains zero wildcard/localhost entries.
 - **Runbook:** [DEPLOYMENT.md](../DEPLOYMENT.md).
+
+##### Delivered in Phase 7
+- **Production safety** (`production_safety.py`): https-only exact `CORS_ORIGINS` (no wildcard/localhost/private/path), non-local `MONGO_URI` without the template password, `AUTO_SEED=false`, `TRUSTED_PROXY_HOPS >= 1`, https `R2_PUBLIC_BASE_URL`, bootstrap password >= 12 characters and a larger blocklist.
+- **Backend:** `/ws/live` refuses a foreign browser `Origin` in production; public `/health/db` reports status and ping only (counts moved to `GET /api/superadmin/db-stats`).
+- **Frontend:** optional `VITE_API_URL` / `VITE_WS_URL` (empty = same origin, so dev and Docker are unchanged); `vercel.json` with SPA rewrite, headers and CSP; frontend Dockerfile on `bun.lock`; nginx proxies `/api`, `/ws`, `/health`.
+- **Docker:** both Dockerfiles repaired for the `apps/` layout (they could not build) and built in CI.
+- **CI:** Bun pinned, `--frozen-lockfile`, pip/Bun caches, timeouts, least-privilege permissions, R2 secrets only on same-repo runs (R2 media spec skipped without them), image-build job.
+- **Launch tooling:** `scripts/smoke.sh` + `scripts/smoke-live.mjs` (health, lockdown, CORS, login, WebSocket origin and live goal sync, R2 upload, throttling).
 
 ##### Stage 3 — Layered Implementation (DB $\to$ Backend $\to$ Frontend)
 1. Hardening audit across backend error handling and proxy-aware rate limiting.

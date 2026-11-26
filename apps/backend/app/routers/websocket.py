@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
+from app.core.config import get_settings
 from app.core.websocket import manager
 
 logger = logging.getLogger("dcl.websocket")
@@ -12,6 +13,17 @@ logger = logging.getLogger("dcl.websocket")
 router = APIRouter(tags=["websocket"])
 
 _ROOM_RE = re.compile(r"^(?:[0-9a-fA-F]{24}|global)$")
+
+
+def origin_allowed(origin: Optional[str]) -> bool:
+    """CORS does not apply to WebSockets, so the handshake's Origin is checked here. Outside
+    production anything goes (local dev, tests). In production a browser's Origin must be one of
+    CORS_ORIGINS; a client that sends no Origin at all is not a browser and cannot be driven by
+    another website, so it is let through (health probes, the smoke script)."""
+    settings = get_settings()
+    if settings.environment != "production" or origin is None:
+        return True
+    return origin.rstrip("/") in {o.rstrip("/") for o in settings.cors_origin_list}
 
 
 @router.websocket("/ws/live")
@@ -32,6 +44,9 @@ async def websocket_live_endpoint(
       - JSON {"action": "subscribe", "tournament_id": "<id>"}: joins that tournament's room.
       - JSON {"action": "unsubscribe", "tournament_id": "<id>"}: leaves that tournament's room.
     """
+    if not origin_allowed(websocket.headers.get("origin")):
+        await websocket.close(code=1008)  # policy violation: handshake from a site we do not serve
+        return
     if tournament_id is not None and not _ROOM_RE.match(tournament_id):
         await websocket.close(code=1008)  # policy violation: not a valid room id
         return

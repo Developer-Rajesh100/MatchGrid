@@ -1,20 +1,27 @@
-# Built from the project root as the build context (see ../.dockerignore).
-# Multi-stage: build the Vite app in a Node stage, then serve the static
-# output from a slim Nginx stage — the build stage (and its node_modules)
-# never ends up in the final image.
+# Built from the REPOSITORY ROOT as the build context (see /.dockerignore):
+#   docker build -f apps/frontend/Dockerfile -t matchgrid-web .
+# Multi-stage: Bun builds the Vite app, then a slim Nginx serves the static output and proxies
+# /api and /ws to the backend. The build stage (and node_modules) never reaches the final image.
 
-FROM node:20-slim AS build
+FROM oven/bun:1.4 AS build
 WORKDIR /app
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
-# frontend/public/assets/ (real team/player photos) is copied into dist/
-# automatically by `vite build` — no separate COPY needed for it.
-COPY frontend/ ./
-RUN npm run build
+# Dependencies first so they cache separately from source changes. bun.lock is the lockfile.
+COPY package.json bun.lock ./
+COPY apps/frontend/package.json apps/frontend/package.json
+RUN bun install --frozen-lockfile
+COPY apps/frontend apps/frontend
+# Optional: bake a cross-origin API into the bundle. Leave empty for the bundled same-origin
+# proxy below (the default for Docker Compose).
+ARG VITE_API_URL=""
+ARG VITE_WS_URL=""
+ENV VITE_API_URL=$VITE_API_URL VITE_WS_URL=$VITE_WS_URL
+RUN cd apps/frontend && bun run build
 
 FROM nginx:1.27-alpine AS runtime
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
+# nginx renders *.template files with the container's environment at start-up.
+ENV API_UPSTREAM=http://backend:8000
+COPY apps/frontend/nginx.conf /etc/nginx/templates/default.conf.template
+COPY --from=build /app/apps/frontend/dist /usr/share/nginx/html
 
 EXPOSE 80
 

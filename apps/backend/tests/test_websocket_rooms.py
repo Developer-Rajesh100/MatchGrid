@@ -398,3 +398,51 @@ def test_websocket_endpoint_rejects_malformed_room_ids():
     with pytest.raises(WebSocketDisconnect):
         with client.websocket_connect("/ws/live?tournament_id=not-an-object-id"):
             pass
+
+
+# ---- Phase 7: handshake Origin check -----------------------------------------------------------
+
+def _ws_settings(monkeypatch, **overrides):
+    from app.core.config import Settings
+    import app.routers.websocket as ws_router
+
+    defaults = dict(environment="production", cors_origins="https://app.example.com,https://www.example.com")
+    defaults.update(overrides)
+    monkeypatch.setattr(ws_router, "get_settings", lambda: Settings(**defaults))
+
+
+def test_origin_check_is_off_outside_production(monkeypatch):
+    from app.routers.websocket import origin_allowed
+
+    _ws_settings(monkeypatch, environment="development")
+    assert origin_allowed("https://evil.example.net") is True
+
+
+def test_origin_check_in_production(monkeypatch):
+    from app.routers.websocket import origin_allowed
+
+    _ws_settings(monkeypatch)
+    assert origin_allowed("https://app.example.com") is True
+    assert origin_allowed("https://www.example.com/") is True  # trailing slash tolerated
+    assert origin_allowed("https://evil.example.net") is False
+    assert origin_allowed("http://app.example.com") is False  # scheme matters
+    assert origin_allowed("https://app.example.com.evil.net") is False  # no prefix tricks
+    assert origin_allowed("null") is False
+    assert origin_allowed(None) is True  # not a browser (probes, scripts): cannot be driven by another site
+
+
+def test_websocket_handshake_from_a_foreign_origin_is_refused_in_production(monkeypatch):
+    from starlette.testclient import TestClient
+    from starlette.websockets import WebSocketDisconnect
+
+    from app.main import app
+
+    _ws_settings(monkeypatch)
+    client = TestClient(app)
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/ws/live", headers={"origin": "https://evil.example.net"}):
+            pass
+    with client.websocket_connect("/ws/live", headers={"origin": "https://app.example.com"}) as ok:
+        ok.send_text("ping")
+        assert ok.receive_text() == "pong"
+

@@ -1,4 +1,4 @@
-const BASE_URL = '';
+import { buildApiUrl } from '../config';
 
 export async function apiClient(endpoint, options = {}) {
   const token =
@@ -20,7 +20,7 @@ export async function apiClient(endpoint, options = {}) {
     config.body = JSON.stringify(options.body);
   }
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, config);
+  const response = await fetch(buildApiUrl(endpoint), config);
 
   if (response.status === 401) {
     // Auth expired or invalid
