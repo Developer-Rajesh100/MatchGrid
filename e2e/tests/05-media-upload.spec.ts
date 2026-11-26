@@ -25,6 +25,9 @@ test.describe('MatchGrid Cloudflare R2 Media Storage & Asset Upload Pipeline', (
     page,
     request,
   }) => {
+    // This spec uploads to, and checks purging from, a REAL Cloudflare R2 bucket. CI only runs it
+    // when the workflow was given R2 credentials (E2E_R2=1): never on fork PRs, which get no secrets.
+    test.skip(!!process.env.CI && !process.env.E2E_R2, 'R2 credentials are not available in this CI run');
     const tracker = createEntityTracker();
     const superadminToken = await loginAsAdmin(request);
     const suffix = Date.now().toString().slice(-5);

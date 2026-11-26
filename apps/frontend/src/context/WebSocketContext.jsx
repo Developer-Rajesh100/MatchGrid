@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import { buildWsUrl } from '../config';
 
 const WebSocketContext = createContext({
   connected: false,
@@ -46,12 +47,11 @@ export function WebSocketProvider({ children }) {
     if (isUnmountedRef.current) return;
 
     try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       // Join the first tournament room straight from the URL; with no tournament known yet the
       // server places us in the hub room, and syncGlobalRoom() leaves it if nobody needs it.
       const rooms = Array.from(activeRoomsRef.current.keys());
       const query = rooms.length ? `?tournament_id=${encodeURIComponent(rooms[0])}` : '';
-      const wsUrl = `${protocol}//${window.location.host}/ws/live${query}`;
+      const wsUrl = buildWsUrl(query);
       const socket = new WebSocket(wsUrl);
       inGlobalRef.current = rooms.length === 0;
       socketRef.current = socket;

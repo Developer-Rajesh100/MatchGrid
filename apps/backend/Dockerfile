@@ -1,5 +1,6 @@
-# Built from the project root as the build context (see ../.dockerignore),
-# so relative paths below are rooted at backend/.
+# Built from the REPOSITORY ROOT as the build context (see /.dockerignore):
+#   docker build -f apps/backend/Dockerfile -t matchgrid-api .
+# Render: Dockerfile Path = apps/backend/Dockerfile, Docker Build Context Directory = .
 #
 # Base image: python:3.14-slim, NOT the 3.12 originally planned in
 # reference/implementation.txt Phase 10.1 — that guidance predates the
@@ -18,23 +19,24 @@ WORKDIR /app
 
 # Only requirements.txt copied in first so dependency installation is
 # cached separately from application code changes.
-COPY backend/requirements.txt ./
+COPY apps/backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Only the actual application package and its runtime data files — no
 # tests/, venv/, .env, or docs (excluded by ../.dockerignore regardless,
 # this is an explicit second layer of the same guarantee).
-COPY backend/app ./app
-COPY backend/data ./data
-COPY backend/docker-entrypoint.sh ./
+COPY apps/backend/app ./app
+COPY apps/backend/data ./data
+COPY apps/backend/docker-entrypoint.sh ./
 
 RUN chmod +x docker-entrypoint.sh && chown -R app:app /app
 USER app
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)" || exit 1
+# The container listens on $PORT (Render sets it, e.g. 10000) and falls back to 8000.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.environ.get('PORT', '8000'), timeout=3)" || exit 1
 
 # No --reload (that's a dev-only flag), no venv (dependencies are installed
 # directly into the image's system Python). A single worker (and a single

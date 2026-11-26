@@ -20,15 +20,20 @@
 .idea
 
 # Backend
-backend/venv
-backend/**/__pycache__
-backend/**/*.pyc
-backend/.pytest_cache
-backend/tests
+apps/backend/.venv
+apps/backend/venv
+**/__pycache__
+**/*.pyc
+apps/backend/.pytest_cache
+apps/backend/tests
 
 # Frontend
-frontend/node_modules
-frontend/dist
+node_modules
+**/node_modules
+apps/frontend/dist
+e2e
+playwright-report
+test-results
 
 # Project docs/reference — not needed inside a runtime image
 docs
