@@ -141,6 +141,9 @@ describe('OrganizerWorkspacePage Component', () => {
       </MemoryRouter>
     );
 
+    // the workspace lands on the Overview tab; the roster is one tab away
+    await waitFor(() => expect(screen.getByTestId('organizer-overview-panel')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('tab-teams'));
     await waitFor(() => {
       expect(screen.getByTestId('tournament-selector')).toBeInTheDocument();
       expect(screen.getByTestId('organizer-teams-panel')).toBeInTheDocument();
@@ -268,5 +271,75 @@ describe('OrganizerWorkspacePage Component', () => {
     await waitFor(() => {
       expect(organizerApi.createScorer).toHaveBeenCalledWith('scorer_alice', 'password123');
     });
+  });
+
+  const mountLoaded = async () => {
+    organizerApi.getMyTournaments.mockResolvedValue(mockTournaments);
+    teamsApi.getTeams.mockResolvedValue(mockTeams);
+    matchesApi.getGroups.mockResolvedValue(mockGroups);
+    organizerApi.getTournamentMatches.mockResolvedValue(mockMatches);
+    organizerApi.getScorers.mockResolvedValue(mockScorers);
+    playersApi.getPlayers.mockResolvedValue(mockPlayers);
+    render(
+      <MemoryRouter initialEntries={['/organizer']}>
+        <Routes><Route path="/organizer" element={<OrganizerWorkspacePage />} /></Routes>
+      </MemoryRouter>
+    );
+    await screen.findByTestId('organizer-overview-panel');
+  };
+
+  it('opens on an Overview with live counts, and points to the next setup step', async () => {
+    await mountLoaded();
+    const panel = screen.getByTestId('organizer-overview-panel');
+    expect(panel).toHaveTextContent('Autumn Cup 2026');
+    // groups are drawn and fixtures exist, but the one match has no scorer: that is the next step
+    const next = panel.querySelector('.ow-step.is-next');
+    expect(next).toHaveTextContent('Assign a scorer to every match');
+    expect(next).toHaveTextContent('1 without a scorer');
+    fireEvent.click(next.querySelector('button'));
+    expect(screen.getByTestId('organizer-scorers-panel')).toBeInTheDocument();
+  });
+
+  it('keeps all five sections reachable from one tab strip', async () => {
+    await mountLoaded();
+    for (const [tab, panel] of [
+      ['tab-teams', 'organizer-teams-panel'],
+      ['tab-fixtures', 'organizer-fixtures-panel'],
+      ['tab-scorers', 'organizer-scorers-panel'],
+      ['tab-settings', 'organizer-settings-panel'],
+      ['tab-overview', 'organizer-overview-panel'],
+    ]) {
+      fireEvent.click(screen.getByTestId(tab));
+      expect(screen.getByTestId(panel)).toBeInTheDocument();
+    }
+  });
+
+  it('keeps the Danger Zone out of every tab except Settings, and needs the exact name to delete', async () => {
+    await mountLoaded();
+    expect(screen.queryByTestId('delete-tournament-btn')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('tab-settings'));
+    fireEvent.click(screen.getByTestId('delete-tournament-btn'));
+
+    const confirm = screen.getByTestId('confirm-delete-tournament-btn');
+    expect(confirm).toBeDisabled();
+    fireEvent.change(screen.getByTestId('delete-confirm-input'), { target: { value: 'autumn cup 2026' } });
+    expect(confirm).toBeDisabled(); // case matters
+    fireEvent.change(screen.getByTestId('delete-confirm-input'), { target: { value: 'Autumn Cup 2026' } });
+    expect(confirm).not.toBeDisabled();
+
+    organizerApi.deleteTournament.mockResolvedValue({});
+    organizerApi.getMyTournaments.mockResolvedValue([]);
+    fireEvent.click(confirm);
+    await waitFor(() => expect(organizerApi.deleteTournament).toHaveBeenCalledWith('tourn-1'));
+    await screen.findByTestId('organizer-empty-state');
+  });
+
+  it('closes a dialog with Escape and labels it for assistive tech', async () => {
+    await mountLoaded();
+    fireEvent.click(screen.getByTestId('tab-teams'));
+    fireEvent.click(screen.getByTestId('add-club-btn'));
+    expect(screen.getByRole('dialog', { name: 'Register Participating Club' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('add-club-modal')).not.toBeInTheDocument();
   });
 });

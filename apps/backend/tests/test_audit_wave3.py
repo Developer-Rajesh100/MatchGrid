@@ -370,3 +370,40 @@ async def test_l8_cancel_and_uncancel_touch_updated_at(clean_db):
     cancelled.updated_at = old
     await cancelled.save()
     assert (await uncancel_match(await Match.get(m.id))).updated_at > old
+
+
+# --------------------------------------------------------------------------- UI support (P2)
+
+
+async def test_featured_live_feed_spans_tournaments_and_only_lists_live_matches(async_client, clean_db):
+    t1, t2 = await _cup("feed-one"), await _cup("feed-two")
+    rows = []
+    for t, status in ((t1, "live"), (t1, "upcoming"), (t2, "live"), (t2, "full_time")):
+        a, b = await _team(t, f"{t.slug}-{status}-A"), await _team(t, f"{t.slug}-{status}-B")
+        m = Match(tournament_id=t.id, match_number=len(rows) + 1, stage="extra", team1_id=a.id, team2_id=b.id,
+                  status=status, started_at=datetime.now(timezone.utc) if status == "live" else None)
+        await m.insert()
+        rows.append(m)
+
+    r = await async_client.get("/api/matches/featured")
+    assert r.status_code == 200
+    body = r.json()
+    assert {m["tournament_slug"] for m in body} == {"feed-one", "feed-two"}
+    assert all(m["status"] == "live" for m in body) and len(body) == 2
+    assert "assigned_scorer_ids" not in r.text  # still no scorer ids in a public payload
+    assert (await async_client.get("/api/matches/featured?limit=1")).json().__len__() == 1
+    assert (await async_client.get("/api/matches/featured?limit=0")).status_code == 422
+
+
+async def test_match_payloads_carry_team_colours_for_the_scoreboard_accent_bars(async_client, clean_db):
+    t = await _cup("colours")
+    a = Team(tournament_id=t.id, name="Reds", color="#EF4444")
+    b = Team(tournament_id=t.id, name="Blues", color="#3B82F6")
+    await a.insert()
+    await b.insert()
+    m = Match(tournament_id=t.id, match_number=1, stage="extra", team1_id=a.id, team2_id=b.id)
+    await m.insert()
+    body = (await async_client.get(f"/api/matches/{m.id}")).json()
+    assert (body["team1_color"], body["team2_color"]) == ("#EF4444", "#3B82F6")
+    listed = (await async_client.get("/api/matches", params={"tournament_id": str(t.id)})).json()[0]
+    assert listed["team1_color"] == "#EF4444"

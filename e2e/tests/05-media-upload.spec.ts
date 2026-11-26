@@ -28,6 +28,8 @@ test.describe('MatchGrid Cloudflare R2 Media Storage & Asset Upload Pipeline', (
     const tracker = createEntityTracker();
     const superadminToken = await loginAsAdmin(request);
     const suffix = Date.now().toString().slice(-5);
+    // The database may already hold other data (e.g. the demo seed): the test must leave it exactly as found.
+    const baseline = (await (await request.get(`${API_BASE_URL}/health/db`)).json()).collections;
 
     const organizerCreds = {
       username: `e2e_media_org_${suffix}`,
@@ -298,8 +300,8 @@ test.describe('MatchGrid Cloudflare R2 Media Storage & Asset Upload Pipeline', (
       expect(healthDbRes.ok()).toBeTruthy();
       const healthDb = await healthDbRes.json();
       expect(healthDb.status).toBe('connected');
-      expect(healthDb.collections.teams).toBe(0);
-      expect(healthDb.collections.players).toBe(0);
+      expect(healthDb.collections.teams).toBe(baseline.teams);
+      expect(healthDb.collections.players).toBe(baseline.players);
     }
   });
 });

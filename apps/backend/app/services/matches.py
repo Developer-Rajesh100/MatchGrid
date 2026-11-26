@@ -671,12 +671,12 @@ async def build_tournament_bracket(tournament_id: PydanticObjectId) -> BracketTr
         slot = m.bracket_slot or m.label or f"M{m.match_number}"
 
         t1_node = (
-            BracketTeamNode(id=str(t1.id), name=t1.name, crest_url=t1.crest_url or t1.logo_url)
+            BracketTeamNode(id=str(t1.id), name=t1.name, crest_url=t1.crest_url or t1.logo_url, color=t1.color)
             if t1
             else None
         )
         t2_node = (
-            BracketTeamNode(id=str(t2.id), name=t2.name, crest_url=t2.crest_url or t2.logo_url)
+            BracketTeamNode(id=str(t2.id), name=t2.name, crest_url=t2.crest_url or t2.logo_url, color=t2.color)
             if t2
             else None
         )

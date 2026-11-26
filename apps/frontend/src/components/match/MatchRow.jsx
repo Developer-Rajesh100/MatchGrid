@@ -1,153 +1,91 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { MapPin } from 'lucide-react';
 import { StatusPill } from '../common/StatusPill';
-import { Avatar } from '../common/Avatar';
-import { Calendar, Clock, MapPin, Activity } from 'lucide-react';
+import { TeamMark } from '../common/TeamMark';
 import { useTournament } from '../../context/TournamentContext';
+import { useNow } from '../../hooks/useNow';
 import { tPath } from '../../utils/paths';
+import { formatDay } from '../../utils/dates';
+import { stageLabel } from '../../utils/matchLabels';
+import { clockOffsetMs, minuteLabel } from '../../utils/clock';
 
+function TeamLine({ name, color, crest, score, winner, played }) {
+  return (
+    <div className={`fixture-row__team ${winner ? 'is-winner' : ''}`}>
+      <TeamMark name={name} color={color} crestUrl={crest} size={26} />
+      <span className="fixture-row__score num">{played && score !== null && score !== undefined ? score : '–'}</span>
+    </div>
+  );
+}
+
+/** One fixture: two team lines with their scores, and its status and kick-off on the side. */
 export function MatchRow({ match, showVenue = false }) {
   const navigate = useNavigate();
   const { slug: contextSlug } = useTournament();
   const slug = match.tournament_slug || contextSlug;
 
-  const isPlayed = match.status === 'full_time' || match.status === 'live' || match.status === 'completed';
-  const team1Name = match.team1_name || 'TBD';
-  const team2Name = match.team2_name || 'TBD';
-
-  const label =
-    match.label ||
-    (match.group_name
-      ? `Group ${match.group_name}`
-      : match.stage === 'semi'
-      ? 'Semi-final'
-      : match.stage === 'final'
-      ? 'Final'
-      : match.stage === 'extra'
-      ? 'Friendly'
-      : '');
-
   const isLive = match.status === 'live';
+  const played = isLive || match.status === 'full_time' || match.status === 'completed';
+  const offset = useMemo(() => clockOffsetMs(match, Date.now()), [match]);
+  const now = useNow(isLive ? 30000 : 0);
+  const open = () => navigate(tPath(slug, `matches/${match.id}`));
 
   return (
     <div
-      className="match-row"
-      onClick={() => navigate(tPath(slug, `matches/${match.id}`))}
-      role="button"
+      className={`fixture-row ${isLive ? 'is-live' : ''}`}
+      onClick={open}
+      role="link"
       tabIndex={0}
-      style={{
-        borderLeft: isLive
-          ? '4px solid var(--status-live)'
-          : match.status === 'full_time'
-          ? '4px solid var(--brand-primary)'
-          : '4px solid var(--border-subtle)',
-      }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') navigate(tPath(slug, `matches/${match.id}`));
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          open();
+        }
       }}
     >
-      <div className="match-teams">
-        <div
-          style={{
-            fontSize: '11px',
-            color: 'var(--text-muted)',
-            fontWeight: 700,
-            letterSpacing: '0.5px',
-            textTransform: 'uppercase',
-            marginBottom: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          <span>Match #{match.match_number}</span>
-          {label && <span>&bull; {label}</span>}
+      <div className="fixture-row__main">
+        <div className="fixture-row__title">
+          <span className="num">Match #{match.match_number}</span>
+          {stageLabel(match) && <span>{stageLabel(match)}</span>}
         </div>
-
-        {/* Team 1 */}
-        <div className="match-team">
-          <div className="match-team-info">
-            <Avatar
-              name={team1Name}
-              photoUrl={match.team1_logo}
-              size={26}
-              color={match.team1_color || '#10B981'}
-            />
-            <span
-              className="match-team-name"
-              style={{
-                fontWeight: match.winner_id === match.team1_id ? 700 : 500,
-                color: match.winner_id === match.team1_id ? 'var(--text-primary)' : 'var(--text-secondary)',
-              }}
-            >
-              {team1Name}
-            </span>
-          </div>
-          <span className="match-score">
-            {isPlayed && match.score1 !== null ? match.score1 : '—'}
-          </span>
-        </div>
-
-        {/* Team 2 */}
-        <div className="match-team">
-          <div className="match-team-info">
-            <Avatar
-              name={team2Name}
-              photoUrl={match.team2_logo}
-              size={26}
-              color={match.team2_color || '#34D399'}
-            />
-            <span
-              className="match-team-name"
-              style={{
-                fontWeight: match.winner_id === match.team2_id ? 700 : 500,
-                color: match.winner_id === match.team2_id ? 'var(--text-primary)' : 'var(--text-secondary)',
-              }}
-            >
-              {team2Name}
-            </span>
-          </div>
-          <span className="match-score">
-            {isPlayed && match.score2 !== null ? match.score2 : '—'}
-          </span>
-        </div>
+        <TeamLine
+          name={match.team1_name}
+          color={match.team1_color}
+          crest={match.team1_crest_url}
+          score={match.score1}
+          played={played}
+          winner={match.winner_id && match.winner_id === match.team1_id}
+        />
+        <TeamLine
+          name={match.team2_name}
+          color={match.team2_color}
+          crest={match.team2_crest_url}
+          score={match.score2}
+          played={played}
+          winner={match.winner_id && match.winner_id === match.team2_id}
+        />
       </div>
 
-      <div className="match-meta">
+      <div className="fixture-row__side">
         <StatusPill status={match.status} isHalfTime={Boolean(match.is_half_time)} />
         {isLive && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              marginTop: '5px',
-              fontSize: '11px',
-              fontWeight: 700,
-              color: match.is_half_time ? 'var(--accent-gold)' : 'var(--status-live)',
-            }}
-          >
-            <Activity size={12} className={match.is_half_time ? '' : 'pulse-live'} />
-            <span>{match.is_half_time ? 'Half Time' : 'In Progress'}</span>
-          </div>
+          <span className={`fixture-row__minute num ${match.is_half_time ? 'is-ht' : ''}`}>
+            {minuteLabel(match, offset, now)}
+          </span>
         )}
-        {match.date && (
-          <div className="match-date-time" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
-            <Calendar size={11} /> {match.date}
-          </div>
-        )}
-        {match.time && (
-          <div className="match-date-time" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Clock size={11} /> {match.time}
-          </div>
+        {!isLive && (
+          <span className="fixture-row__when">
+            <span>{formatDay(match.date)}</span>
+            {match.time && <span className="num">{match.time}</span>}
+          </span>
         )}
         {showVenue && match.venue && (
-          <div className="match-date-time" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <MapPin size={11} /> {match.venue}
-          </div>
+          <span className="fixture-row__venue"><MapPin size={11} aria-hidden="true" />{match.venue}</span>
         )}
       </div>
     </div>
   );
 }
+
 export default MatchRow;

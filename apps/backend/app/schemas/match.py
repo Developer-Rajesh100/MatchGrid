@@ -29,9 +29,11 @@ class MatchOut(BaseModel):
     team1_id: Optional[str] = None
     team1_name: Optional[str] = None
     team1_crest_url: Optional[str] = None
+    team1_color: Optional[str] = None
     team2_id: Optional[str] = None
     team2_name: Optional[str] = None
     team2_crest_url: Optional[str] = None
+    team2_color: Optional[str] = None
     status: MatchStatus
     score1: int = 0
     score2: int = 0
@@ -128,6 +130,7 @@ class BracketTeamNode(BaseModel):
     id: str
     name: str
     crest_url: Optional[str] = None
+    color: Optional[str] = None
     seed: Optional[str] = None
 
 

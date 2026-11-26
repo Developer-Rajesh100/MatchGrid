@@ -99,7 +99,7 @@ export function MatchesPage() {
           onClick={() => { setFilterStage('bracket'); setFilterStatus('all'); }}
           data-testid="tab-bracket"
         >
-          🏆 Bracket
+          <Trophy size={14} aria-hidden="true" /> Bracket
         </button>
         {matches.some((m) => m.stage === 'extra') && (
           <button

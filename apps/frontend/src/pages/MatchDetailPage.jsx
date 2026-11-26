@@ -12,6 +12,10 @@ import { formatTime } from '../utils/time';
 import { clockOffsetMs, matchElapsedSeconds } from '../utils/clock';
 import { useTournament } from '../context/TournamentContext';
 import { tPath } from '../utils/paths';
+import { EventIcon } from '../components/common/EventIcon';
+import { Scoreboard } from '../components/match/Scoreboard';
+import { formatDay } from '../utils/dates';
+import { stageLabel } from '../utils/matchLabels';
 
 export function MatchDetailPage() {
   const { matchId } = useParams();
@@ -124,8 +128,9 @@ export function MatchDetailPage() {
       {/* Main Match Header Card */}
       <div className="card" style={{ marginBottom: '24px', padding: '28px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.6px', textTransform: 'uppercase' }}>
-            Match #{match.match_number} {label ? `&bull; ${label}` : ''}
+          <span className="match-title">
+            <span className="match-title__no">Match #{match.match_number}</span>
+            {stageLabel(match) && <span className="match-title__stage">{stageLabel(match)}</span>}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <StatusPill status={match.status} isHalfTime={Boolean(match.is_half_time)} />
@@ -141,271 +146,71 @@ export function MatchDetailPage() {
           </div>
         </div>
 
-        {/* Score & Teams Display */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-around',
-            margin: '20px 0',
-            flexWrap: 'wrap',
-            gap: '16px',
-          }}
-        >
-          {/* Team 1 */}
-          <div
-            onClick={() => match.team1_id && navigate(tPath(match.tournament_slug || contextSlug, `teams/${match.team1_id}`))}
-            style={{ textAlign: 'center', flex: '1 1 180px', cursor: match.team1_id ? 'pointer' : 'default' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
-              <Avatar
-                name={match.team1_name || 'TBD'}
-                photoUrl={match.team1_logo}
-                size={58}
-                color={match.team1_color || '#10B981'}
-              />
-            </div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              {match.team1_name || 'TBD'}
-            </div>
-            {match.winner_id === match.team1_id && (
-              <span className="pill pill-full-time" style={{ marginTop: '8px', fontSize: '10px' }}>
-                Winner
-              </span>
-            )}
-          </div>
-
-          {/* Big Score Header */}
-          <div style={{ textAlign: 'center', padding: '0 24px' }}>
-            {isPlayed ? (
+        {/* Scoreboard: one axis at every width, team colour as the 3px bar on each outer edge */}
+        <Scoreboard
+          match={match}
+          variant="public"
+          onTeamClick={(teamId) => navigate(tPath(match.tournament_slug || contextSlug, `teams/${teamId}`))}
+          center={
+            (match.status === 'live' || match.status === 'full_time') && (
               <div
-                className="hero-score"
-                style={{ fontSize: '52px', letterSpacing: '2px', lineHeight: 1 }}
+                className={`sb-clock sb-clock--${match.status === 'live' ? (match.is_half_time ? 'ht' : 'live') : 'ft'}`}
+                data-testid="public-match-timer"
               >
-                {match.score1 ?? 0} &ndash; {match.score2 ?? 0}
+                <span className="sb-clock__row">
+                  <Clock size={14} aria-hidden="true" />
+                  <span data-testid="timer-display" className="timer-display num sb-clock__time">
+                    {timerUnknown ? '—' : formatTime(timerSeconds)}
+                  </span>
+                  {match.status === 'live' && !match.is_half_time && (
+                    <span className="live-dot" data-testid="timer-live-dot" />
+                  )}
+                  {match.status === 'live' && match.is_half_time && (
+                    <span className="sb-dot-ht" data-testid="timer-halftime-dot" title="Paused for Half Time" />
+                  )}
+                </span>
+                <span data-testid="timer-status" className="sb-clock__state">
+                  {match.status === 'live'
+                    ? match.is_half_time
+                      ? 'Half Time • Timer Paused'
+                      : 'Live • Timer Running'
+                    : 'Full Time • Timer Stopped'}
+                </span>
               </div>
-            ) : (
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '36px', color: 'var(--text-secondary)', fontWeight: 700 }}>
-                VS
-              </div>
-            )}
-            <div
-              style={{
-                fontSize: '12px',
-                color: match.is_half_time ? 'var(--accent-gold)' : 'var(--text-muted)',
-                marginTop: '8px',
-                fontWeight: match.is_half_time ? 700 : 600,
-                letterSpacing: '0.6px',
-                textTransform: 'uppercase',
-              }}
-            >
-              {match.status === 'live'
-                ? match.is_half_time
-                  ? 'HALF TIME'
-                  : 'MATCH IN PROGRESS'
-                : match.status === 'full_time'
-                ? 'FULL TIME'
-                : 'UPCOMING'}
-            </div>
-          </div>
+            )
+          }
+        />
 
-          {/* Team 2 */}
-          <div
-            onClick={() => match.team2_id && navigate(tPath(match.tournament_slug || contextSlug, `teams/${match.team2_id}`))}
-            style={{ textAlign: 'center', flex: '1 1 180px', cursor: match.team2_id ? 'pointer' : 'default' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
-              <Avatar
-                name={match.team2_name || 'TBD'}
-                photoUrl={match.team2_logo}
-                size={58}
-                color={match.team2_color || '#34D399'}
-              />
-            </div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              {match.team2_name || 'TBD'}
-            </div>
-            {match.winner_id === match.team2_id && (
-              <span className="pill pill-full-time" style={{ marginTop: '8px', fontSize: '10px' }}>
-                Winner
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Public Match Timer Display (Audience Read-Only) */}
-        {(match.status === 'live' || match.status === 'full_time') && (
-          <div
-            className="admin-timer-card"
-            data-testid="public-match-timer"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '20px auto',
-              padding: '16px 28px',
-              maxWidth: '360px',
-              width: '100%',
-              textAlign: 'center',
-              boxShadow: 'inset 0 1px 4px rgba(0, 0, 0, 0.4)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <Clock
-                size={15}
-                color={
-                  match.status === 'live'
-                    ? match.is_half_time
-                      ? 'var(--accent-gold)'
-                      : 'var(--status-live)'
-                    : 'var(--brand-primary)'
-                }
-              />
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                Match Timer
-              </span>
-              {match.status === 'live' && !match.is_half_time && (
-                <span
-                  className="pulse-live"
-                  data-testid="timer-live-dot"
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: 'var(--status-live)',
-                    display: 'inline-block',
-                    boxShadow: '0 0 8px var(--status-live)',
-                  }}
-                />
-              )}
-              {match.status === 'live' && match.is_half_time && (
-                <span
-                  data-testid="timer-halftime-dot"
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: 'var(--accent-gold)',
-                    display: 'inline-block',
-                  }}
-                  title="Paused for Half Time"
-                />
-              )}
-            </div>
-
-            <div
-              data-testid="timer-display"
-              className="timer-display"
-              style={{
-                fontSize: '40px',
-                fontWeight: 700,
-                letterSpacing: '2px',
-                lineHeight: 1.1,
-                color:
-                  match.status === 'live'
-                    ? match.is_half_time
-                      ? 'var(--accent-gold)'
-                      : 'var(--status-live)'
-                    : 'var(--text-primary)',
-              }}
-            >
-              {timerUnknown ? '—' : formatTime(timerSeconds)}
-            </div>
-
-            <div
-              data-testid="timer-status"
-              style={{
-                fontSize: '11.5px',
-                fontWeight: 700,
-                color:
-                  match.status === 'live'
-                    ? match.is_half_time
-                      ? 'var(--accent-gold)'
-                      : 'var(--status-live)'
-                    : 'var(--text-secondary)',
-                marginTop: '4px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.6px',
-              }}
-            >
-              {match.status === 'live'
-                ? match.is_half_time
-                  ? 'Half Time • Timer Paused'
-                  : 'Live • Timer Running'
-                : 'Full Time • Timer Stopped'}
-            </div>
-          </div>
-        )}
-
-        {/* Goal Scorers Summary Panel */}
         {isPlayed && (team1Goals.length > 0 || team2Goals.length > 0) && (
-          <div
-            className="goal-scorer-panel"
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: '24px',
-              padding: '14px 20px',
-              background: 'var(--bg-elevated)',
-              borderRadius: '8px',
-              border: '1px solid var(--border-subtle)',
-              marginBottom: '18px',
-              fontSize: '13px',
-            }}
-          >
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px', textAlign: 'left' }}>
+          <div className="goal-summary goal-scorer-panel">
+            <ul className="goal-summary__side">
               {team1Goals.map((g) => (
-                <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>⚽</span>
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{g.player_name}</span>
-                  {g.minute && <span style={{ color: 'var(--brand-primary)', fontSize: '11.5px', fontWeight: 700 }}>{g.minute}'</span>}
-                  {g.assist_player_name && (
-                    <span style={{ color: 'var(--text-muted)', fontSize: '11.5px' }}>({g.assist_player_name})</span>
-                  )}
-                </div>
+                <li key={g.id}>
+                  <EventIcon type="goal" size={14} />
+                  <span className="goal-summary__name">{g.player_name}</span>
+                  {g.minute && <span className="goal-summary__min num">{g.minute}'</span>}
+                  {g.assist_player_name && <span className="goal-summary__assist">({g.assist_player_name})</span>}
+                </li>
               ))}
-            </div>
-            <div className="goal-scorer-panel-team2" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px', textAlign: 'right', alignItems: 'flex-end' }}>
+            </ul>
+            <ul className="goal-summary__side goal-summary__side--away goal-scorer-panel-team2">
               {team2Goals.map((g) => (
-                <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {g.assist_player_name && (
-                    <span style={{ color: 'var(--text-muted)', fontSize: '11.5px' }}>({g.assist_player_name})</span>
-                  )}
-                  {g.minute && <span style={{ color: 'var(--brand-primary)', fontSize: '11.5px', fontWeight: 700 }}>{g.minute}'</span>}
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{g.player_name}</span>
-                  <span>⚽</span>
-                </div>
+                <li key={g.id}>
+                  {g.assist_player_name && <span className="goal-summary__assist">({g.assist_player_name})</span>}
+                  {g.minute && <span className="goal-summary__min num">{g.minute}'</span>}
+                  <span className="goal-summary__name">{g.player_name}</span>
+                  <EventIcon type="goal" size={14} />
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         )}
 
-        {/* Tied Knockout Match Note */}
         {isKnockout && isDrawn && (
-          <div
-            style={{
-              padding: '12px 16px',
-              background: 'var(--accent-gold-tint)',
-              border: '1px solid rgba(245, 158, 11, 0.35)',
-              borderRadius: '8px',
-              marginBottom: '18px',
-              textAlign: 'center',
-              fontSize: '13.5px',
-              color: 'var(--accent-gold)',
-            }}
-          >
+          <div className="tie-note">
             {winnerName ? (
               <span>
-                <strong>Tied at full time</strong> &mdash; Knockout Progression Winner: <strong>{winnerName}</strong>
+                <strong>Tied at full time</strong> &mdash; Knockout Progression Winner: <strong>{winnerName}</strong> (P)
               </span>
             ) : (
               <span>
@@ -415,33 +220,15 @@ export function MatchDetailPage() {
           </div>
         )}
 
-        {/* Match metadata bar */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: '24px',
-            borderTop: '1px solid var(--border-subtle)',
-            paddingTop: '16px',
-            fontSize: '13px',
-            color: 'var(--text-secondary)',
-            flexWrap: 'wrap',
-          }}
-        >
+        <div className="match-facts">
           {match.date && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Calendar size={14} color="var(--brand-primary)" /> {match.date}
-            </span>
+            <span><Calendar size={14} aria-hidden="true" /> {formatDay(match.date)}</span>
           )}
           {match.time && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Clock size={14} color="var(--brand-primary)" /> {match.time}
-            </span>
+            <span><Clock size={14} aria-hidden="true" /> {match.time}</span>
           )}
           {match.venue && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <MapPin size={14} color="var(--brand-primary)" /> {match.venue}
-            </span>
+            <span><MapPin size={14} aria-hidden="true" /> {match.venue}</span>
           )}
         </div>
       </div>
@@ -452,7 +239,7 @@ export function MatchDetailPage() {
           className="card"
           style={{
             marginBottom: '24px',
-            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.14), var(--bg-surface))',
+            background: 'var(--bg-surface)',
             borderColor: 'rgba(245, 158, 11, 0.4)',
             display: 'flex',
             alignItems: 'center',
@@ -507,9 +294,7 @@ export function MatchDetailPage() {
                   >
                     <div className="event-minute">{evt.minute ? `${evt.minute}'` : '•'}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '16px' }}>
-                        {evt.type === 'goal' ? '⚽' : evt.type === 'yellow' ? '🟨' : evt.type === 'red' ? '🟥' : '•'}
-                      </span>
+                      <EventIcon type={evt.type} size={17} />
                       <div>
                         <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{evt.player_name}</span>
                         {evt.assist_player_name && (

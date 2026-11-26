@@ -13,6 +13,7 @@ export const matchesApi = {
     const qs = query.toString();
     return apiClient(`/api/matches${qs ? `?${qs}` : ''}`);
   },
+  getFeaturedLive: (limit = 8) => apiClient(`/api/matches/featured?limit=${limit}`),
   getMatch: (matchId) => apiClient(`/api/matches/${matchId}`),
   createMatch: (data) => apiClient('/api/matches', { method: 'POST', body: data }),
   deleteMatch: (matchId) => apiClient(`/api/matches/${matchId}`, { method: 'DELETE' }),

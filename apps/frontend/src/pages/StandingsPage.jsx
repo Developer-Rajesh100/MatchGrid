@@ -2,15 +2,35 @@ import React, { useEffect, useState } from 'react';
 import { standingsApi } from '../api/standings';
 import { StandingsTable } from '../components/standings/StandingsTable';
 import { LoadingState, ErrorState } from '../components/common/Common';
-import { BarChart3, Info, RefreshCw, Trophy } from 'lucide-react';
+import { BarChart3, Info, RefreshCw } from 'lucide-react';
 import { useLiveSocket } from '../hooks/useLiveSocket';
 import { useTournament } from '../context/TournamentContext';
 
+const NEXT_ROUND = { semis_final: 'semi-finals', quarters_semis_final: 'quarter-finals' };
+
+/** The tournament's own rules in words, from its settings (never hard-coded points or pairings). */
+function describeRules(config, groupCount) {
+  if (!config) return 'Points, then goal difference, then goals scored, then club name decide the order of each table.';
+  const { points_win: w, points_draw: d, points_loss: l, knockout_format: fmt, qualifiers_per_group: q } = config;
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const points = `Clubs receive ${plural(w, 'point')} for a win, ${plural(d, 'point')} for a draw and ${plural(l, 'point')} for a defeat.`;
+  const order = 'Tie-breakers: points, then goal difference, then goals for, then club name.';
+  if (fmt === 'none') return `${points} ${order} The table decides the tournament; there is no knockout stage.`;
+  const advance = `The top ${q} ${q === 1 ? 'club' : 'clubs'} from each group advance to the ${NEXT_ROUND[fmt]}.`;
+  const official =
+    fmt === 'semis_final' && groupCount === 2 && q === 2
+      ? ' Semi-final 1 is Group A 2nd vs Group B 1st, and Semi-final 2 is Group B 2nd vs Group A 1st.'
+      : ' Pairings are seeded from the final group tables.';
+  return `${points} ${order} ${advance}${official}`;
+}
+
 export function StandingsPage() {
-  const { tournamentId, slug } = useTournament();
+  const { tournamentId, slug, tournament } = useTournament();
   const [standings, setStandings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const rulesText = describeRules(tournament?.config, standings.length);
 
   const fetchStandings = async (showLoading = true) => {
     try {
@@ -55,7 +75,7 @@ export function StandingsPage() {
       ) : (
         <>
           {standings.length === 0 ? (
-            <div className="card text-center" style={{ padding: '36px', marginBottom: '32px', color: 'var(--text-muted)' }}>
+            <div className="card empty-note">
               No tournament groups or standings available. Group tables will appear once teams are drawn and fixtures begin.
             </div>
           ) : (
@@ -70,47 +90,13 @@ export function StandingsPage() {
             </div>
           )}
 
-          {/* Qualification rules callout */}
-          <div
-            className="card"
-            style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderLeft: '4px solid var(--brand-primary)',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '16px',
-              padding: '20px',
-            }}
-          >
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                background: 'var(--brand-primary-tint)',
-                color: 'var(--brand-primary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Info size={20} />
-            </div>
+          <aside className="rules-note">
+            <Info size={18} aria-hidden="true" />
             <div>
-              <h4 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '16px', color: 'var(--text-primary)', marginBottom: '6px' }}>
-                MatchGrid Progression Rules & Tie-breakers
-              </h4>
-              <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
-                Clubs receive <strong>3 points for a win</strong>, <strong>1 point for a draw</strong>, and <strong>0 for a defeat</strong>.
-                Tie-breaker hierarchy: <strong>Points</strong> &rarr; <strong>Goal Difference (GD)</strong> &rarr; <strong>Goals For (GF)</strong> &rarr; <strong>Club Name Alphabetical</strong>.
-                The top 2 clubs from each group advance to the Knockout Semi-Finals:
-                <strong> Semi-final 1: Group A 2nd vs Group B 1st (A2 vs B1)</strong> &bull;
-                <strong> Semi-final 2: Group B 2nd vs Group A 1st (B2 vs A1)</strong>.
-              </p>
+              <h4>MatchGrid Progression Rules & Tie-breakers</h4>
+              <p>{rulesText}</p>
             </div>
-          </div>
+          </aside>
         </>
       )}
     </div>

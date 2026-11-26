@@ -12,6 +12,7 @@ export function NavBar() {
   const { isConnected } = useWebSocket();
   const navigate = useNavigate();
   const location = useLocation();
+  const inTournament = /^\/t\//.test(location.pathname);
 
   useEffect(() => {
     const handleAuthChange = () => {
@@ -57,12 +58,11 @@ export function NavBar() {
               <span className="brand-wordmark-title">
                 Match<span>Grid</span>
               </span>
-              <span className="brand-wordmark-tag">Live Tournament Center</span>
             </div>
           </NavLink>
 
-          {/* Quick Tournament Switcher Dropdown */}
-          <TournamentSwitcher />
+          {/* The switcher only means something inside a tournament; elsewhere the "Tournaments" link is the hub entry */}
+          {inTournament && <TournamentSwitcher />}
 
           {/* Desktop Navigation Tabs */}
           <nav className="brand-nav-tabs" aria-label="Main navigation">
@@ -83,10 +83,11 @@ export function NavBar() {
             {/* Live WebSocket Status Indicator */}
             <div
               className={`connection-indicator ${isConnected ? 'online' : ''}`}
-              title={isConnected ? 'Live WebSocket connection active' : 'Connecting to live socket...'}
+              role="status"
+              aria-label={isConnected ? 'Live updates connected' : 'Reconnecting to live updates'}
+              title={isConnected ? 'Live updates connected' : 'Reconnecting to live updates…'}
             >
               <span className="connection-dot" />
-              <span>{isConnected ? 'LIVE' : 'SYNCING'}</span>
             </div>
 
             {isAdmin ? (
@@ -167,7 +168,6 @@ export function NavBar() {
               <span className="brand-wordmark-title">
                 Match<span>Grid</span>
               </span>
-              <span className="brand-wordmark-tag">Live Tournament Center</span>
             </div>
           </div>
           <button
@@ -180,9 +180,11 @@ export function NavBar() {
         </div>
 
         <nav className="mobile-drawer-links">
-          <div style={{ marginBottom: '12px' }}>
-            <TournamentSwitcher />
-          </div>
+          {inTournament && (
+            <div style={{ marginBottom: '12px' }}>
+              <TournamentSwitcher />
+            </div>
+          )}
           {navLinks.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
