@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from app.core.deps import require_superadmin
 from app.core.errors import ConflictError, NotFoundError, ValidationAppError
 from app.core.security import hash_password
-from app.models import Match, Tournament, User, UserRole
+from app.models import DOCUMENT_MODELS, Match, Tournament, User, UserRole
 from app.schemas.auth import OrganizerCreate, UserOut, UserStatusUpdate
 from app.schemas.tournament import TournamentOut
 from app.services.users import unassign_scorer_everywhere
@@ -118,6 +118,13 @@ async def platform_stats(_admin: User = Depends(require_superadmin)) -> dict[str
         "total_tournaments": total_tournaments,
         "total_matches": total_matches,
     }
+
+
+@router.get("/db-stats")
+async def database_stats(_admin: User = Depends(require_superadmin)) -> dict[str, dict[str, int]]:
+    """Document count per collection. Moved here from the public /health/db probe so that
+    internal data volumes are only visible to the platform owner."""
+    return {"collections": {model.Settings.name: await model.find_all().count() for model in DOCUMENT_MODELS}}
 
 
 @router.delete("/users/{user_id}", status_code=204)

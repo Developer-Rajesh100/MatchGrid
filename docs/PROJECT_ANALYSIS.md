@@ -379,7 +379,7 @@ stateDiagram-v2
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `GET` | `/health` | Public | Basic service liveness health check probe. |
-| `GET` | `/health/db` | Public | Database readiness probe; reports document counts for all 11 collections. |
+| `GET` | `/health/db` | Public | Database readiness probe; reports connection status and ping time only. Per-collection document counts moved to `GET /api/superadmin/db-stats` (superadmin). |
 | `GET` | `/ws/live` | Public | WebSocket endpoint for client connections and invalidation broadcasts. |
 | `POST` | `/api/auth/login` | Public | Authenticates admin credentials; throttled by client IP with exponential backoff. |
 | `GET` | `/api/auth/me` | Admin | Returns current authenticated admin identity. |
