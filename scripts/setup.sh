@@ -68,9 +68,7 @@ bun install
 echo "5. Running database migrations..."
 (cd apps/backend && ./.venv/bin/python -m app.migrations.runner)
 
-# 6. Seed initial tournament data
-echo "6. Seeding initial tournament data..."
-(cd apps/backend && ./.venv/bin/python -m app.scripts.seed_data)
+# Optional demo data (not run automatically): bun run seed:demo
 
 echo ""
 echo "=========================================================="

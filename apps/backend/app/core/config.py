@@ -15,10 +15,8 @@ class Settings(BaseSettings):
     mongo_uri: str = "mongodb://localhost:27017"
     mongo_db_name: str = "matchgrid"
 
-    # Startup bootstrap (see app/core/bootstrap.py): run pending migrations and
-    # create-only seed the bundled data/*.json before serving requests.
+    # Startup bootstrap (see app/core/bootstrap.py): run pending migrations before serving requests.
     auto_migrate: bool = True
-    auto_seed: bool = True
 
     # Auth
     jwt_secret: str = "change-me-in-.env"
@@ -35,10 +33,16 @@ class Settings(BaseSettings):
     # header a client cannot forge. Use 0 when the app is reached directly (no proxy).
     trusted_proxy_hops: int = 1
 
+    # Opt-in: a header that an edge proxy always overwrites with the real client IP, e.g.
+    # "cf-connecting-ip" when every request passes through Cloudflare (Render does this). When set
+    # and present it wins over X-Forwarded-For. Only set it if clients cannot reach the app around
+    # that proxy, or they could forge the header to dodge the login throttle.
+    client_ip_header: str = ""
+
     # CORS
     cors_origins: str = "http://localhost:5173"
 
-    # Tournament (seed defaults)
+    # Name of the default tournament created by migration 0002 on a fresh database
     tournament_name: str = "MatchGrid"
     tournament_season: str = "1"
 

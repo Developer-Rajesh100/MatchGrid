@@ -6,7 +6,7 @@ export function Footer() {
     <footer className="brand-footer">
       <div className="footer-row">
         <NavLink to="/" className="footer-brand">
-          <img src="/assets/brand/matchgrid-logo.png" alt="" />
+          <img src="/brand/matchgrid-logo.png" alt="" />
           <span>MatchGrid</span>
         </NavLink>
         <nav className="footer-links" aria-label="Footer">

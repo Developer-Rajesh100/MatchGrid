@@ -1,16 +1,39 @@
 """IP-based login throttling with exponential backoff.
 
-Deliberately NOT an account lockout: this system has exactly one admin
-account (see docs/DATABASE_DESIGN.md §2, reference/plan.txt §8), so a
-lockout tied to the account itself would be a self-inflicted denial-of-
-service — anyone (or any bug) that fails the password enough times could
-lock out the one legitimate operator during a live tournament. Throttling
-is keyed by client IP instead, and the first few failures are always free
-(a real admin mistyping their password a couple of times must never be
-blocked), per implementation.txt Phase 9.1.
+Deliberately NOT an account lockout: locking an account after failed logins would let anyone
+lock a scorer or organizer out in the middle of a live match. Throttling is keyed by client IP
+instead, and the first few failures are always free so a mistyped password never blocks anyone.
 """
 
 import time
+
+from starlette.requests import Request
+
+from app.core.config import get_settings
+
+
+def client_key(request: Request) -> str:
+    """The client IP used for login throttling.
+
+    1. CLIENT_IP_HEADER (opt-in), e.g. Cloudflare's cf-connecting-ip: one value the edge
+       proxy always overwrites, so it is stable per client even when the request crosses
+       several proxies whose own addresses vary between requests.
+    2. Otherwise X-Forwarded-For, which is client-controlled except for what our own proxies
+       append: the trustworthy entry is the one `trusted_proxy_hops` places from the right
+       (never the leftmost, which an attacker can set to any value).
+    3. Otherwise the socket peer."""
+    settings = get_settings()
+    header = settings.client_ip_header.strip().lower()
+    if header:
+        value = request.headers.get(header, "").split(",")[0].strip()
+        if value:
+            return value
+    hops = settings.trusted_proxy_hops
+    forwarded = [part.strip() for part in request.headers.get("x-forwarded-for", "").split(",") if part.strip()]
+    if hops > 0 and len(forwarded) >= hops:
+        return forwarded[-hops]
+    return request.client.host if request.client else "unknown"
+
 
 FREE_ATTEMPTS = 5  # this many failures from one IP cost nothing
 BASE_DELAY_SECONDS = 1

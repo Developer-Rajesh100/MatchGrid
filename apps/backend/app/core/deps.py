@@ -35,6 +35,19 @@ async def get_current_user(
     return user
 
 
+async def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_security),
+) -> User | None:
+    """The signed-in user for public read endpoints, or None. A missing, invalid or expired token
+    simply means "anonymous" here: public pages must keep working with a stale session."""
+    if credentials is None:
+        return None
+    try:
+        return await get_current_user(credentials)
+    except UnauthorizedError:
+        return None
+
+
 async def require_superadmin(
     current_user: User = Depends(get_current_user),
 ) -> User:

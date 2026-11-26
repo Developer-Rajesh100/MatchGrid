@@ -22,42 +22,35 @@ from app.services.bracket import (
     assert_downstream_unstarted,
     recompute_bracket,
 )
-from app.services.player_stats import recalculate_player_statistics
+from app.services.player_stats import is_empty, recalculate_players_statistics
+from app.services.scoring import count_goals, winner_from_score
 from app.services.standings import recalculate_group_standings
 from app.services.tournament_stage import (
     KNOCKOUT_SIZES,
     compute_knockout_pairings,
     get_match_winner,
+    match_goals,
     refresh_tournament_stage,
 )
 
 STAGE_RANK = {"group": 0, "quarter": 1, "semi": 2, "final": 3, "extra": 4}
+_ROUND_OF_STAGE = {
+    "quarters_semis_final": {"quarter": 1, "semi": 2, "final": 3},
+    "semis_final": {"semi": 1, "final": 2},
+    "none": {},
+}
 
 
 async def compute_score(match: Match) -> tuple[int, int]:
-    if not match.team1_id or not match.team2_id:
-        return 0, 0
-    events = await MatchEvent.find(MatchEvent.match_id == match.id, MatchEvent.type == "goal").to_list()
-    score1 = sum(1 for e in events if e.team_id == match.team1_id)
-    score2 = sum(1 for e in events if e.team_id == match.team2_id)
-    return score1, score2
+    """(team1, team2) goals of one match. Lists use compute_scores_and_winners() instead."""
+    return await match_goals(match)
 
 
 async def compute_scores_and_winners(
     matches: list[Match],
 ) -> dict[PydanticObjectId, tuple[int, int, Optional[PydanticObjectId]]]:
-    """Batched score+winner lookup for a whole list of matches.
-
-    Every list endpoint (GET /matches and its /upcoming, /live, /completed
-    shortcuts) used to call compute_score(match) and, for each full_time
-    match, get_match_winner(match) separately — each of those independently
-    re-fetching that match's goal events, so a page of N matches issued up to
-    2N MongoDB round-trips for data that could be fetched in one query.
-    Found and fixed during the Timer/Half-Time audit's Performance &
-    Scalability follow-up. Single-match code paths (match detail, player
-    detail history, etc.) still use compute_score()/get_match_winner()
-    directly — this is only for the list-endpoint hot path.
-    """
+    """Batched score + winner lookup for a whole list of matches: one goal-event query for all of
+    them, instead of one (or two) per match."""
     match_ids = [m.id for m in matches if m.team1_id and m.team2_id]
     events = (
         await MatchEvent.find({"match_id": {"$in": match_ids}, "type": "goal"}).to_list()
@@ -73,19 +66,17 @@ async def compute_scores_and_winners(
         if not m.team1_id or not m.team2_id:
             results[m.id] = (0, 0, None)
             continue
-        match_events = events_by_match.get(m.id, [])
-        score1 = sum(1 for e in match_events if e.team_id == m.team1_id)
-        score2 = sum(1 for e in match_events if e.team_id == m.team2_id)
-        winner_id: Optional[PydanticObjectId] = None
-        if m.status == "full_time":
-            if score1 > score2:
-                winner_id = m.team1_id
-            elif score2 > score1:
-                winner_id = m.team2_id
-            else:
-                winner_id = m.winner_override_id
-        results[m.id] = (score1, score2, winner_id)
+        score1, score2 = count_goals(m, events_by_match.get(m.id, []))
+        results[m.id] = (score1, score2, winner_from_score(m, score1, score2))
     return results
+
+
+async def _broadcast_status(match: Match) -> None:
+    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+
+
+async def _broadcast_updated(match: Match) -> None:
+    await broadcast({"type": "match_updated", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
 
 
 async def get_match_or_404(match_id: PydanticObjectId) -> Match:
@@ -107,7 +98,7 @@ async def start_match(match: Match) -> Match:
     match.ended_at = None
     match.updated_at = datetime.now(timezone.utc)
     await match.save()
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+    await _broadcast_status(match)
     return match
 
 
@@ -129,15 +120,22 @@ async def end_match(match: Match) -> Match:
         await recompute_bracket(match.tournament_id, trigger_match=match)
     else:
         await refresh_tournament_stage(match.tournament_id)
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+    await _broadcast_status(match)
     return match
 
 
 async def pause_half_time(match: Match, elapsed_seconds: Optional[int] = None) -> Match:
+    """live -> half time. Idempotent: a repeated call (double-click, two scorers, a retried request)
+    leaves the frozen clock alone, because while paused `started_at` no longer describes the clock
+    and recomputing from it would count the break as playing time. An explicit `elapsed_seconds`
+    is still applied, so an operator can correct the half-time reading."""
     if match.status != "live":
         raise ConflictError("Only a live match can be paused for half time")
+    explicit = elapsed_seconds is not None and elapsed_seconds >= 0
+    if match.is_half_time and not explicit:
+        return match
     match.is_half_time = True
-    if elapsed_seconds is not None and elapsed_seconds >= 0:
+    if explicit:
         match.elapsed_seconds = int(elapsed_seconds)
     elif match.started_at:
         now = datetime.now(timezone.utc)
@@ -146,19 +144,23 @@ async def pause_half_time(match: Match, elapsed_seconds: Optional[int] = None) -
         match.elapsed_seconds = 0
     match.updated_at = datetime.now(timezone.utc)
     await match.save()
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+    await _broadcast_status(match)
     return match
 
 
 async def resume_match(match: Match) -> Match:
+    """half time -> running. Idempotent: resuming a clock that is already running is a no-op (it
+    used to re-anchor `started_at` on a stale half-time snapshot and rewind the live clock)."""
     if match.status != "live":
         raise ConflictError("Only a live match can be resumed")
+    if not match.is_half_time:
+        return match
     match.is_half_time = False
     elapsed = match.elapsed_seconds or 0
     match.started_at = datetime.now(timezone.utc) - timedelta(seconds=elapsed)
     match.updated_at = datetime.now(timezone.utc)
     await match.save()
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+    await _broadcast_status(match)
     return match
 
 
@@ -169,7 +171,7 @@ async def reset_timer(match: Match) -> Match:
     match.elapsed_seconds = 0
     match.updated_at = datetime.now(timezone.utc)
     await match.save()
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+    await _broadcast_status(match)
     return match
 
 
@@ -196,7 +198,7 @@ async def reopen_match(match: Match) -> Match:
         await recompute_bracket(match.tournament_id, trigger_match=match)
     else:
         await refresh_tournament_stage(match.tournament_id)
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+    await _broadcast_status(match)
     return match
 
 
@@ -209,7 +211,7 @@ async def cancel_match(match: Match) -> Match:
     match.status = "cancelled"
     match.updated_at = datetime.now(timezone.utc)
     await match.save()
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+    await _broadcast_status(match)
     return match
 
 
@@ -219,7 +221,7 @@ async def uncancel_match(match: Match) -> Match:
     match.status = "upcoming"
     match.updated_at = datetime.now(timezone.utc)
     await match.save()
-    await broadcast({"type": "match_status_changed", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+    await _broadcast_status(match)
     return match
 
 
@@ -235,7 +237,7 @@ async def set_winner(match: Match, team_id: PydanticObjectId) -> Match:
     match.winner_override_id = team_id
     await match.save()
     await recompute_bracket(match.tournament_id, trigger_match=match)
-    await broadcast({"type": "match_updated", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+    await _broadcast_updated(match)
     return match
 
 
@@ -295,11 +297,8 @@ async def purge_matches(matches: list[Match]) -> None:
     await MatchLineup.find({"match_id": {"$in": match_ids}}).delete()
     await Match.find({"_id": {"$in": match_ids}}).delete()
 
-    for player_id in affected:
-        stats = await recalculate_player_statistics(player_id)
-        if stats and not any(
-            [stats.goals, stats.assists, stats.yellow_cards, stats.red_cards, stats.potm_awards, stats.appearances]
-        ):
+    for stats in (await recalculate_players_statistics(affected)).values():
+        if is_empty(stats):
             await stats.delete()
     for group_id in group_ids:
         await recalculate_group_standings(group_id)
@@ -364,7 +363,7 @@ async def generate_group_fixtures(group_id: PydanticObjectId, force: bool) -> li
 
     new_matches.sort(key=lambda m: m.match_number)
     for m in new_matches:
-        await broadcast({"type": "match_updated", "match_id": str(m.id), "tournament_id": str(m.tournament_id)})
+        await _broadcast_updated(m)
     return new_matches
 
 
@@ -420,7 +419,7 @@ async def generate_semis(tournament_id: PydanticObjectId) -> list[Match]:
         await slot.save()
     await refresh_tournament_stage(tournament_id)
     for m in semis:
-        await broadcast({"type": "match_updated", "match_id": str(m.id), "tournament_id": str(m.tournament_id)})
+        await _broadcast_updated(m)
     return semis
 
 
@@ -531,7 +530,7 @@ async def create_new_match(
             continue
     else:
         raise ConflictError("Could not allocate a match number — please try again")
-    await broadcast({"type": "match_updated", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+    await _broadcast_updated(match)
     return match
 
 
@@ -583,7 +582,7 @@ async def assign_match_teams(
         # Lineup entries are tied to the old teams' players.
         await MatchLineup.find(MatchLineup.match_id == match.id).delete()
     await refresh_tournament_stage(match.tournament_id)
-    await broadcast({"type": "match_updated", "match_id": str(match.id), "tournament_id": str(match.tournament_id)})
+    await _broadcast_updated(match)
     return match
 
 
@@ -637,7 +636,7 @@ async def seed_knockout_bracket(tournament_id: PydanticObjectId) -> list[Match]:
         for quarter, (team1, team2) in zip(quarters, pairings):
             quarter.team1_id, quarter.team2_id = team1, team2
             await quarter.save()
-            await broadcast({"type": "match_updated", "match_id": str(quarter.id), "tournament_id": str(quarter.tournament_id)})
+            await _broadcast_updated(quarter)
         await refresh_tournament_stage(tournament_id)
         return quarters
     return []
@@ -649,7 +648,7 @@ async def build_tournament_bracket(tournament_id: PydanticObjectId) -> BracketTr
     if tournament is None:
         raise NotFoundError("Tournament not found")
 
-    fmt = tournament.config.knockout_format if getattr(tournament, "config", None) else "semis_final"
+    fmt = tournament.config.knockout_format
 
     matches = await Match.find(
         Match.tournament_id == tournament_id,
@@ -671,17 +670,18 @@ async def build_tournament_bracket(tournament_id: PydanticObjectId) -> BracketTr
         slot = m.bracket_slot or m.label or f"M{m.match_number}"
 
         t1_node = (
-            BracketTeamNode(id=str(t1.id), name=t1.name, crest_url=t1.crest_url or t1.logo_url, color=t1.color)
+            BracketTeamNode(id=str(t1.id), name=t1.name, crest_url=t1.crest, color=t1.color)
             if t1
             else None
         )
         t2_node = (
-            BracketTeamNode(id=str(t2.id), name=t2.name, crest_url=t2.crest_url or t2.logo_url, color=t2.color)
+            BracketTeamNode(id=str(t2.id), name=t2.name, crest_url=t2.crest, color=t2.color)
             if t2
             else None
         )
 
-        round_idx = m.round_order or (1 if m.stage == "semi" else 2 if m.stage == "final" else 1)
+        # Rows written before round_order existed fall back to their stage's place in this format.
+        round_idx = m.round_order or _ROUND_OF_STAGE[fmt].get(m.stage, 1)
         if fmt == "semis_final":
             round_idx = 1 if m.stage == "semi" else 2
 
@@ -716,7 +716,7 @@ async def build_tournament_bracket(tournament_id: PydanticObjectId) -> BracketTr
         champ_node = BracketChampionNode(
             team_id=str(champ_team.id),
             name=champ_team.name,
-            crest_url=champ_team.crest_url or champ_team.logo_url,
+            crest_url=champ_team.crest,
         )
 
     return BracketTreeOut(

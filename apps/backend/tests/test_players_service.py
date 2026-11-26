@@ -153,12 +153,3 @@ async def test_legacy_player_documents_with_position_still_load_and_are_not_expo
     legacy = next(p for p in listed if p["dcl_id"] == "LEGACY-1")
     assert "position" not in legacy
     assert legacy["name"] == "Old Doc"
-
-
-def test_importer_accepts_files_with_or_without_position():
-    from app.scripts.import_tournament_data import validate
-
-    base = {"name": "T", "group": "A", "color": "#fff", "players": [{"name": "P", "number": 1}]}
-    assert [e for e in validate({"teams": [base]}) if not e.startswith("NOTE")] == []
-    with_pos = {**base, "players": [{"name": "P", "number": 1, "position": "GK"}]}
-    assert [e for e in validate({"teams": [with_pos]}) if not e.startswith("NOTE")] == []

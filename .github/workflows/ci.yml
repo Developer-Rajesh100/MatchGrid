@@ -91,7 +91,6 @@ jobs:
             echo "JWT_SECRET=ci-test-secret-key-for-automated-playwright-runs"
             echo "ADMIN_BOOTSTRAP_USERNAME=admin"
             echo "ADMIN_BOOTSTRAP_PASSWORD=replace-with-a-strong-password"
-            echo "AUTO_SEED=false"
             echo "CORS_ORIGINS=http://localhost:5173"
             echo "TOURNAMENT_NAME=MatchGrid"
             echo "TOURNAMENT_SEASON=1"

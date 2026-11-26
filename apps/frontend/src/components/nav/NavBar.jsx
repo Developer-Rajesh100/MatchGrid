@@ -50,7 +50,7 @@ export function NavBar() {
           {/* Logo & Wordmark */}
           <NavLink to="/" className="brand-logo-link">
             <img
-              src="/assets/brand/matchgrid-logo.png"
+              src="/brand/matchgrid-logo.png"
               alt="MatchGrid Logo"
               className="brand-logo-img"
             />
@@ -163,7 +163,7 @@ export function NavBar() {
       <aside className={`mobile-drawer ${mobileMenuOpen ? 'open' : ''}`} aria-label="Mobile navigation">
         <div className="mobile-drawer-header">
           <div className="brand-logo-link">
-            <img src="/assets/brand/matchgrid-logo.png" alt="MatchGrid" className="brand-logo-img" />
+            <img src="/brand/matchgrid-logo.png" alt="MatchGrid" className="brand-logo-img" />
             <div className="brand-wordmark">
               <span className="brand-wordmark-title">
                 Match<span>Grid</span>

@@ -11,6 +11,7 @@ match-event/status endpoints in the API phase).
 from beanie import PydanticObjectId
 
 from app.models import GroupTeam, Match, MatchEvent, Team, Tournament, TournamentStanding
+from app.services.scoring import count_goals
 
 
 async def recalculate_group_standings(group_id: PydanticObjectId) -> list[TournamentStanding]:
@@ -50,9 +51,7 @@ async def recalculate_group_standings(group_id: PydanticObjectId) -> list[Tourna
     for match in completed_matches:
         if match.team1_id not in totals or match.team2_id not in totals:
             continue
-        events = goals_by_match.get(match.id, [])
-        goals1 = sum(1 for e in events if e.team_id == match.team1_id)
-        goals2 = sum(1 for e in events if e.team_id == match.team2_id)
+        goals1, goals2 = count_goals(match, goals_by_match.get(match.id, []))
 
         t1, t2 = totals[match.team1_id], totals[match.team2_id]
         t1["P"] += 1
@@ -116,7 +115,9 @@ async def recalculate_group_standings(group_id: PydanticObjectId) -> list[Tourna
     return results
 
 
-async def sorted_group_standings(group_id: PydanticObjectId) -> list[TournamentStanding]:
+async def sorted_group_standings(
+    group_id: PydanticObjectId, teams: dict[PydanticObjectId, Team] | None = None
+) -> list[TournamentStanding]:
     """Points desc, Goal Difference desc, Goals For desc, team name asc — same
     tiebreak order as the reference prototype (docs/PROJECT_ANALYSIS.md §7)."""
     rows = await TournamentStanding.find(TournamentStanding.group_id == group_id).to_list()
@@ -125,7 +126,8 @@ async def sorted_group_standings(group_id: PydanticObjectId) -> list[TournamentS
         # ever been materialized — build the all-zero baseline (one row per
         # assigned team) instead of returning an empty table.
         rows = await recalculate_group_standings(group_id)
-    teams = {t.id: t for t in await Team.find({"_id": {"$in": [r.team_id for r in rows]}}).to_list()}
+    if teams is None:
+        teams = {t.id: t for t in await Team.find({"_id": {"$in": [r.team_id for r in rows]}}).to_list()}
     rows.sort(
         key=lambda r: (
             -r.points,

@@ -2,7 +2,7 @@ from typing import Optional
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, Query
 
-from app.core.deps import check_tournament_ownership, get_current_admin
+from app.core.deps import check_tournament_ownership, get_current_admin, get_optional_user
 from app.core.errors import NotFoundError
 from app.models import Group, GroupTeam, Player, Team, User
 from app.schemas.team import TeamCreate, TeamOut, TeamUpdate
@@ -10,15 +10,20 @@ from app.services.groups import assert_group_in_tournament, assign_team_group
 from app.services.media import release_media, validate_media_url
 from app.services.serializers import team_to_out
 from app.services.teams import create_team, delete_team, rename_team_checked
-from app.services.tournament_scope import resolve_tournament_id
+from app.services.tournament_scope import ensure_tournament_visible, resolve_tournament_id
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
 
-async def _team_or_404(team_id: str) -> Team:
+async def _team_or_404(team_id: str, viewer: Optional[User] = None, public: bool = False) -> Team:
     team = await Team.get(PydanticObjectId(team_id))
     if team is None:
         raise NotFoundError("Team not found")
+    if public or viewer is not None:
+        try:
+            await ensure_tournament_visible(team.tournament_id, viewer)
+        except NotFoundError:
+            raise NotFoundError("Team not found")
     return team
 
 
@@ -26,8 +31,9 @@ async def _team_or_404(team_id: str) -> Team:
 async def list_teams(
     tournament_id: Optional[str] = Query(default=None),
     tournament_slug: Optional[str] = Query(default=None),
+    viewer: Optional[User] = Depends(get_optional_user),
 ) -> list[TeamOut]:
-    resolved_tid = await resolve_tournament_id(tournament_id, tournament_slug)
+    resolved_tid = await resolve_tournament_id(tournament_id, tournament_slug, viewer)
     teams = await Team.find(Team.tournament_id == resolved_tid).to_list()
     group_teams = {gt.team_id: gt for gt in await GroupTeam.find(GroupTeam.tournament_id == resolved_tid).to_list()}
     groups = {g.id: g for g in await Group.find(Group.tournament_id == resolved_tid).to_list()}
@@ -64,8 +70,8 @@ async def add_team(payload: TeamCreate, admin: User = Depends(get_current_admin)
 
 
 @router.get("/{team_id}", response_model=TeamOut)
-async def get_team(team_id: str) -> TeamOut:
-    team = await _team_or_404(team_id)
+async def get_team(team_id: str, viewer: Optional[User] = Depends(get_optional_user)) -> TeamOut:
+    team = await _team_or_404(team_id, viewer, public=True)
     gt = await GroupTeam.find_one(GroupTeam.team_id == team.id)
     group = await Group.get(gt.group_id) if gt else None
     player_count = await Player.find(Player.team_id == team.id).count()
@@ -92,7 +98,7 @@ async def update_team(
     if "name" in data:
         await rename_team_checked(team, data["name"])
 
-    old_crest = team.crest_url or team.logo_url
+    old_crest = team.crest
     for field, value in data.items():
         setattr(team, field, value)
 
@@ -105,7 +111,7 @@ async def update_team(
     if data:
         await team.save()
 
-    new_crest = team.crest_url or team.logo_url
+    new_crest = team.crest
     if old_crest and new_crest != old_crest:
         await release_media(old_crest, team.tournament_id)
 

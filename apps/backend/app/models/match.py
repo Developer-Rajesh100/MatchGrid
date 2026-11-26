@@ -47,5 +47,6 @@ class Match(Document):
             IndexModel("date"),
             IndexModel([("tournament_id", 1), ("match_number", 1)], unique=True),
             IndexModel("tournament_id"),
+            IndexModel([("tournament_id", 1), ("status", 1)]),  # live counts, filtered lists
             IndexModel("assigned_scorer_ids"),
         ]

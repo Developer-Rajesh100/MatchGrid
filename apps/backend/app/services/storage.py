@@ -14,7 +14,6 @@ from app.core.errors import (
     PayloadTooLargeError,
     ServiceUnavailableError,
     UnprocessableEntityError,
-    ValidationAppError,
 )
 from app.schemas.uploads import UploadCategory, UploadImageOut
 

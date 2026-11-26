@@ -15,6 +15,7 @@ from app.schemas.player import (
     PlayerUpdate,
 )
 from app.services.media import release_media
+from app.services.scoring import count_goals
 from app.services.serializers import player_to_out
 
 
@@ -156,7 +157,8 @@ async def get_player_detail(player: Player) -> PlayerDetailOut:
     matches = await Match.find(
         {
             "$or": [{"team1_id": player.team_id}, {"team2_id": player.team_id}],
-            "status": {"$ne": "upcoming"},
+            # Only matches that were actually played: never upcoming or cancelled ones.
+            "status": {"$in": ["live", "full_time"]},
             "stage": {"$ne": "extra"},
         }
     ).sort("match_number").to_list()
@@ -166,10 +168,7 @@ async def get_player_detail(player: Player) -> PlayerDetailOut:
     ).to_list()
     opponents_by_id = {t.id: t for t in opponents}
 
-    # One query for every event across all of this player's matches, instead
-    # of the previous 2 queries per match (compute_score's own goal-event
-    # fetch, plus a separate full-event fetch right after) — found during the
-    # Timer/Half-Time audit's Performance & Scalability follow-up.
+    # One query for every event across all of this player's matches.
     match_ids = [m.id for m in matches]
     all_events = (
         await MatchEvent.find({"match_id": {"$in": match_ids}}).to_list() if match_ids else []
@@ -186,8 +185,7 @@ async def get_player_detail(player: Player) -> PlayerDetailOut:
         opponent_id = match.team2_id if is_team1 else match.team1_id
         opponent = opponents_by_id.get(opponent_id)
         events = events_by_match.get(match.id, [])
-        score1 = sum(1 for e in events if e.type == "goal" and e.team_id == match.team1_id)
-        score2 = sum(1 for e in events if e.type == "goal" and e.team_id == match.team2_id)
+        score1, score2 = count_goals(match, [e for e in events if e.type == "goal"])
         my_score, opp_score = (score1, score2) if is_team1 else (score2, score1)
 
         if match.status == "live":

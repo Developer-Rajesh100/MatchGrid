@@ -27,4 +27,7 @@ class PlayerStatistics(Document):
 
     class Settings:
         name = "player_statistics"
-        indexes = [IndexModel("player_id", unique=True)]
+        indexes = [
+            IndexModel("player_id", unique=True),
+            IndexModel("tournament_id"),  # leaderboards and tournament deletion
+        ]
