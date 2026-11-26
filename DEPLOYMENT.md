@@ -136,6 +136,14 @@ SMOKE_ADMIN_USER=superadmin SMOKE_ADMIN_PASSWORD='<bootstrap password>' \
 
 It checks: `/health` and `/health/db` (and that no collection counts leak); `/docs` and `/openapi.json` disabled; HSTS and nosniff headers; the SPA root, a deep link and the CSP header; CORS allowed for the frontend origin and refused for a stranger; superadmin sign-in; the WebSocket answers ping, accepts your origin and refuses a foreign one; and with `--full` a goal logged on a temporary match arrives on a spectator socket and an image uploads to R2 and loads back (everything it creates is deleted). The last step deliberately provokes the login throttle, so your IP is locked out of login for up to a minute afterwards (`--skip-ratelimit` omits it).
 
+Then the full role walk-through, also safe to run against production (everything it creates is named `[E2E-AUDIT]` / `e2e_audit_` and removed; it fails unless the database counts return to the baseline):
+
+```bash
+bun scripts/live-audit.mjs https://<service>.onrender.com https://matchgrid.<account>.workers.dev
+```
+
+It reads `SMOKE_ADMIN_USER` / `SMOKE_ADMIN_PASSWORD` from `~/.matchgrid-smoke.env` (or the file named by `SMOKE_ENV_FILE`).
+
 ### 4.2 By hand (2 minutes)
 1. Sign in at `/login` as the bootstrap superadmin → lands on `/superadmin`.
 2. Create an organizer, sign in as them, create a competition with two clubs and a crest image (proves R2).
@@ -223,6 +231,7 @@ Run **one API instance with one worker** until these move to shared state (Redis
 | Concern | Today | If you run a second worker/instance |
 |---|---|---|
 | Live WebSocket rooms (`app/core/websocket.py`) | In-process room registry | A goal logged on instance A never reaches spectators connected to B. |
+| Worker count | `docker-entrypoint.sh` pins `uvicorn --workers 1` | Without the pin, uvicorn starts `$WEB_CONCURRENCY` workers if the platform sets it: the same split, inside one instance. |
 | Login throttling (`app/core/rate_limit.py`) | In-process, per client IP | The limit is multiplied by the number of instances. |
 | Startup migrations | Guarded by a Mongo lock | Safe with several instances. |
 
@@ -245,6 +254,7 @@ Other deliberate limits:
 | The hub shows "An error occurred"; calls go to `…workers.dev/api/…` and return 404 | `VITE_API_URL` was empty at build time. Set the Workers build variables and rebuild the frontend. |
 | Reloading `/login` or any `/t/...` page gives a 404 | The Worker was deployed without `apps/frontend/wrangler.jsonc` (SPA fallback): check the root directory and deploy command (Step 4). |
 | Bad logins are never throttled (no 429) | `CLIENT_IP_HEADER` is not set on Render, so each request reaches the throttle from a different proxy address (§4.4). |
+| 429s come and go at random; a live goal sometimes misses a spectator | More than one API process: check Render runs exactly **1 instance** (Settings → Scaling) and that the image's entrypoint still pins `--workers 1` (§8). |
 | Live scores never update; connection dot is red | `VITE_WS_URL` wrong, or `CORS_ORIGINS` rejects the origin (the socket is refused with code 1008), or the free instance is asleep. |
 | Crests and photos are blocked | `R2_PUBLIC_BASE_URL` is `http://`, or the bucket's public (`r2.dev`) access is off: the object URL then answers 401. |
 | Uploads return 503 | One of the `R2_*` variables is empty. |
