@@ -965,7 +965,18 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=2026, help="random seed for the generated structure/results")
     parser.add_argument("--allow-test-db", action="store_true")
     parser.add_argument("--allow-production", action="store_true")
+    parser.add_argument("--showcase", action="store_true",
+                        help="build the four-tournament showcase (alex.organizer, priya.organizer, ...) instead; "
+                             "accepts --media, --reset-showcase, --dry-run (see app.scripts.seed_showcase)")
+    parser.add_argument("--media", choices=("inline", "r2"), default="inline", help="showcase only")
+    parser.add_argument("--reset-showcase", action="store_true", help="showcase only")
+    parser.add_argument("--dry-run", action="store_true", help="showcase only")
     args = parser.parse_args()
+    if args.showcase:
+        from app.scripts import seed_showcase
+
+        seed_showcase.run_cli(args)
+        return
 
     result = asyncio.run(seed(args.tournaments, args.seed, args.reset, args.allow_test_db, args.allow_production))
     print(f"Database: {result['database']}")

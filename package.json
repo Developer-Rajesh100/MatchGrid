@@ -13,6 +13,7 @@
     "dev:frontend": "bun --filter frontend dev",
     "dev": "bun run db:up && concurrently --kill-others -n \"backend,frontend\" -c \"cyan,magenta\" \"bun run dev:backend\" \"bun run dev:frontend\"",
     "seed:demo": "cd apps/backend && ./.venv/bin/python -m app.scripts.seed_realistic_demo",
+    "seed:showcase": "cd apps/backend && ./.venv/bin/python -m app.scripts.seed_showcase",
     "test:backend": "cd apps/backend && ./.venv/bin/pytest -v",
     "test:frontend": "bun --filter frontend test",
     "test:e2e": "bunx playwright test",
