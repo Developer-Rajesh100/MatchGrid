@@ -8,7 +8,7 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from app.core.config import get_settings
 from app.core.websocket import manager
 
-logger = logging.getLogger("dcl.websocket")
+logger = logging.getLogger("matchgrid.websocket")
 
 router = APIRouter(tags=["websocket"])
 

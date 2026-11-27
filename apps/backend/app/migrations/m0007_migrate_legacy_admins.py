@@ -17,7 +17,7 @@ from app.models import User, UserRole
 
 NAME = "0007_migrate_legacy_admins"
 
-logger = logging.getLogger("dcl.migrations")
+logger = logging.getLogger("matchgrid.migrations")
 
 
 async def up() -> None:

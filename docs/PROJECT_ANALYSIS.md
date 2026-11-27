@@ -1,3 +1,5 @@
+> **Note (historical baseline):** This audit describes the original DCL Season 5 system. The project is now **MatchGrid** (`Developer-Rajesh100/MatchGrid`); the names and paths below are kept as originally written.
+
 # DCL Season 5 — Digital Scoreboard: Codebase Audit & Architectural Analysis
 
 > **Document Version:** 1.0.0  

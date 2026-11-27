@@ -6,7 +6,7 @@ services:
     ports:
       - "${MONGO_PORT:-27017}:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-dcl_admin}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-matchgrid_admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-change-me-strong-password}
     volumes:
       - mongo_data:/data/db
@@ -20,3 +20,7 @@ services:
 
 volumes:
   mongo_data:
+    # Pinned to the volume created when the project folder was still called DCL_score_board,
+    # so the local database survives the folder rename.
+    external: true
+    name: dcl_score_board_mongo_data

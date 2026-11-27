@@ -163,10 +163,10 @@ def test_every_bad_origin_is_reported_not_just_the_first():
     "uri",
     [
         "mongodb://localhost:27017",
-        "mongodb://dcl_admin:s3cr3t-Pass@127.0.0.1:27018/?authSource=admin",
-        "mongodb://dcl_admin:s3cr3t-Pass@[::1]:27017",
+        "mongodb://matchgrid_admin:s3cr3t-Pass@127.0.0.1:27018/?authSource=admin",
+        "mongodb://matchgrid_admin:s3cr3t-Pass@[::1]:27017",
         "mongodb://user:s3cr3t-Pass@10.0.0.5:27017",  # private address
-        "mongodb://dcl_admin:change-me-strong-password@db.example.com:27017",  # template password
+        "mongodb://matchgrid_admin:change-me-strong-password@db.example.com:27017",  # template password
         "mongodb+srv://cluster0.abcde.mongodb.net",  # Atlas with no credentials
         "postgres://user:pw@db.example.com/x",  # wrong database entirely
     ],
@@ -219,7 +219,7 @@ def test_the_ci_and_dev_values_in_this_repo_can_never_pass_in_production():
     settings = _settings(
         jwt_secret="ci-test-secret-key-for-automated-playwright-runs",
         cors_origins="http://localhost:5173",
-        mongo_uri="mongodb://dcl_admin:change-me-strong-password@localhost:27017/?authSource=admin",
+        mongo_uri="mongodb://matchgrid_admin:change-me-strong-password@localhost:27017/?authSource=admin",
         admin_bootstrap_password="replace-with-a-strong-password",
         debug=True,
     )

@@ -36,7 +36,7 @@ jobs:
         ports:
           - 27017:27017
         env:
-          MONGO_INITDB_ROOT_USERNAME: dcl_admin
+          MONGO_INITDB_ROOT_USERNAME: matchgrid_admin
           MONGO_INITDB_ROOT_PASSWORD: change-me-strong-password
         options: >-
           --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\")'"
@@ -85,7 +85,7 @@ jobs:
       - name: Configure test environment variables
         run: |
           {
-            echo "MONGO_URI=mongodb://dcl_admin:change-me-strong-password@localhost:27017/?authSource=admin"
+            echo "MONGO_URI=mongodb://matchgrid_admin:change-me-strong-password@localhost:27017/?authSource=admin"
             echo "MONGO_DB_NAME=matchgrid"
             echo "ENVIRONMENT=development"
             echo "JWT_SECRET=ci-test-secret-key-for-automated-playwright-runs"

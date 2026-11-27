@@ -21,7 +21,7 @@ from app.core.security import hash_password
 from app.migrations.runner import apply_migrations
 from app.models import User, UserRole
 
-logger = logging.getLogger("dcl.bootstrap")
+logger = logging.getLogger("matchgrid.bootstrap")
 
 LOCK_ID = "startup_bootstrap"
 LOCK_TTL = timedelta(minutes=5)

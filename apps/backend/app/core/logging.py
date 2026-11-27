@@ -3,7 +3,7 @@ import time
 
 from fastapi import FastAPI, Request
 
-logger = logging.getLogger("dcl")
+logger = logging.getLogger("matchgrid")
 
 
 def setup_logging(level: str = "INFO") -> None:

@@ -241,7 +241,7 @@ Other deliberate limits:
 * **Uploads** are capped at 5 MB (enforced while streaming), must be JPEG/PNG/WebP and are structurally verified. EXIF metadata is not stripped.
 * **Free-tier cold starts** drop live sockets; the client reconnects on its own.
 * **Draft tournaments are private.** A `draft` is left out of the public directory and every public read (pages, lists, live strip) answers 404 for it, except to the superadmin, its organizer and the scorers assigned in it. Publish it by setting the status to `active`.
-* **Deployment identifiers** such as the `dcl_scoreboard` test database name and older GitHub names predate the MatchGrid rename. They are left alone on purpose: renaming the production database value would point the app at an empty database.
+* **Legacy identifiers** are kept on purpose for compatibility: the `dcl_id` player field and `DCL-nnn` ID format (live MongoDB index and API contract), the `dcl_timer_<id>` localStorage key (active match clocks), and the production `MONGO_DB_NAME` value (renaming it would point the app at an empty database).
 
 ---
 

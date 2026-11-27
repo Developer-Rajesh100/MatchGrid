@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-logger = logging.getLogger("dcl.websocket")
+logger = logging.getLogger("matchgrid.websocket")
 
 # One stalled client must never delay a broadcast (or the HTTP request that triggered it).
 SEND_TIMEOUT_SECONDS = 2.0

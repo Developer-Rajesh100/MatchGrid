@@ -63,7 +63,7 @@ async def get_player(player_id: str, viewer: Optional[User] = Depends(get_option
 
 @router.post("", response_model=PlayerOut, status_code=201)
 async def add_player(payload: PlayerCreate, admin: User = Depends(get_current_admin)) -> PlayerOut:
-    """Add a player to a team. DCL ID is auto-assigned; jersey number must be unique on the team."""
+    """Add a player to a team. Registration ID is auto-assigned; jersey number must be unique on the team."""
     team = await Team.get(PydanticObjectId(payload.team_id))
     if team is None:
         raise NotFoundError("Team not found")
